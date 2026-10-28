@@ -27,12 +27,14 @@ renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.setSize(innerWidth,innerHeight);
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure=1.12;
+renderer.toneMappingExposure=1.0;
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 space.appendChild(renderer.domElement);
 const root=new THREE.Group();scene.add(root);
-const ambient=new THREE.AmbientLight(0x9b9b9b,1.25);scene.add(ambient);
-const key=new THREE.DirectionalLight(0xffdfc1,3.2);key.position.set(-3,1.5,4);scene.add(key);
-const rim=new THREE.DirectionalLight(0x7189b1,1.7);rim.position.set(3,-1,-3);scene.add(rim);
+const ambient=new THREE.AmbientLight(0x9b9b9b,0.55);scene.add(ambient);
+const key=new THREE.DirectionalLight(0xffdfc1,2.2);key.position.set(-3,1.5,4);key.castShadow=true;key.shadow.mapSize.set(1024,1024);key.shadow.camera.left=-2;key.shadow.camera.right=2;key.shadow.camera.top=2;key.shadow.camera.bottom=-2;key.shadow.bias=-0.00008;key.shadow.normalBias=0.015;scene.add(key);
+const rim=new THREE.DirectionalLight(0x7189b1,0.45);rim.position.set(3,-1,-3);scene.add(rim);
 const loader=new THREE.TextureLoader();loader.setCrossOrigin('anonymous');
 let mars,gridGroup,markerGroup,stars,textureLoaded=false,marsTexture=null;
 
@@ -79,6 +81,8 @@ function applyMarsTexture(texture){
 // Do not create or display a globe until the measured elevation grid has passed validation.
 loadMolaTopography().then(info=>{
  mars=new THREE.Mesh(buildTerrainGeometry(),new THREE.MeshStandardMaterial({color:0x9c5138,roughness:1}));
+ mars.castShadow=true;
+ mars.receiveShadow=true;
  root.add(mars);updatePolarCaps(THREE,root,worldState);
  worldState.terrain.source=info.source;
  if(marsTexture)applyMarsTexture(marsTexture);
