@@ -4,7 +4,10 @@ import { terrainHeight, updatePolarCaps } from './world/terrain.js';
 
 const TEXTURE_URL='https://www.solarsystemscope.com/textures/download/8k_mars.jpg';
 const worldState = createInitialWorldState();
-document.querySelector('#meanTemp').textContent = '−' + Math.abs(worldState.climate.meanSurfaceTemperatureC) + '°C';
+const initialTemp = worldState.climate.meanSurfaceTemperatureC;
+document.querySelector('#meanTemp').textContent = (initialTemp < 0 ? '−' : initialTemp > 0 ? '+' : '') + Math.abs(initialTemp) + '°C';
+document.querySelector('#meanDiameter').textContent = worldState.planet.meanDiameterKm.toLocaleString('en-US') + ' km';
+document.querySelector('#planetAge').textContent = (worldState.planet.ageYears / 1e9).toFixed(1) + ' billion';
 document.querySelector('#pressure').textContent = worldState.climate.atmosphere.pressurePa + ' Pa';
 const locations={
  olympus:{name:'Olympus Mons',lat:18.65,lon:-133.8,zoom:1.7,description:'A shield volcano rising roughly 22 kilometres above the surrounding plains.'},
