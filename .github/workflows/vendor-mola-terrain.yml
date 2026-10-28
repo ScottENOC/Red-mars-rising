@@ -1,6 +1,7 @@
 name: Vendor NASA MOLA terrain data
 
 on:
+  workflow_dispatch:
   push:
     branches: [development]
     paths-ignore:
