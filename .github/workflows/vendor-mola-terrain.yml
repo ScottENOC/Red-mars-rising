@@ -1,4 +1,4 @@
-name: Vendor NASA MOLA terrain data
+name: Vendor Mars terrain and colour data
 
 on:
   workflow_dispatch:
@@ -6,6 +6,7 @@ on:
     branches: [development]
     paths-ignore:
       - 'data/mola/megt90n000cb.img'
+      - 'data/mars/8k_mars.jpg'
 
 permissions:
   contents: write
@@ -24,7 +25,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p data/mola
+          mkdir -p data/mola data/mars
           curl --fail --location --retry 3 --retry-delay 2 \
             'https://pds-geosciences.wustl.edu/mgs/urn-nasa-pds-mgs_mola_topography_derived/meg004/megt90n000cb.img' \
             --output data/mola/megt90n000cb.img
@@ -35,6 +36,15 @@ jobs:
             exit 1
           fi
           echo "Validated official MOLA grid: $actual_bytes bytes"
+          curl --fail --location --retry 3 --retry-delay 2 \
+            'https://www.solarsystemscope.com/textures/download/8k_mars.jpg' \
+            --output data/mars/8k_mars.jpg
+          texture_bytes="$(wc -c < data/mars/8k_mars.jpg | tr -d ' ')"
+          if [ "$texture_bytes" -lt 1000000 ] || [ "$(head -c 2 data/mars/8k_mars.jpg | od -An -tx1 | tr -d ' \n')" != "ffd8" ]; then
+            echo "Mars colour texture failed size or JPEG-signature validation: $texture_bytes bytes" >&2
+            exit 1
+          fi
+          echo "Validated Mars colour texture: $texture_bytes bytes"
 
       - name: Commit terrain data to development
         shell: bash
@@ -42,10 +52,10 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add data/mola/megt90n000cb.img
+          git add data/mola/megt90n000cb.img data/mars/8k_mars.jpg
           if git diff --cached --quiet; then
             echo 'MOLA terrain file already present; nothing to commit.'
             exit 0
           fi
-          git commit -m 'Vendor official NASA MOLA terrain grid'
+          git commit -m 'Vendor Mars topography and colour texture'
           git push origin HEAD:development
