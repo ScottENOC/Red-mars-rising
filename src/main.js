@@ -34,7 +34,7 @@ const ambient=new THREE.AmbientLight(0x9b9b9b,1.25);scene.add(ambient);
 const key=new THREE.DirectionalLight(0xffdfc1,3.2);key.position.set(-3,1.5,4);scene.add(key);
 const rim=new THREE.DirectionalLight(0x7189b1,1.7);rim.position.set(3,-1,-3);scene.add(rim);
 const loader=new THREE.TextureLoader();loader.setCrossOrigin('anonymous');
-let mars,gridGroup,markerGroup,stars,textureLoaded=false;
+let mars,gridGroup,markerGroup,stars,textureLoaded=false,marsTexture=null;
 
 function buildTerrainGeometry() {
  const geometry=new THREE.SphereGeometry(1,360,240),positions=geometry.attributes.position;
@@ -46,26 +46,54 @@ function buildTerrainGeometry() {
  }
  geometry.computeVertexNormals();return geometry;
 }
-const fallbackMat=new THREE.MeshStandardMaterial({color:0x9c5138,roughness:1});
-mars=new THREE.Mesh(buildTerrainGeometry(),fallbackMat);root.add(mars);
-updatePolarCaps(THREE, root, worldState);
-// Upgrade from the approximate fallback to measured MOLA elevation once loaded.
+function showTerrainError(error) {
+ const panel=document.querySelector('#terrainError'),details=document.querySelector('#terrainErrorDetails');
+ const message=error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+ details.value=[
+  'RED MARS RISING — REQUIRED TERRAIN DATA FAILED',
+  `Time: ${new Date().toISOString()}`,
+  `URL: ${'https://pds-geosciences.wustl.edu/mgs/urn-nasa-pds-mgs_mola_topography_derived/meg004/megt90n000cb.img'}`,
+  `Browser: ${navigator.userAgent}`,
+  `Error: ${message}`,
+  error instanceof Error && error.stack ? `Stack:\n${error.stack}` : ''
+ ].filter(Boolean).join('\n\n');
+ panel.hidden=false;
+ document.querySelector('#loading').classList.add('hidden');
+}
+document.querySelector('#copyTerrainError').addEventListener('click',async()=>{
+ const details=document.querySelector('#terrainErrorDetails');
+ try {
+  await navigator.clipboard.writeText(details.value);
+  document.querySelector('#copyTerrainError').textContent='Copied';
+ } catch (error) {
+  details.focus();details.select();details.setSelectionRange(0,details.value.length);
+  document.querySelector('#copyTerrainError').textContent='Select text, then Copy';
+ }
+});
+function applyMarsTexture(texture){
+ if(!mars)return;
+ texture.colorSpace=THREE.SRGBColorSpace;texture.wrapS=THREE.RepeatWrapping;
+ if(mars.material) mars.material.dispose();
+ mars.material=new THREE.MeshStandardMaterial({map:texture,roughness:1,metalness:0});textureLoaded=true;
+}
+// Do not create or display a globe until the measured elevation grid has passed validation.
 loadMolaTopography().then(info=>{
- const previous=mars.geometry;mars.geometry=buildTerrainGeometry();previous.dispose();
- updatePolarCaps(THREE,root,worldState);
+ mars=new THREE.Mesh(buildTerrainGeometry(),new THREE.MeshStandardMaterial({color:0x9c5138,roughness:1}));
+ root.add(mars);updatePolarCaps(THREE,root,worldState);
  worldState.terrain.source=info.source;
+ if(marsTexture)applyMarsTexture(marsTexture);
  document.querySelector('#loading p').textContent='NASA MOLA topography loaded';
+ document.querySelector('#loading').classList.add('hidden');
 }).catch(error=>{
- console.warn('NASA MOLA elevation unavailable; using procedural fallback.',error);
- worldState.terrain.source='procedural-fallback';
- document.querySelector('#loading p').textContent='Using approximate terrain';
+ console.error('Required NASA MOLA terrain failed to load.',error);
+ showTerrainError(error);
 });
 loader.load(TEXTURE_URL,texture=>{
- texture.colorSpace=THREE.SRGBColorSpace;
- texture.wrapS=THREE.RepeatWrapping;
- mars.material.dispose();mars.material=new THREE.MeshStandardMaterial({map:texture,roughness:1,metalness:0});textureLoaded=true;
- document.querySelector('#loading').classList.add('hidden');
-},undefined,()=>{document.querySelector('#loading p').textContent='Terrain active · colour texture unavailable';setTimeout(()=>document.querySelector('#loading').classList.add('hidden'),900);});
+ marsTexture=texture;
+ if(mars)applyMarsTexture(texture);
+},undefined,error=>{
+ console.warn('Mars colour texture unavailable; the elevation-based globe remains available.',error);
+});
 const starGeo=new THREE.BufferGeometry(),starPositions=[];
 for(let i=0;i<1600;i++){const r=12+Math.random()*24,theta=Math.random()*Math.PI*2,phi=Math.acos(2*Math.random()-1);starPositions.push(r*Math.sin(phi)*Math.cos(theta),r*Math.cos(phi),r*Math.sin(phi)*Math.sin(theta));}
 starGeo.setAttribute('position',new THREE.Float32BufferAttribute(starPositions,3));
@@ -125,4 +153,4 @@ function resize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMa
 addEventListener('resize',resize);
 function animate(){requestAnimationFrame(animate);root.quaternion.slerp(targetRotation,.09);camera.position.z+=(zoom-camera.position.z)*.12;stars.rotation.y+=.00004;renderer.render(scene,camera);}
 setZoom(4.2);animate();
-setTimeout(()=>document.querySelector('#loading').classList.add('hidden'),6500);
+
