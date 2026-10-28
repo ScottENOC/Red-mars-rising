@@ -13,6 +13,15 @@ The opening prototype is a pre-arrival Mars atlas:
 - Six notable places to focus on: Olympus Mons, Valles Marineris, Hellas Planitia, Gale Crater, the north polar cap and Jezero Crater.
 - Responsive layouts for phones and desktop.
 
+## Code structure
+
+- `index.html` is the page shell and styling; application logic lives in ES modules.
+- `src/main.js` wires up the prototype interface and Three.js scene.
+- `src/world/world-state.js` defines scenario-owned initial conditions, including polar ice extent, climate metadata, celestial bodies and an event log.
+- `src/world/terrain.js` contains the current procedural terrain approximation and renders polar ice from world state.
+
+The current polar caps are **initial scenario values**, not permanent geometry. Changing a cap's `extentDeg` in world state and calling `updatePolarCaps` rebuilds its visible footprint; setting it to zero removes it. Climate simulation and persistent geological deformation are not implemented yet. Terrain is still a procedural visual approximation, not a measured elevation model.
+
 ## Run it
 
 Open `index.html` through GitHub Pages or a local web server. The globe uses Three.js from jsDelivr and loads the Mars surface texture from Solar System Scope, so the first view requires an internet connection.
