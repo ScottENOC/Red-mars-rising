@@ -6,7 +6,6 @@ const TEXTURE_URL=new URL('../data/mars/8k_mars.jpg', import.meta.url).href;
 const worldState = createInitialWorldState();
 
 // Mission timeline: the first crew leaves Earth in late 2026 and arrives in July 2027.
-const MISSION_DEPARTURE_UTC = Date.UTC(2026, 10, 18, 12);
 const MISSION_ARRIVAL_UTC = Date.UTC(2027, 6, 22, 0);
 const ARRIVAL_LOCAL_SOL_SECONDS = 9 * 3600;
 const MARS_SOL_SECONDS = 88775.244;
@@ -16,28 +15,23 @@ let clockSpeed = 60; // one game minute per real second by default
 let clockUiElapsed = 0;
 const clockStyle = document.createElement('style');
 clockStyle.textContent = `
-#missionClock{position:absolute;z-index:4;top:86px;right:clamp(14px,3.5vw,48px);width:230px;padding:13px 14px;background:#0b1018e8;border:1px solid #ffffff24;backdrop-filter:blur(16px);box-shadow:0 12px 40px #0005;font-variant-numeric:tabular-nums}
-#missionClock .mc-kicker{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:#c17b60}
-#missionClock .mc-date{font-size:17px;letter-spacing:.03em;margin-top:5px;color:#f1e8df}
-#missionClock .mc-sol{font-size:10px;color:#b5b4b1;margin-top:4px;letter-spacing:.08em}
-#missionClock .mc-route{font-size:9px;line-height:1.6;color:#888f93;margin-top:10px;border-top:1px solid #ffffff16;padding-top:8px}
-#missionClock .mc-controls{display:flex;gap:6px;margin-top:10px}
-#missionClock button{flex:1;border:1px solid #ffffff25;background:#ffffff08;padding:7px 5px;font-size:9px;letter-spacing:.08em;color:#ded6ce}
-#missionClock button:active,#missionClock button:hover{border-color:#c17b60;color:#fff}
-#missionClock .mc-status{color:#9caf91}
-@media(max-width:760px){#missionClock{top:72px;right:12px;width:178px;padding:10px 11px}#missionClock .mc-date{font-size:14px}#missionClock .mc-route{font-size:8px;margin-top:7px;padding-top:6px}#missionClock .mc-controls{margin-top:7px}#missionClock button{padding:7px 3px;font-size:8px}}
-@media(max-width:390px){#missionClock{top:66px;width:160px;padding:8px 9px}#missionClock .mc-date{font-size:12px}}
+#missionClock{position:absolute;z-index:4;top:86px;right:clamp(14px,3.5vw,48px);display:flex;align-items:center;gap:12px;padding:8px 10px;background:#0b1018d9;border:1px solid #ffffff24;backdrop-filter:blur(16px);box-shadow:0 12px 40px #0005;font-variant-numeric:tabular-nums}
+#missionClock .mc-now{display:flex;flex-direction:column;gap:3px;min-width:100px}
+#missionClock .mc-date{font-size:12px;letter-spacing:.06em;color:#f1e8df}
+#missionClock .mc-sol{font-size:10px;color:#b5b4b1;letter-spacing:.04em}
+#missionClock .mc-controls{display:flex;gap:5px}
+#missionClock button{border:1px solid #ffffff25;background:#ffffff08;padding:7px 8px;font-size:9px;letter-spacing:.05em;color:#ded6ce;white-space:nowrap}
+#missionClock button:hover{border-color:#c17b60;color:#fff}
+@media(max-width:760px){#missionClock{top:68px;right:12px;gap:6px;padding:6px 7px}#missionClock .mc-now{min-width:82px}#missionClock .mc-date{font-size:10px}#missionClock .mc-sol{font-size:9px}#missionClock .mc-controls{gap:3px}#missionClock button{padding:7px 5px;font-size:8px}}
+@media(max-width:390px){#missionClock{top:63px;right:8px;gap:5px;padding:5px}#missionClock .mc-now{min-width:70px}#missionClock .mc-date{font-size:9px}#missionClock .mc-sol{font-size:8px}#missionClock button{padding:6px 4px;font-size:7px}}
 `;
 document.head.appendChild(clockStyle);
 const clockPanel = document.createElement('section');
 clockPanel.id = 'missionClock';
 clockPanel.setAttribute('aria-label', 'Mission date and Mars local time');
 clockPanel.innerHTML = `
-  <div class="mc-kicker">Mission clock</div>
-  <div class="mc-date" id="mcDate">22 JUL 2027</div>
-  <div class="mc-sol" id="mcSol">SOL 001 · 09:00 LMST</div>
-  <div class="mc-route">EARTH DEPARTURE · 18 NOV 2026<br>MARS ARRIVAL · 22 JUL 2027</div>
-  <div class="mc-controls"><button id="mcPlay" type="button">Ⅱ PAUSE</button><button id="mcSpeed" type="button">×60 SPEED</button></div>`;
+  <div class="mc-now"><div class="mc-date" id="mcDate">22 JUL 2027</div><div class="mc-sol" id="mcSol">SOL 001 · 09:00 LMST</div></div>
+  <div class="mc-controls"><button id="mcPlay" type="button">Ⅱ PAUSE</button><button id="mcSpeed" type="button">×60</button></div>`;
 document.querySelector('#app').appendChild(clockPanel);
 document.querySelector('#mcPlay').addEventListener('click', () => {
   clockRunning = !clockRunning;
@@ -47,7 +41,7 @@ document.querySelector('#mcPlay').addEventListener('click', () => {
 document.querySelector('#mcSpeed').addEventListener('click', () => {
   const speeds = [1, 10, 60, 300];
   clockSpeed = speeds[(speeds.indexOf(clockSpeed) + 1) % speeds.length];
-  document.querySelector('#mcSpeed').textContent = '×' + clockSpeed + ' SPEED';
+  document.querySelector('#mcSpeed').textContent = '×' + clockSpeed;
 });
 const dateFormatter = new Intl.DateTimeFormat('en-AU', {day:'2-digit', month:'short', year:'numeric', timeZone:'UTC'});
 function updateMissionClock(deltaSeconds) {
@@ -226,7 +220,7 @@ function focusMoon(id){
  const m=moonObjects[id];if(!m)return;focusedMoon=id;
  for(const [otherId,o] of Object.entries(moonObjects)){o.focusedScale=otherId===id;o.body.scale.setScalar(otherId===id?.03:moonSpecs[otherId].radius);o.marker.visible=otherId!==id&&zoom>1.8;o.halo.visible=otherId!==id&&zoom>6.5;}
  cameraFocus.copy(m.group.position);setZoom(.18);
- document.querySelector('#phobosBtn').classList.toggle('active',id==='phobos');document.querySelector('#deimosBtn').classList.toggle('active',id==='deimos');
+ document.querySelectorAll('[data-moon]').forEach(el=>el.classList.toggle('active',el.dataset.moon===id));
  notify('Observing '+moonSpecs[id].name+' · close approach view');
 }
 let pointer=null,lastTrackball=null,pointers=new Map(),pinchStart=0,pinchZoom=zoom,dragged=false;
@@ -234,14 +228,13 @@ const raycaster=new THREE.Raycaster(),pointerNdc=new THREE.Vector2();
 function setZoom(v){zoom=THREE.MathUtils.clamp(v,minZoom,maxZoom);updateLod();}
 function notify(message){const t=document.querySelector('#toast');t.textContent=message;t.classList.add('show');clearTimeout(notify.timer);notify.timer=setTimeout(()=>t.classList.remove('show'),1800);}
 function setActivePlace(id){document.querySelectorAll('.place').forEach(el=>el.classList.toggle('active',el.dataset.place===id));}
-function focusPlace(id){const p=locations[id];if(!p)return;focusedMoon=null;cameraFocus.set(0,0,0);for(const [mid,m] of Object.entries(moonObjects)){m.focusedScale=false;m.body.scale.setScalar(moonSpecs[mid].radius);}document.querySelector('#phobosBtn').classList.remove('active');document.querySelector('#deimosBtn').classList.remove('active');const v=xyz(p.lat,p.lon,1);const yaw=Math.atan2(-v.x,v.z);const pitch=Math.asin(v.y);targetRotation.setFromEuler(new THREE.Euler(pitch,yaw,0,'YXZ'));setZoom(Math.min(zoom,p.zoom+0.45));setActivePlace(id);notify(p.name+' · '+p.description);}
-document.querySelectorAll('.place').forEach(el=>el.addEventListener('click',()=>focusPlace(el.dataset.place)));
-document.querySelector('#zoomIn').addEventListener('click',()=>setZoom(zoom*.82));
-document.querySelector('#zoomOut').addEventListener('click',()=>setZoom(zoom*1.22));
-document.querySelector('#reset').addEventListener('click',()=>{focusedMoon=null;cameraFocus.set(0,0,0);for(const [id,m] of Object.entries(moonObjects)){m.focusedScale=false;m.body.scale.setScalar(moonSpecs[id].radius);}document.querySelector('#phobosBtn').classList.remove('active');document.querySelector('#deimosBtn').classList.remove('active');targetRotation.setFromEuler(new THREE.Euler(THREE.MathUtils.degToRad(-8),THREE.MathUtils.degToRad(18),0,'YXZ'));setZoom(4.2);notify('Mars global view restored');});
-document.querySelector('#phobosBtn').addEventListener('click',()=>focusMoon('phobos'));
-document.querySelector('#deimosBtn').addEventListener('click',()=>focusMoon('deimos'));
-document.querySelector('#labelsBtn').addEventListener('click',e=>{showLabels=!showLabels;markerGroup.visible=showLabels;e.currentTarget.classList.toggle('active',showLabels);});
+function resetView(announce=true){focusedMoon=null;cameraFocus.set(0,0,0);for(const [id,m] of Object.entries(moonObjects)){m.focusedScale=false;m.body.scale.setScalar(moonSpecs[id].radius);}document.querySelectorAll('[data-moon]').forEach(el=>el.classList.remove('active'));targetRotation.setFromEuler(new THREE.Euler(THREE.MathUtils.degToRad(-8),THREE.MathUtils.degToRad(18),0,'YXZ'));setZoom(4.2);setActivePlace('global');if(announce)notify('Mars global view restored');}
+function focusPlace(id){if(id==='global'){resetView();return;}const p=locations[id];if(!p)return;focusedMoon=null;cameraFocus.set(0,0,0);for(const [mid,m] of Object.entries(moonObjects)){m.focusedScale=false;m.body.scale.setScalar(moonSpecs[mid].radius);}document.querySelectorAll('[data-moon]').forEach(el=>el.classList.remove('active'));const v=xyz(p.lat,p.lon,1);const yaw=Math.atan2(-v.x,v.z);const pitch=Math.asin(v.y);targetRotation.setFromEuler(new THREE.Euler(pitch,yaw,0,'YXZ'));setZoom(Math.min(zoom,p.zoom+0.45));setActivePlace(id);notify(p.name+' · '+p.description);}
+document.querySelectorAll('[data-place]').forEach(el=>el.addEventListener('click',()=>{focusPlace(el.dataset.place);landmarksMenu.hidden=true;labelsBtn.setAttribute('aria-expanded','false');}));
+document.querySelectorAll('[data-moon]').forEach(el=>el.addEventListener('click',()=>{focusMoon(el.dataset.moon);landmarksMenu.hidden=true;labelsBtn.setAttribute('aria-expanded','false');}));
+const landmarksMenu=document.querySelector('#landmarksMenu'),labelsBtn=document.querySelector('#labelsBtn');
+labelsBtn.addEventListener('click',()=>{landmarksMenu.hidden=!landmarksMenu.hidden;labelsBtn.classList.toggle('active',!landmarksMenu.hidden);labelsBtn.setAttribute('aria-expanded',String(!landmarksMenu.hidden));});
+document.querySelector('#closeLandmarks').addEventListener('click',()=>{landmarksMenu.hidden=true;labelsBtn.classList.remove('active');labelsBtn.setAttribute('aria-expanded','false');});
 document.querySelector('#gridBtn').addEventListener('click',e=>{showGrid=!showGrid;gridGroup.visible=showGrid;e.currentTarget.classList.toggle('active',showGrid);});
 const dataMenu=document.querySelector('#dataMenu'),dataBtn=document.querySelector('#dataBtn');
 dataBtn.addEventListener('click',()=>{dataMenu.hidden=!dataMenu.hidden;dataBtn.classList.toggle('active',!dataMenu.hidden);});
