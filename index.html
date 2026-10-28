@@ -43,8 +43,8 @@
     <div class="panel-foot"><span>Mars</span><span>Explore</span></div>
   </aside>
   <div class="bottom-left">
-    <div class="stat"><strong>6,779 km</strong><span>Mean diameter</span></div>
-    <div class="stat"><strong>4.5 billion</strong><span>Years in the making</span></div>
+    <div class="stat"><strong id="meanDiameter">6,779 km</strong><span>Mean diameter</span></div>
+    <div class="stat"><strong id="planetAge">4.5 billion</strong><span>Years in the making</span></div>
   </div>
   <section class="data-menu" id="dataMenu" hidden aria-label="World parameters">
     <div class="data-menu-head"><span>World parameters</span><button id="closeData" aria-label="Close world parameters">×</button></div>
@@ -58,7 +58,7 @@
     <button class="tool" id="mapBtn"><span class="sym">▤</span>Surface map</button>
     <button class="tool active" id="labelsBtn"><span class="sym">⌖</span>Landmarks</button>
     <button class="tool" id="gridBtn"><span class="sym">⊞</span>Grid</button>
-    <button class="tool" id="dataBtn"><span class="sym">ⓘ</span>World data</button>
+    <button class="tool" id="dataBtn"><span class="sym">ⓘ</span>Data</button>
   </nav>
   <div class="hint">Drag to turn · Pinch to zoom · Select a landmark</div>
   <div class="toast" id="toast"></div>
