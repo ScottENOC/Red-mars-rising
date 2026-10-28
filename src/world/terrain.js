@@ -26,11 +26,14 @@ export async function loadMolaTopography() {
 
   molaElevationAt = (lat, lon) => {
     const wrappedLon = ((lon % 360) + 360) % 360;
-    const x = wrappedLon * MOLA_PIXELS_PER_DEGREE;
-    const y = THREE.MathUtils.clamp((90 - lat) * MOLA_PIXELS_PER_DEGREE, 0, MOLA_HEIGHT - 1);
-    const x0raw = Math.floor(x), x0 = x0raw % MOLA_WIDTH, x1 = (x0 + 1) % MOLA_WIDTH;
+    // Shift by half a cell: the PDS/ENVI registration correction places
+    // grid sample centres half a pixel from the nominal map origin.
+    const x = wrappedLon * MOLA_PIXELS_PER_DEGREE - 0.5;
+    const y = THREE.MathUtils.clamp((90 - lat) * MOLA_PIXELS_PER_DEGREE - 0.5, 0, MOLA_HEIGHT - 1);
+    const xWrapped = ((x % MOLA_WIDTH) + MOLA_WIDTH) % MOLA_WIDTH;
+    const x0 = Math.floor(xWrapped), x1 = (x0 + 1) % MOLA_WIDTH;
     const y0 = Math.floor(y), y1 = Math.min(y0 + 1, MOLA_HEIGHT - 1);
-    const fx = x - x0raw, fy = y - y0;
+    const fx = xWrapped - x0, fy = y - y0;
     const a = elevation[y0 * MOLA_WIDTH + x0], b = elevation[y0 * MOLA_WIDTH + x1];
     const c = elevation[y1 * MOLA_WIDTH + x0], d = elevation[y1 * MOLA_WIDTH + x1];
     return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy;
