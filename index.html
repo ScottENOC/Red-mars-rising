@@ -73,7 +73,7 @@ const locations={
  jezero:{name:'Jezero Crater',lat:18.38,lon:77.58,zoom:2.0,description:'A preserved delta records a time when water flowed across the Martian surface.'}
 };
 const space=document.querySelector('#space'),flatMap=document.querySelector('#flatMap'),flatTexture=document.querySelector('#flatTexture');
-flatTexture.src=COLOR_TEXTURE_URL;
+flatTexture.src=TEXTURE_URL;
 const scene=new THREE.Scene();
 const camera=new THREE.PerspectiveCamera(36,innerWidth/innerHeight,.1,100);
 camera.position.set(0,0,4.2);
