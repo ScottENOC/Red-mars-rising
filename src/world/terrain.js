@@ -4,7 +4,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.m
 function angularDistance(lat1,lon1,lat2,lon2){const a=THREE.MathUtils.degToRad(lat1),b=THREE.MathUtils.degToRad(lat2),dl=THREE.MathUtils.degToRad(lon2-lon1),dp=b-a;const q=Math.sin(dp/2)**2+Math.cos(a)*Math.cos(b)*Math.sin(dl/2)**2;return 2*Math.asin(Math.sqrt(Math.min(1,q)));}
 const volcanoes=[[18.65,226.2,.095,.17],[12.7,248,.045,.10],[0,247,.042,.095],[-9,239.3,.05,.105],[24.8,147.2,.055,.12],[40.5,109.9,.035,.08]];
 
-const MOLA_URL = 'https://pds-geosciences.wustl.edu/mgs/urn-nasa-pds-mgs_mola_topography_derived/meg004/megt90n000cb.img';
+const MOLA_URL = new URL('../../../data/mola/megt90n000cb.img', import.meta.url).href;
 const MOLA_PIXELS_PER_DEGREE = 4;
 const MOLA_WIDTH = 360 * MOLA_PIXELS_PER_DEGREE;
 const MOLA_HEIGHT = 180 * MOLA_PIXELS_PER_DEGREE;
@@ -13,7 +13,7 @@ let molaElevationAt = null;
 // The PDS MEGDR topography image is a headerless, signed 16-bit big-endian grid
 // in metres, simple cylindrical projection, 0–360°E and 90°N–90°S.
 export async function loadMolaTopography() {
-  const response = await fetch(MOLA_URL, { mode: 'cors', cache: 'force-cache' });
+  const response = await fetch(MOLA_URL, { cache: 'force-cache' });
   if (!response.ok) throw new Error(`MOLA data request failed (${response.status})`);
   const buffer = await response.arrayBuffer();
   const expectedBytes = MOLA_WIDTH * MOLA_HEIGHT * 2;
