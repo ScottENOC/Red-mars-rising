@@ -129,7 +129,7 @@ const raycaster=new THREE.Raycaster(),pointerNdc=new THREE.Vector2();
 function setZoom(v){zoom=THREE.MathUtils.clamp(v,minZoom,maxZoom);camera.position.z=zoom;}
 function notify(message){const t=document.querySelector('#toast');t.textContent=message;t.classList.add('show');clearTimeout(notify.timer);notify.timer=setTimeout(()=>t.classList.remove('show'),1800);}
 function setActivePlace(id){document.querySelectorAll('.place').forEach(el=>el.classList.toggle('active',el.dataset.place===id));document.querySelector('#coordReadout').textContent=Math.abs(locations[id].lat).toFixed(1)+'° '+(locations[id].lat>=0?'N':'S')+'  /  '+Math.abs(locations[id].lon).toFixed(1)+'° '+(locations[id].lon>=0?'E':'W');}
-function focusPlace(id){const p=locations[id];if(!p)return;const v=xyz(p.lat,p.lon,1);const yaw=Math.atan2(-v.x,v.z);const pitch=Math.asin(v.y);targetRotation.set(-pitch,yaw,0,'YXZ');setZoom(Math.min(zoom,p.zoom+0.45));setActivePlace(id);notify(p.name+' · '+p.description);}
+function focusPlace(id){const p=locations[id];if(!p)return;const v=xyz(p.lat,p.lon,1);const yaw=Math.atan2(-v.x,v.z);const pitch=Math.asin(v.y);targetRotation.set(pitch,yaw,0,'YXZ');setZoom(Math.min(zoom,p.zoom+0.45));setActivePlace(id);notify(p.name+' · '+p.description);}
 document.querySelectorAll('.place').forEach(el=>el.addEventListener('click',()=>focusPlace(el.dataset.place)));
 document.querySelector('#zoomIn').addEventListener('click',()=>setZoom(zoom*.82));
 document.querySelector('#zoomOut').addEventListener('click',()=>setZoom(zoom*1.22));
