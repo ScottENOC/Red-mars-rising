@@ -4,6 +4,75 @@ import { terrainHeight, terrainRadiusOffset, loadMolaTopography, updatePolarCaps
 
 const TEXTURE_URL=new URL('../data/mars/8k_mars.jpg', import.meta.url).href;
 const worldState = createInitialWorldState();
+
+// Mission timeline: the first crew leaves Earth in late 2026 and arrives in July 2027.
+const MISSION_DEPARTURE_UTC = Date.UTC(2026, 10, 18, 12);
+const MISSION_ARRIVAL_UTC = Date.UTC(2027, 6, 22, 0);
+const ARRIVAL_LOCAL_SOL_SECONDS = 9 * 3600;
+const MARS_SOL_SECONDS = 88775.244;
+let elapsedGameSeconds = 0;
+let clockRunning = true;
+let clockSpeed = 60; // one game minute per real second by default
+let clockUiElapsed = 0;
+const clockStyle = document.createElement('style');
+clockStyle.textContent = `
+#missionClock{position:absolute;z-index:4;top:86px;right:clamp(14px,3.5vw,48px);width:230px;padding:13px 14px;background:#0b1018e8;border:1px solid #ffffff24;backdrop-filter:blur(16px);box-shadow:0 12px 40px #0005;font-variant-numeric:tabular-nums}
+#missionClock .mc-kicker{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:#c17b60}
+#missionClock .mc-date{font-size:17px;letter-spacing:.03em;margin-top:5px;color:#f1e8df}
+#missionClock .mc-sol{font-size:10px;color:#b5b4b1;margin-top:4px;letter-spacing:.08em}
+#missionClock .mc-route{font-size:9px;line-height:1.6;color:#888f93;margin-top:10px;border-top:1px solid #ffffff16;padding-top:8px}
+#missionClock .mc-controls{display:flex;gap:6px;margin-top:10px}
+#missionClock button{flex:1;border:1px solid #ffffff25;background:#ffffff08;padding:7px 5px;font-size:9px;letter-spacing:.08em;color:#ded6ce}
+#missionClock button:active,#missionClock button:hover{border-color:#c17b60;color:#fff}
+#missionClock .mc-status{color:#9caf91}
+@media(max-width:760px){#missionClock{top:72px;right:12px;width:178px;padding:10px 11px}#missionClock .mc-date{font-size:14px}#missionClock .mc-route{font-size:8px;margin-top:7px;padding-top:6px}#missionClock .mc-controls{margin-top:7px}#missionClock button{padding:7px 3px;font-size:8px}}
+@media(max-width:390px){#missionClock{top:66px;width:160px;padding:8px 9px}#missionClock .mc-date{font-size:12px}}
+`;
+document.head.appendChild(clockStyle);
+const clockPanel = document.createElement('section');
+clockPanel.id = 'missionClock';
+clockPanel.setAttribute('aria-label', 'Mission date and Mars local time');
+clockPanel.innerHTML = `
+  <div class="mc-kicker">Mission clock</div>
+  <div class="mc-date" id="mcDate">22 JUL 2027</div>
+  <div class="mc-sol" id="mcSol">SOL 001 · 09:00 LMST</div>
+  <div class="mc-route">EARTH DEPARTURE · 18 NOV 2026<br>MARS ARRIVAL · 22 JUL 2027</div>
+  <div class="mc-controls"><button id="mcPlay" type="button">Ⅱ PAUSE</button><button id="mcSpeed" type="button">×60 SPEED</button></div>`;
+document.querySelector('#app').appendChild(clockPanel);
+document.querySelector('#mcPlay').addEventListener('click', () => {
+  clockRunning = !clockRunning;
+  document.querySelector('#mcPlay').textContent = clockRunning ? 'Ⅱ PAUSE' : '▶ PLAY';
+  document.querySelector('#mcPlay').setAttribute('aria-label', clockRunning ? 'Pause game time' : 'Resume game time');
+});
+document.querySelector('#mcSpeed').addEventListener('click', () => {
+  const speeds = [1, 10, 60, 300];
+  clockSpeed = speeds[(speeds.indexOf(clockSpeed) + 1) % speeds.length];
+  document.querySelector('#mcSpeed').textContent = '×' + clockSpeed + ' SPEED';
+});
+const dateFormatter = new Intl.DateTimeFormat('en-AU', {day:'2-digit', month:'short', year:'numeric', timeZone:'UTC'});
+function updateMissionClock(deltaSeconds) {
+  if (clockRunning) elapsedGameSeconds += deltaSeconds * clockSpeed;
+  const missionDate = new Date(MISSION_ARRIVAL_UTC + elapsedGameSeconds * 1000);
+  const localSolTime = ((ARRIVAL_LOCAL_SOL_SECONDS + elapsedGameSeconds) % MARS_SOL_SECONDS + MARS_SOL_SECONDS) % MARS_SOL_SECONDS;
+  const hour = Math.floor(localSolTime / 3600);
+  const minute = Math.floor((localSolTime % 3600) / 60);
+  const solNumber = Math.floor(elapsedGameSeconds / MARS_SOL_SECONDS) + 1;
+  document.querySelector('#mcDate').textContent = dateFormatter.format(missionDate).toUpperCase();
+  document.querySelector('#mcSol').textContent = 'SOL ' + String(solNumber).padStart(3, '0') + ' · ' + String(hour).padStart(2, '0') + ':' + String(minute).padStart(2, '0') + ' LMST';
+}
+// Approximate Mars solar longitude from its mean orbital motion and equation of centre.
+// This gives seasonal solar declination; the sol clock drives the subsolar longitude.
+function marsSolarDeclination(dateMs) {
+  const daysSinceJ2000 = (dateMs - Date.UTC(2000, 0, 1, 12)) / 86400000;
+  const rad = Math.PI / 180;
+  const meanAnomaly = (19.3870 + 0.52402075 * daysSinceJ2000) * rad;
+  const fictitiousMeanSun = (270.3863 + 0.5240384 * daysSinceJ2000) * rad;
+  const equationOfCentre = (10.691 + 3.0 * Math.sin(meanAnomaly) + 0.623 * Math.sin(2 * meanAnomaly) +
+    0.050 * Math.sin(3 * meanAnomaly) + 0.005 * Math.sin(4 * meanAnomaly) + 0.0005 * Math.sin(5 * meanAnomaly)) * rad;
+  const solarLongitude = fictitiousMeanSun + equationOfCentre;
+  return Math.asin(Math.sin(25.19 * rad) * Math.sin(solarLongitude));
+}
+
 const initialTemp = worldState.climate.meanSurfaceTemperatureC;
 document.querySelector('#meanTemp').textContent = (initialTemp < 0 ? '−' : initialTemp > 0 ? '+' : '') + Math.abs(initialTemp) + '°C';
 document.querySelector('#meanDiameter').textContent = worldState.planet.meanDiameterKm.toLocaleString('en-US') + ' km';
@@ -32,9 +101,14 @@ renderer.shadowMap.enabled=true;
 renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 space.appendChild(renderer.domElement);
 const root=new THREE.Group();scene.add(root);
-const ambient=new THREE.AmbientLight(0x9b9b9b,0.55);scene.add(ambient);
-const key=new THREE.DirectionalLight(0xffdfc1,2.2);key.position.set(-3,1.5,4);key.castShadow=true;key.shadow.mapSize.set(1024,1024);key.shadow.camera.left=-2;key.shadow.camera.right=2;key.shadow.camera.top=2;key.shadow.camera.bottom=-2;key.shadow.bias=-0.00008;key.shadow.normalBias=0.015;scene.add(key);
-const rim=new THREE.DirectionalLight(0x7189b1,0.45);rim.position.set(3,-1,-3);scene.add(rim);
+const ambient=new THREE.AmbientLight(0x777b84,0.12);scene.add(ambient);
+const key=new THREE.DirectionalLight(0xffdfc1,2.8);
+key.position.set(0,0,4);key.castShadow=true;
+key.shadow.mapSize.set(2048,2048);
+key.shadow.camera.left=-1.12;key.shadow.camera.right=1.12;key.shadow.camera.top=1.12;key.shadow.camera.bottom=-1.12;
+key.shadow.camera.near=0.1;key.shadow.camera.far=8;key.shadow.camera.updateProjectionMatrix();
+key.shadow.bias=-0.00002;key.shadow.normalBias=0.002;key.shadow.radius=2;scene.add(key);
+const rim=new THREE.DirectionalLight(0x7189b1,0.07);rim.position.set(3,-1,-3);scene.add(rim);
 const loader=new THREE.TextureLoader();loader.setCrossOrigin('anonymous');
 let mars,gridGroup,markerGroup,stars,textureLoaded=false,marsTexture=null;
 
@@ -155,6 +229,27 @@ space.addEventListener('pointerup',endPointer);space.addEventListener('pointerca
 space.addEventListener('click',e=>{if(dragged)return;const rect=renderer.domElement.getBoundingClientRect();pointerNdc.x=((e.clientX-rect.left)/rect.width)*2-1;pointerNdc.y=-((e.clientY-rect.top)/rect.height)*2+1;raycaster.setFromCamera(pointerNdc,camera);const hits=raycaster.intersectObjects(markerGroup.children,false);if(hits.length&&hits[0].object.userData.id)focusPlace(hits[0].object.userData.id);});
 function resize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);}
 addEventListener('resize',resize);
-function animate(){requestAnimationFrame(animate);root.quaternion.slerp(targetRotation,.09);camera.position.z+=(zoom-camera.position.z)*.12;stars.rotation.y+=.00004;renderer.render(scene,camera);}
-setZoom(4.2);animate();
+let previousFrameTime=performance.now();
+function updateSolarLighting() {
+ const missionDateMs=MISSION_ARRIVAL_UTC+elapsedGameSeconds*1000;
+ const declination=marsSolarDeclination(missionDateMs);
+ const localSolSeconds=((ARRIVAL_LOCAL_SOL_SECONDS+elapsedGameSeconds)%MARS_SOL_SECONDS+MARS_SOL_SECONDS)%MARS_SOL_SECONDS;
+ const localSolarHours=localSolSeconds/3600;
+ const subsolarLongitude=(12-localSolarHours)*360/MARS_SOL_SECONDS*3600;
+ const latitude=declination,longitude=THREE.MathUtils.degToRad(subsolarLongitude);
+ const sunLocal=new THREE.Vector3(-Math.cos(latitude)*Math.sin(longitude),Math.sin(latitude),Math.cos(latitude)*Math.cos(longitude)).normalize();
+ const sunWorld=sunLocal.applyQuaternion(root.quaternion).multiplyScalar(4);
+ key.position.copy(sunWorld);
+}
+function animate(now=performance.now()){
+ requestAnimationFrame(animate);
+ const dt=Math.min(Math.max((now-previousFrameTime)/1000,0),0.25);previousFrameTime=now;
+ updateMissionClock(dt);
+ root.quaternion.slerp(targetRotation,.09);
+ camera.position.z+=(zoom-camera.position.z)*.12;
+ stars.rotation.y+=.00004;
+ updateSolarLighting();
+ renderer.render(scene,camera);
+}
+setZoom(4.2);updateMissionClock(0);updateSolarLighting();animate();
 
