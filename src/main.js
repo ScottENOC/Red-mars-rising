@@ -1,3 +1,7 @@
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js';
+import { createInitialWorldState } from './world/world-state.js';
+import { terrainHeight, updatePolarCaps } from './world/terrain.js';
+
 const TEXTURE_URL='https://www.solarsystemscope.com/textures/download/8k_mars.jpg';
 const worldState = createInitialWorldState();
 const locations={
