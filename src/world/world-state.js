@@ -4,7 +4,7 @@ export function createInitialWorldState() {
     schemaVersion: 1,
     scenarioId: 'present-day-mars-before-arrival',
     time: { sol: 0 },
-    planet: { id: 'mars', meanDiameterKm: 6779 },
+    planet: { id: 'mars', meanDiameterKm: 6779, ageYears: 4_500_000_000 },
     terrain: {
       source: 'procedural-prototype',
       // Geological changes will be stored separately from the baseline elevation.
