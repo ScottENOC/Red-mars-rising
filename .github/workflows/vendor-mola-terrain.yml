@@ -1,0 +1,50 @@
+name: Vendor NASA MOLA terrain data
+
+on:
+  push:
+    branches: [development]
+    paths-ignore:
+      - 'data/mola/megt90n000cb.img'
+
+permissions:
+  contents: write
+
+jobs:
+  fetch-mola:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out development
+        uses: actions/checkout@v4
+        with:
+          ref: development
+          fetch-depth: 0
+
+      - name: Download and validate official NASA/PDS MOLA grid
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/mola
+          curl --fail --location --retry 3 --retry-delay 2 \
+            'https://pds-geosciences.wustl.edu/mgs/urn-nasa-pds-mgs_mola_topography_derived/meg004/megt90n000cb.img' \
+            --output data/mola/megt90n000cb.img
+          actual_bytes="$(wc -c < data/mola/megt90n000cb.img | tr -d ' ')"
+          expected_bytes=2073600
+          if [ "$actual_bytes" -ne "$expected_bytes" ]; then
+            echo "Unexpected MOLA file size: $actual_bytes bytes; expected $expected_bytes" >&2
+            exit 1
+          fi
+          echo "Validated official MOLA grid: $actual_bytes bytes"
+
+      - name: Commit terrain data to development
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/mola/megt90n000cb.img
+          if git diff --cached --quiet; then
+            echo 'MOLA terrain file already present; nothing to commit.'
+            exit 0
+          fi
+          git commit -m 'Vendor official NASA MOLA terrain grid'
+          git push origin HEAD:development
