@@ -1,6 +1,6 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js';
 
-// NASA MOLA global topography is the preferred source. Procedural relief remains a graceful fallback.
+// NASA MOLA global topography is mandatory; never substitute invented terrain.
 function angularDistance(lat1,lon1,lat2,lon2){const a=THREE.MathUtils.degToRad(lat1),b=THREE.MathUtils.degToRad(lat2),dl=THREE.MathUtils.degToRad(lon2-lon1),dp=b-a;const q=Math.sin(dp/2)**2+Math.cos(a)*Math.cos(b)*Math.sin(dl/2)**2;return 2*Math.asin(Math.sqrt(Math.min(1,q)));}
 const volcanoes=[[18.65,226.2,.095,.17],[12.7,248,.045,.10],[0,247,.042,.095],[-9,239.3,.05,.105],[24.8,147.2,.055,.12],[40.5,109.9,.035,.08]];
 
@@ -54,10 +54,8 @@ export async function loadMolaTopography() {
 // Elevation is converted from metres to a fraction of Mars' mean radius.
 // Vertical exaggeration defaults to 1: terrain is not artistically enlarged.
 export function terrainRadiusOffset(lat, lon, verticalExaggeration = 1) {
-  if (molaElevationAt) return molaElevationAt(lat, lon) * verticalExaggeration / 3390000;
-  // Keep the fallback's broad features visible, but avoid its prototype
-  // amplitudes producing hundreds-of-kilometres relief on the globe.
-  return terrainHeight(lat, lon) * 0.06;
+  if (!molaElevationAt) throw new Error('MOLA terrain requested before NASA elevation data finished loading');
+  return molaElevationAt(lat, lon) * verticalExaggeration / 3390000;
 }
 
 export function terrainHeight(lat,lon){let h=0;h+=.035*Math.exp(-1 * (angularDistance(lat,lon,10,250)/.52)**2);h+=.018*Math.exp(-1 * (angularDistance(lat,lon,25,147)/.22)**2);
