@@ -52,8 +52,9 @@ export async function loadMolaTopography() {
 }
 
 // Elevation is converted from metres to a fraction of Mars' mean radius.
-// Vertical exaggeration defaults to 1: terrain is not artistically enlarged.
-export function terrainRadiusOffset(lat, lon, verticalExaggeration = 1) {
+// A 4x vertical exaggeration makes major relief legible in the orbital globe view;
+// the underlying shapes and relative elevations still come from NASA MOLA.
+export function terrainRadiusOffset(lat, lon, verticalExaggeration = 4) {
   if (!molaElevationAt) throw new Error('MOLA terrain requested before NASA elevation data finished loading');
   return molaElevationAt(lat, lon) * verticalExaggeration / 3390000;
 }
