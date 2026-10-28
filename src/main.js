@@ -1,6 +1,6 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js';
 import { createInitialWorldState } from './world/world-state.js';
-import { terrainHeight, updatePolarCaps } from './world/terrain.js';
+import { terrainHeight, terrainRadiusOffset, loadMolaTopography, updatePolarCaps } from './world/terrain.js';
 
 const TEXTURE_URL='https://www.solarsystemscope.com/textures/download/8k_mars.jpg';
 const worldState = createInitialWorldState();
@@ -36,10 +36,30 @@ const rim=new THREE.DirectionalLight(0x7189b1,1.7);rim.position.set(3,-1,-3);sce
 const loader=new THREE.TextureLoader();loader.setCrossOrigin('anonymous');
 let mars,gridGroup,markerGroup,stars,textureLoaded=false;
 
-const sphereGeometry=new THREE.SphereGeometry(1,360,240),posAttr=sphereGeometry.attributes.position;
-for(let i=0;i<posAttr.count;i++){const x=posAttr.getX(i),y=posAttr.getY(i),z=posAttr.getZ(i),lat=Math.asin(THREE.MathUtils.clamp(y,-1,1))*180/Math.PI,lon=Math.atan2(-x,z)*180/Math.PI,r=1+terrainHeight(lat,lon);posAttr.setXYZ(i,x*r,y*r,z*r);}sphereGeometry.computeVertexNormals();
-const fallbackMat=new THREE.MeshStandardMaterial({color:0x9c5138,roughness:1});mars=new THREE.Mesh(sphereGeometry,fallbackMat);root.add(mars);
+function buildTerrainGeometry() {
+ const geometry=new THREE.SphereGeometry(1,360,240),positions=geometry.attributes.position;
+ for(let i=0;i<positions.count;i++){
+  const x=positions.getX(i),y=positions.getY(i),z=positions.getZ(i);
+  const lat=Math.asin(THREE.MathUtils.clamp(y,-1,1))*180/Math.PI,lon=Math.atan2(-x,z)*180/Math.PI;
+  const r=1+terrainRadiusOffset(lat,lon);
+  positions.setXYZ(i,x*r,y*r,z*r);
+ }
+ geometry.computeVertexNormals();return geometry;
+}
+const fallbackMat=new THREE.MeshStandardMaterial({color:0x9c5138,roughness:1});
+mars=new THREE.Mesh(buildTerrainGeometry(),fallbackMat);root.add(mars);
 updatePolarCaps(THREE, root, worldState);
+// Upgrade from the approximate fallback to measured MOLA elevation once loaded.
+loadMolaTopography().then(info=>{
+ const previous=mars.geometry;mars.geometry=buildTerrainGeometry();previous.dispose();
+ updatePolarCaps(THREE,root,worldState);
+ worldState.terrain.source=info.source;
+ document.querySelector('#loading p').textContent='NASA MOLA topography loaded';
+}).catch(error=>{
+ console.warn('NASA MOLA elevation unavailable; using procedural fallback.',error);
+ worldState.terrain.source='procedural-fallback';
+ document.querySelector('#loading p').textContent='Using approximate terrain';
+});
 loader.load(TEXTURE_URL,texture=>{
  texture.colorSpace=THREE.SRGBColorSpace;
  texture.wrapS=THREE.RepeatWrapping;
@@ -85,7 +105,7 @@ document.querySelector('#mapBtn').addEventListener('click',()=>setView(true));
 const dataMenu=document.querySelector('#dataMenu'),dataBtn=document.querySelector('#dataBtn');
 dataBtn.addEventListener('click',()=>{dataMenu.hidden=!dataMenu.hidden;dataBtn.classList.toggle('active',!dataMenu.hidden);});
 document.querySelector('#closeData').addEventListener('click',()=>{dataMenu.hidden=true;dataBtn.classList.remove('active');});
-function setView(flat){isFlat=flat;space.style.display=flat?'none':'block';flatMap.style.display=flat?'block':'none';document.querySelector('#globeBtn').classList.toggle('active',!flat);document.querySelector('#mapBtn').classList.toggle('active',flat);document.querySelector('#mapNote').textContent=flat?'Select a landmark':'Drag to turn · Pinch to zoom';document.querySelector('.zoom-controls').style.display=flat?'none':'flex';if(flat)drawFlatPins();else{document.querySelectorAll('.flat-pin').forEach(el=>el.remove());}}
+function setView(flat){isFlat=flat;space.style.display=flat?'none':'block';flatMap.style.display=flat?'block':'none';document.querySelector('#globeBtn').classList.toggle('active',!flat);document.querySelector('#mapBtn').classList.toggle('active',flat);document.querySelector('.zoom-controls').style.display=flat?'none':'flex';if(flat)drawFlatPins();else{document.querySelectorAll('.flat-pin').forEach(el=>el.remove());}}
 function drawFlatPins(){document.querySelectorAll('.flat-pin').forEach(el=>el.remove());Object.entries(locations).forEach(([id,p])=>{const pin=document.createElement('button');pin.className='flat-pin';pin.style.left=((p.lon+180)/360*100)+'%';pin.style.top=((90-p.lat)/180*100)+'%';pin.innerHTML='<span>'+p.name+'</span>';pin.addEventListener('click',()=>{setView(false);focusPlace(id);});flatMap.appendChild(pin);});}
 space.addEventListener('wheel',e=>{e.preventDefault();setZoom(zoom*Math.exp(e.deltaY*.001));}, {passive:false});
 function trackballPoint(clientX,clientY){
