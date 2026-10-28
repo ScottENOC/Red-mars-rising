@@ -126,6 +126,7 @@ function updateLod(){
  if(lod===currentLod)return;currentLod=lod;
  const old=mars.geometry;
  mars.geometry=buildTerrainGeometry(...[[360,240,true],[180,120,true],[96,64,true],[48,32,true],[32,24,false]][lod]);old.dispose();
+ for(const child of root.children)if(child.userData?.polarCapHemisphere)child.visible=lod<4;
  if(lod===4&&mars.material.map){mars.material.map=null;mars.material.color.set(0x9c5138);mars.material.needsUpdate=true;}
  else if(lod<4&&!mars.material.map&&marsTexture){mars.material.map=marsTexture;mars.material.color.set(0xffffff);mars.material.needsUpdate=true;}
 }
@@ -217,13 +218,13 @@ function updateMoonOrbits(){
  for(const [id,spec] of Object.entries(moonSpecs)){
   const m=moonObjects[id],a=spec.phase+elapsedGameSeconds/(spec.periodHours*3600)*Math.PI*2;
   m.group.position.set(Math.cos(a)*spec.orbit,Math.sin(a)*spec.orbit*.08,Math.sin(a)*spec.orbit*.997);
-  m.orbitLine.visible=zoom>3.1;m.marker.visible=zoom>1.8&&!m.focusedScale;m.halo.visible=zoom>3.1&&!m.focusedScale;
+  m.orbitLine.visible=zoom>6.5;m.marker.visible=zoom>1.8&&!m.focusedScale;m.halo.visible=zoom>6.5&&!m.focusedScale;
   if(focusedMoon===id)cameraFocus.copy(m.group.position);
  }
 }
 function focusMoon(id){
  const m=moonObjects[id];if(!m)return;focusedMoon=id;
- for(const [otherId,o] of Object.entries(moonObjects)){o.focusedScale=otherId===id;o.body.scale.setScalar(otherId===id?.03:moonSpecs[otherId].radius);o.marker.visible=otherId!==id&&zoom>1.8;o.halo.visible=otherId!==id&&zoom>3.1;}
+ for(const [otherId,o] of Object.entries(moonObjects)){o.focusedScale=otherId===id;o.body.scale.setScalar(otherId===id?.03:moonSpecs[otherId].radius);o.marker.visible=otherId!==id&&zoom>1.8;o.halo.visible=otherId!==id&&zoom>6.5;}
  cameraFocus.copy(m.group.position);setZoom(.18);
  document.querySelector('#phobosBtn').classList.toggle('active',id==='phobos');document.querySelector('#deimosBtn').classList.toggle('active',id==='deimos');
  notify('Observing '+moonSpecs[id].name+' · close approach view');
