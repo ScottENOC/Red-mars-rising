@@ -22,7 +22,17 @@ export async function loadMolaTopography() {
   }
   const view = new DataView(buffer);
   const elevation = new Int16Array(MOLA_WIDTH * MOLA_HEIGHT);
-  for (let i = 0; i < elevation.length; i++) elevation[i] = view.getInt16(i * 2, false);
+  let minElevation = Infinity, maxElevation = -Infinity;
+  for (let i = 0; i < elevation.length; i++) {
+    const value = view.getInt16(i * 2, false);
+    elevation[i] = value;
+    if (value < minElevation) minElevation = value;
+    if (value > maxElevation) maxElevation = value;
+  }
+  // Reject an HTML error page or incorrect decoding even if the byte count matches.
+  if (minElevation < -10000 || maxElevation > 25000 || minElevation >= maxElevation) {
+    throw new Error(`MOLA elevation values out of range: ${minElevation} to ${maxElevation} m`);
+  }
 
   molaElevationAt = (lat, lon) => {
     const wrappedLon = ((lon % 360) + 360) % 360;
@@ -45,7 +55,9 @@ export async function loadMolaTopography() {
 // Vertical exaggeration defaults to 1: terrain is not artistically enlarged.
 export function terrainRadiusOffset(lat, lon, verticalExaggeration = 1) {
   if (molaElevationAt) return molaElevationAt(lat, lon) * verticalExaggeration / 3390000;
-  return terrainHeight(lat, lon);
+  // Keep the fallback's broad features visible, but avoid its prototype
+  // amplitudes producing hundreds-of-kilometres relief on the globe.
+  return terrainHeight(lat, lon) * 0.06;
 }
 
 export function terrainHeight(lat,lon){let h=0;h+=.035*Math.exp(-1 * (angularDistance(lat,lon,10,250)/.52)**2);h+=.018*Math.exp(-1 * (angularDistance(lat,lon,25,147)/.22)**2);
