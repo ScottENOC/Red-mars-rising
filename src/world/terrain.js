@@ -3,7 +3,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.m
 // Procedural fallback terrain only. Replaceable by measured elevation data later.
 function angularDistance(lat1,lon1,lat2,lon2){const a=THREE.MathUtils.degToRad(lat1),b=THREE.MathUtils.degToRad(lat2),dl=THREE.MathUtils.degToRad(lon2-lon1),dp=b-a;const q=Math.sin(dp/2)**2+Math.cos(a)*Math.cos(b)*Math.sin(dl/2)**2;return 2*Math.asin(Math.sqrt(Math.min(1,q)));}
 const volcanoes=[[18.65,226.2,.095,.17],[12.7,248,.045,.10],[0,247,.042,.095],[-9,239.3,.05,.105],[24.8,147.2,.055,.12],[40.5,109.9,.035,.08]];
-function terrainHeight(lat,lon){let h=0;h+=.035*Math.exp(-(angularDistance(lat,lon,10,250)/.52)**2);h+=.018*Math.exp(-(angularDistance(lat,lon,25,147)/.22)**2);
+export function terrainHeight(lat,lon){let h=0;h+=.035*Math.exp(-(angularDistance(lat,lon,10,250)/.52)**2);h+=.018*Math.exp(-(angularDistance(lat,lon,25,147)/.22)**2);
 for(const [a,b,amp,sigma] of volcanoes){const d=angularDistance(lat,lon,a,b);h+=amp*Math.exp(-(d/sigma)**2);h-=amp*.17*Math.exp(-(d/(sigma*.20))**2);}
 const centre=-12+3*Math.sin((lon-55)*Math.PI/45),window=Math.exp(-((lon+65)/58)**8);h-=.062*Math.exp(-((lat-centre)/3.1)**2)*window;h-=.022*Math.exp(-((lat-centre-4.5)/1.8)**2)*window;
 for(const [a,b,r,depth] of [[-42.4,70.5,.19,.085],[-50,316,.12,.055],[12,88,.105,.035],[45,110,.14,.045],[-20,290,.07,.025],[25,15,.045,.018],[-5,160,.04,.015]]){const d=angularDistance(lat,lon,a,b);h-=depth*Math.exp(-(d/r)**4);h+=depth*.24*Math.exp(-((d-r*1.1)/(r*.2))**2);}
