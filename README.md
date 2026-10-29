@@ -61,7 +61,7 @@ Rival sponsors observe the first colony for at least 60 sols, assess whether the
 
 ## Conserved material accounting — in progress
 
-The simulation now has a dedicated `src/world/material-inventories.js` module. Planetary water is separated into atmospheric vapour, surface ice, subsurface ice, groundwater, surface liquid water and hydrated-mineral water-equivalent stocks. Colony water is held separately in tanks, process-water storage, habitat humidity and wastewater. Stocks are measured in kilograms, and transfers are recorded in a ledger. Initial reservoir sizes are explicitly labelled scenario estimates, not precise global measurements.
+The simulation now has a dedicated `src/world/material-inventories.js` module and an expandable **Material inventories & conservation** view in the colony operations panel. Planetary water is separated into atmospheric vapour, surface ice, subsurface ice, groundwater, surface liquid water and hydrated-mineral water-equivalent stocks. Colony water is held separately in tanks, process-water storage, habitat humidity and wastewater. Stocks are measured in kilograms, and transfers are recorded in a ledger. Initial reservoir sizes are explicitly labelled scenario estimates, not precise global measurements.
 
 ### Natural meteoroids and impactors
 
@@ -75,8 +75,8 @@ Sources: [Tomkins et al. (2019), micrometeoroid flux and mineralogy](https://agu
 
 ### Water cycling, recycling and chemistry
 
-- Water use moves colony tank water into wastewater. The recycling pass recovers 85% of wastewater into tanks and records an electricity cost of 0.001 kWh per kilogram treated; the remaining 15% stays in the wastewater/brine stock. The energy ledger records this cost, but it is not yet coupled to the colony's abstract power-capacity/demand UI.
-- The water extractor transfers 35,000 kg from subsurface ice to colony tanks only if the planetary source has sufficient mass.
+- Water use moves 95% of used water into wastewater and 5% into habitat humidity. The recycling pass recovers 85% of wastewater and 95% of habitat humidity into tanks, recording separate electricity costs for treatment and condensation. Residual water remains in brine/humidity stocks rather than disappearing. The energy ledger records these costs, but they are not yet coupled to the colony's abstract power-capacity/demand UI.
+- Each starting site receives a local accessible-ice sub-reservoir carved out of the global subsurface-ice stock, so it is not double-counted. Its initial size and extraction rate depend on site prospectivity. An ice survey improves confidence and extraction throughput; the extractor transfers only the amount the local stock and technology can supply.
 - A first-pass climate cycle transfers water between surface liquid, surface ice and atmospheric vapour through evaporation, freezing, sublimation and condensation/deposition. A small atmospheric escape term is recorded as an external output. These rates are intentionally exposed as rough global scenario assumptions, not a calibrated local Mars climate model; surface temperatures and cold traps are not spatially resolved yet.
 - `electrolyseWater` converts water into stoichiometric H₂ and O₂ mass stocks and records electricity use. `recombineHydrogenOxygen` converts those gases back into water and records released heat. Their system-energy values are provisional engineering assumptions.
 - `importWater` supports explicit external water deliveries, so directed ice-bearing bodies can later add matter to a chosen reservoir through a recorded external input.
@@ -85,8 +85,7 @@ The diagnostics now include water-derived mass and hydrogen/oxygen balance check
 
 ### Next implementation steps
 
-1. Make site-specific extraction, accessibility and production rates depend on geology and technology.
-2. Resolve atmospheric ablation into explicit chemical species and include oxygen/hydrogen chemistry beyond the water system.
-3. Add elemental inventories and conservation across industrial processing, food, biomass, human metabolism and waste.
-4. Add geographic impact locations, crater formation and optional player-directed ice-rich asteroid missions.
+1. Add elemental inventories and conservation across industrial processing, food, biomass, human metabolism and waste.
+2. Refine atmospheric ablation chemistry and connect atmospheric composition changes to climate feedbacks.
+3. Add geographic impact locations, crater formation and optional player-directed ice-rich asteroid missions.
 
