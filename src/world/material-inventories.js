@@ -186,13 +186,23 @@ export function processWaterClimate(w,sol){
 
 export function recycleColonyWater(w,sol){
   const m=ensureMaterialInventories(w);
-  for(const [id,c] of Object.entries(m.colonies)){
-    const stock=c.waterKg,recovered=stock.wastewater*.85;
-    if(recovered>0){
-      const electricity=recovered*.001;stock.wastewater-=recovered;stock.tanks+=recovered;
+  for(const [id,colony] of Object.entries(m.colonies)){
+    const stock=colony.waterKg;
+    const wastewaterRecovery=stock.wastewater*.85;
+    if(wastewaterRecovery>0){
+      transferWater(w,{from:'colony:'+id+':wastewater',to:'colony:'+id+':tanks',massKg:wastewaterRecovery,sol,process:'wastewater-recycling',note:'85% recovery; remaining water stays in concentrated wastewater/brine.'});
+      const electricity=wastewaterRecovery*.001;
       m.energy.electricityConsumedKWh+=electricity;
-      if(w.economy)w.economy.water=(Number(w.economy.water)||0)+recovered/1000;
-      m.ledger.push({sol,substance:'H2O',massKg:recovered,from:'colony:'+id+':wastewater',to:'colony:'+id+':tanks',process:'water-recycling',note:'85% recovered; 15% remains in brine/losses; electricity '+electricity.toFixed(3)+' kWh.'});
+      if(w.economy)w.economy.water=(Number(w.economy.water)||0)+wastewaterRecovery/1000;
+      m.ledger.push({sol,substance:'energy',massKg:0,from:'colony:'+id+':electricity',to:'colony:'+id+':water-treatment',process:'electricity-consumption',note:electricity+' kWh used for wastewater treatment.'});
+    }
+    const humidityRecovery=stock.habitatHumidity*.95;
+    if(humidityRecovery>0){
+      transferWater(w,{from:'colony:'+id+':habitatHumidity',to:'colony:'+id+':tanks',massKg:humidityRecovery,sol,process:'humidity-condensation',note:'95% of habitat humidity condensed back into usable water; residual humidity remains in the habitat.'});
+      const electricity=humidityRecovery*.0015;
+      m.energy.electricityConsumedKWh+=electricity;
+      if(w.economy)w.economy.water=(Number(w.economy.water)||0)+humidityRecovery/1000;
+      m.ledger.push({sol,substance:'energy',massKg:0,from:'colony:'+id+':electricity',to:'colony:'+id+':humidity-condenser',process:'electricity-consumption',note:electricity+' kWh used for humidity recovery.'});
     }
   }
 }
