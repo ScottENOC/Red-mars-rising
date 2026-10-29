@@ -2,10 +2,14 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.m
 import { createInitialWorldState } from './world/world-state.js';
 import { terrainHeight, terrainRadiusOffset, loadMolaTopography, updatePolarCaps } from './world/terrain.js';
 import { createColonyAndLogistics } from './world/colony-logistics.js';
+import { STARTING_LOCATIONS, SPONSORS, startCampaign } from './world/campaign-options.js';
+import { processWorldTick, commissionProject } from './world/world-tick.js';
 
 const TEXTURE_URL=new URL('../data/mars/8k_mars.jpg', import.meta.url).href;
 const worldState = createInitialWorldState();
 let colonyLogistics = null;
+let terrainReady = false;
+let lastProcessedClockSol = 0;
 const SHOW_GENERATED_POLAR_CAPS = true;
 let lastIceSolarLongitude = -1;
 
@@ -14,7 +18,7 @@ const MISSION_ARRIVAL_UTC = Date.UTC(2027, 6, 22, 0);
 const ARRIVAL_LOCAL_SOL_SECONDS = 9 * 3600;
 const MARS_SOL_SECONDS = 88775.244;
 let elapsedGameSeconds = 0;
-let clockRunning = true;
+let clockRunning = false;
 let clockSpeed = 60; // one game minute per real second by default
 let clockUiElapsed = 0;
 const clockStyle = document.createElement('style');
@@ -30,12 +34,102 @@ clockStyle.textContent = `
 @media(max-width:390px){#missionClock{top:63px;right:8px;gap:5px;padding:5px}#missionClock .mc-now{min-width:70px}#missionClock .mc-date{font-size:9px}#missionClock .mc-sol{font-size:8px}#missionClock button{padding:6px 4px;font-size:7px}}
 `;
 document.head.appendChild(clockStyle);
+
+const campaignStyle=document.createElement('style');
+campaignStyle.textContent=`
+#campaignStart{position:absolute;z-index:10;inset:0;display:flex;align-items:center;justify-content:center;padding:18px;background:#070a0feF;backdrop-filter:blur(18px);overflow:auto}
+#campaignStart[hidden]{display:none}
+.cs-card{width:min(880px,100%);max-height:calc(100dvh - 36px);overflow:auto;border:1px solid #ffffff28;background:linear-gradient(145deg,#141a22f7,#090d13f7);box-shadow:0 24px 90px #000b;padding:clamp(18px,4vw,36px)}
+.cs-kicker{font-size:10px;letter-spacing:.22em;color:#d87957;text-transform:uppercase}
+.cs-card h2{font:400 clamp(27px,4vw,42px)/1.05 Georgia,serif;margin:10px 0 12px}
+.cs-intro{max-width:680px;color:#aeb2b5;font-size:13px;line-height:1.65;margin:0 0 22px}
+.cs-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.cs-field label{display:block;color:#d7c3b7;font-size:10px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px}
+.cs-field select{width:100%;background:#0a0f16;border:1px solid #ffffff2b;color:#f2e9df;padding:12px;font:inherit;font-size:13px;border-radius:0}
+.cs-detail{margin-top:10px;min-height:124px;padding:14px;background:#ffffff06;border:1px solid #ffffff14;color:#aeb2b5;font-size:12px;line-height:1.6}
+.cs-detail strong{display:block;color:#eee1d5;font-weight:500;margin-bottom:5px}
+.cs-detail .cs-meta{color:#d49a7e;font-size:10px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:7px}
+.cs-footer{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:20px;padding-top:16px;border-top:1px solid #ffffff1c}
+.cs-note{max-width:470px;color:#8f979c;font-size:11px;line-height:1.5}
+#csStart{border:1px solid #d87957;background:#3a2119;padding:13px 18px;color:#ffe6d8;font-size:11px;letter-spacing:.13em;text-transform:uppercase;white-space:nowrap}
+#csStart:disabled{opacity:.45}
+#campaignPanel{position:absolute;z-index:4;left:clamp(14px,3vw,38px);top:clamp(150px,22vh,220px);width:min(300px,calc(100vw - 28px));max-height:52vh;overflow:auto;background:#0b1018ed;border:1px solid #ffffff24;backdrop-filter:blur(16px);padding:14px;box-shadow:0 14px 42px #0006}
+#campaignPanel[hidden]{display:none}
+.cp-heading{display:flex;justify-content:space-between;gap:8px;color:#d9c2b3;font-size:10px;letter-spacing:.16em;text-transform:uppercase;margin-bottom:8px}
+.cp-metrics{font-size:11px;line-height:1.65;color:#aeb4b7;border-bottom:1px solid #ffffff18;padding-bottom:9px;margin-bottom:8px}
+.cp-metrics strong{color:#eee4dc;font-weight:500}
+.cp-project{border-top:1px solid #ffffff12;padding:9px 0}
+.cp-project strong{display:block;color:#e7e2dc;font-size:11px;font-weight:500}
+.cp-project small{display:block;color:#899197;font-size:9px;line-height:1.5;margin:4px 0 7px}
+.cp-project button{border:1px solid #ffffff24;background:#ffffff08;color:#d9c2b3;font-size:9px;letter-spacing:.08em;padding:7px 9px}
+.cp-project button:disabled{opacity:.5}
+@media(max-width:760px){#campaignStart{padding:10px}.cs-card{max-height:calc(100dvh - 20px);padding:18px}.cs-grid{grid-template-columns:1fr;gap:12px}.cs-detail{min-height:0}.cs-footer{align-items:flex-start;flex-direction:column}.cs-note{max-width:none}#csStart{width:100%}#campaignPanel{top:112px;left:10px;width:min(260px,calc(100vw - 20px));max-height:45vh;padding:10px}}
+`;
+document.head.appendChild(campaignStyle);
+const campaignStart=document.createElement('section');
+campaignStart.id='campaignStart';
+campaignStart.innerHTML=`
+ <div class="cs-card">
+  <div class="cs-kicker">Red Mars Rising · First Expedition</div>
+  <h2>Choose where humanity begins.</h2>
+  <p class="cs-intro">Five years of expedition supplies are committed to the site you select. Every sponsor remains active in the wider Mars programme; your choice changes your starting support, political obligations and the relationships you inherit.</p>
+  <div class="cs-grid">
+   <div class="cs-field"><label for="csSite">Starting site</label><select id="csSite"></select><div class="cs-detail" id="csSiteDetail"></div></div>
+   <div class="cs-field"><label for="csSponsor">Starting sponsor</label><select id="csSponsor"></select><div class="cs-detail" id="csSponsorDetail"></div></div>
+  </div>
+  <div class="cs-footer"><div class="cs-note">These are strategic abstractions, not guarantees: local water, construction conditions and future inundation depend on later surveys and the evolving climate model.</div><button id="csStart" type="button">Begin expedition</button></div>
+ </div>`;
+document.querySelector('#app').appendChild(campaignStart);
+const siteSelect=campaignStart.querySelector('#csSite');
+const sponsorSelect=campaignStart.querySelector('#csSponsor');
+const siteDetail=campaignStart.querySelector('#csSiteDetail');
+const sponsorDetail=campaignStart.querySelector('#csSponsorDetail');
+for(const site of STARTING_LOCATIONS){const option=document.createElement('option');option.value=site.id;option.textContent=site.name;siteSelect.appendChild(option);}
+for(const sponsor of SPONSORS){const option=document.createElement('option');option.value=sponsor.id;option.textContent=sponsor.name;sponsorSelect.appendChild(option);}
+siteSelect.value='elysium';sponsorSelect.value='nasa';
+function refreshStartDetails(){
+ const site=STARTING_LOCATIONS.find(x=>x.id===siteSelect.value),sponsor=SPONSORS.find(x=>x.id===sponsorSelect.value);
+ siteDetail.innerHTML='<strong>'+site.terrain+'</strong><div class="cs-meta">'+site.climate+'</div><div><b>Water:</b> '+site.water+'</div><div><b>Build:</b> '+site.construction+' · <b>Security:</b> '+site.security+'</div><div><b>Opportunity:</b> '+site.opportunity+'</div>';
+ sponsorDetail.innerHTML='<strong>'+sponsor.name+'</strong><div class="cs-meta">'+sponsor.type+' sponsor · patience '+sponsor.patience+'/100</div><div>'+sponsor.description+'</div><div><b>Strengths:</b> '+sponsor.strengths+'</div><div><b>Obligations:</b> '+sponsor.obligations+'</div>';
+}
+siteSelect.addEventListener('change',refreshStartDetails);sponsorSelect.addEventListener('change',refreshStartDetails);refreshStartDetails();
+const campaignPanel=document.createElement('section');campaignPanel.id='campaignPanel';campaignPanel.hidden=true;document.querySelector('#app').appendChild(campaignPanel);
+function renderCampaignPanel(){
+ if(!worldState.campaign.started)return;
+ const sponsor=worldState.sponsors.find(x=>x.id===worldState.campaign.startingSponsorId);
+ const home=worldState.settlements.find(x=>x.kind==='primary-colony');
+ const tempAnomaly=worldState.climate.energyBalance.temperatureAnomalyC??0;
+ campaignPanel.innerHTML='<div class="cp-heading"><span>Colony operations</span><span>Sol '+worldState.time.sol+'</span></div>'+
+ '<div class="cp-metrics"><strong>'+home.name+'</strong><br>'+sponsor.name+' · '+worldState.settlements.length+' settlement(s)<br>Funds '+worldState.economy.funds+' · Materials '+worldState.economy.materials+' · Water '+worldState.economy.water.toFixed(1)+'<br>Morale '+worldState.colonists.morale.toFixed(1)+' · Sponsor patience '+worldState.campaign.sponsorPatience.toFixed(1)+'<br>Global heat contribution: '+tempAnomaly.toExponential(3)+' °C anomaly</div>'+
+ '<div class="cp-heading"><span>Projects</span><span>'+worldState.infrastructure.projects.filter(p=>p.status==='active').length+' active</span></div>'+
+ worldState.infrastructure.projects.map(p=>'<div class="cp-project"><strong>'+p.name+'</strong><small>'+p.description+'<br>Cost: '+Object.entries(p.cost).map(([k,v])=>k+' '+v).join(' · ')+'<br>'+ (p.status==='active'?'Progress '+Math.round(p.progress*100)+'%'+(p.pausedReason?' · '+p.pausedReason:''):p.status==='complete'?'Completed':'Build time '+p.durationSols+' sols')+'</small><button data-project="'+p.id+'" '+(p.status!=='available'?'disabled':'')+'>'+(p.status==='active'?'In progress':p.status==='complete'?'Complete':'Commission project')+'</button></div>').join('');
+}
+campaignPanel.addEventListener('click',event=>{
+ const button=event.target.closest('[data-project]');if(!button)return;
+ const result=commissionProject(worldState,button.dataset.project);notify(result.ok?'Project commissioned':result.reason);renderCampaignPanel();
+});
+function beginSelectedCampaign(){
+ if(worldState.campaign.started)return;
+ const {site,sponsor}=startCampaign(worldState,siteSelect.value,sponsorSelect.value);
+ locations.colony={name:worldState.settlements[0].name,lat:site.lat,lon:site.lon,zoom:.15,description:'The first settlement at '+site.name+'. Five years of expedition supplies are committed to this site.'};
+ const colonyNav=document.querySelector('[data-place="colony"] .place-name');if(colonyNav)colonyNav.textContent=worldState.settlements[0].name+' · First colony';
+ const jezeroNav=document.querySelector('[data-place="jezero"]');if(jezeroNav&&site.id==='jezero')jezeroNav.querySelector('.place-name').textContent='Jezero Crater · First colony';
+ campaignStart.hidden=true;campaignPanel.hidden=false;
+ clockRunning=true;document.querySelector('#mcPlay').textContent='Ⅱ PAUSE';
+ if(terrainReady&&!colonyLogistics)colonyLogistics=createColonyAndLogistics(THREE,{root,scene,worldState,terrainRadiusOffset,notify});
+ if(site.id==='elysium'||site.id==='arcadia')notify('Expedition landed at '+site.name+' · '+sponsor.name+' sponsorship');
+ else notify('Expedition landed at '+site.name+' · '+sponsor.name+' sponsorship');
+ renderCampaignPanel();
+ if(terrainReady)focusPlace('colony');
+}
+campaignStart.querySelector('#csStart').addEventListener('click',beginSelectedCampaign);
+
 const clockPanel = document.createElement('section');
 clockPanel.id = 'missionClock';
 clockPanel.setAttribute('aria-label', 'Mission date and Mars local time');
 clockPanel.innerHTML = `
   <div class="mc-now"><div class="mc-date" id="mcDate">22 JUL 2027</div><div class="mc-sol" id="mcSol">SOL 001 · 09:00 LMST</div></div>
-  <div class="mc-controls"><button id="mcPlay" type="button">Ⅱ PAUSE</button><button id="mcSpeed" type="button">×60</button></div>`;
+  <div class="mc-controls"><button id="mcPlay" type="button">▶ PLAY</button><button id="mcSpeed" type="button">×60</button></div>`;
 document.querySelector('#app').appendChild(clockPanel);
 document.querySelector('#mcPlay').addEventListener('click', () => {
   clockRunning = !clockRunning;
@@ -50,6 +144,13 @@ document.querySelector('#mcSpeed').addEventListener('click', () => {
 const dateFormatter = new Intl.DateTimeFormat('en-AU', {day:'2-digit', month:'short', year:'numeric', timeZone:'UTC'});
 function updateMissionClock(deltaSeconds) {
   if (clockRunning) elapsedGameSeconds += deltaSeconds * clockSpeed;
+  const completedSols=Math.floor(elapsedGameSeconds/MARS_SOL_SECONDS);
+  if(worldState.campaign.started&&completedSols>lastProcessedClockSol){
+    while(lastProcessedClockSol<completedSols){processWorldTick(worldState);lastProcessedClockSol++;}
+    renderCampaignPanel();
+    const temp=worldState.climate.meanSurfaceTemperatureC;
+    document.querySelector('#meanTemp').textContent=(temp<0?'−':'')+Math.abs(temp).toFixed(12)+'°C';
+  }
   const missionDate = new Date(MISSION_ARRIVAL_UTC + elapsedGameSeconds * 1000);
   const localSolTime = ((ARRIVAL_LOCAL_SOL_SECONDS + elapsedGameSeconds) % MARS_SOL_SECONDS + MARS_SOL_SECONDS) % MARS_SOL_SECONDS;
   const hour = Math.floor(localSolTime / 3600);
@@ -85,7 +186,7 @@ const locations={
  gale:{name:'Gale Crater',lat:-5.4,lon:137.8,zoom:2.1,description:'A layered mountain of sediment inside a crater explored by the Curiosity rover.'},
  north:{name:'North polar cap',lat:82,lon:15,zoom:1.55,description:'Seasonal frost and layered deposits preserve a record of changing Martian climate.'},
  jezero:{name:'Jezero Crater',lat:18.38,lon:77.58,zoom:2.0,description:'A preserved delta records a time when water flowed across the Martian surface.'},
- colony:{name:'Jezero Base',lat:18.38,lon:77.58,zoom:0.15,description:'The first settlement: habitats, greenhouse, laboratory, landing pad and autonomous equipment.'}
+ colony:{name:'First colony',lat:4.5,lon:154.5,zoom:0.15,description:'The first settlement: habitats, greenhouse, laboratory, landing pad and autonomous equipment.'}
 };
 const space=document.querySelector('#space');
 const scene=new THREE.Scene();
@@ -235,7 +336,8 @@ loadMolaTopography().then(info=>{
   lastIceSolarLongitude = Math.floor(arrivalLs);
  }
  worldState.terrain.source=info.source;
- colonyLogistics=createColonyAndLogistics(THREE,{root,scene,worldState,terrainRadiusOffset,notify});
+ terrainReady=true;
+ if(worldState.campaign.started&&!colonyLogistics)colonyLogistics=createColonyAndLogistics(THREE,{root,scene,worldState,terrainRadiusOffset,notify});
  if(marsTexture)applyMarsTexture(marsTexture);
  document.querySelector('#loading p').textContent='NASA MOLA topography loaded';
  document.querySelector('#loading').classList.add('hidden');
