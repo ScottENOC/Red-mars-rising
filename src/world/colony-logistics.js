@@ -322,7 +322,7 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
       const crater = records[i];
       const lat = THREE.MathUtils.degToRad(crater.lat), lon = THREE.MathUtils.degToRad(crater.lon);
       const normal = new THREE.Vector3(-Math.cos(lat)*Math.sin(lon),Math.sin(lat),Math.cos(lat)*Math.cos(lon));
-      position.copy(normal).multiplyScalar(1 + terrainRadiusOffset(crater.lat,crater.lon));
+      position.copy(normal).multiplyScalar(1 + terrainRadiusOffset(crater.lat,crater.lon,1,false));
       quaternion.setFromUnitVectors(centreNormal,normal);
       scale.setScalar(Math.max(0.5,Number(crater.craterDiameterM||10)/2)/3_389_500);
       matrix.compose(position,quaternion,scale);
