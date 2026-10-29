@@ -96,12 +96,13 @@ export function processSponsorCommitments(w,sol,events=[]){
  const home=primaryColony(w),sponsor=sponsorFor(w);
  if(!home||!sponsor)return events;
  const conflict=!!(w.campaign?.earthConflictDeclared||w.campaign?.warWithEarth||w.campaign?.survivalGuaranteeSuspended);
- state.survivalGuaranteeActive=!conflict;
- if(conflict&&!state.survivalBreachRecorded){
+ const guaranteeSuspended=conflict||w.campaign?.sponsorCommitmentsSuspended===true;
+ state.survivalGuaranteeActive=!guaranteeSuspended;
+ if(guaranteeSuspended&&!state.survivalBreachRecorded){
   state.survivalBreachRecorded=true;
   record(w,{sol,kind:'survival-guarantee-suspended',description:sponsor.name+' suspended its founding survival guarantee following the Earth conflict. The colony must seek alternative aid.'});
  }
- if(!conflict&&state.survivalBreachRecorded){
+ if(!guaranteeSuspended&&state.survivalBreachRecorded){
   state.survivalBreachRecorded=false;
   record(w,{sol,kind:'survival-guarantee-restored',description:sponsor.name+' restored the founding survival guarantee.'});
  }
