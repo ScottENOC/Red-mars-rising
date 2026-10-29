@@ -10,8 +10,40 @@ const MOLA_WIDTH = 360 * MOLA_PIXELS_PER_DEGREE;
 const MOLA_HEIGHT = 180 * MOLA_PIXELS_PER_DEGREE;
 let molaElevationAt = null;
 let terrainWorldState = null;
-export function setTerrainWorldState(worldState) { terrainWorldState = worldState; }
-
+let craterSpatialIndex = new Map();
+let craterSpatialIndexCount = -1;
+export function setTerrainWorldState(worldState) {
+  terrainWorldState = worldState;
+  craterSpatialIndexCount = -1;
+}
+function craterCell(lat, lon) {
+  const latCell = Math.max(0, Math.min(179, Math.floor(lat + 90)));
+  const lonCell = Math.floor((((lon % 360) + 360) % 360));
+  return latCell + ':' + lonCell;
+}
+function getCraterCandidates(lat, lon) {
+  const records = terrainWorldState?.terrain?.geologicalModifications ?? [];
+  if (records.length !== craterSpatialIndexCount) {
+    craterSpatialIndex = new Map();
+    for (const crater of records) {
+      if (crater.kind !== 'impact-crater') continue;
+      const latCell = Math.max(0, Math.min(179, Math.floor(crater.lat + 90)));
+      const lonCell = Math.floor((((crater.lon % 360) + 360) % 360));
+      for (let dy = -1; dy <= 1; dy++) {
+        const y = latCell + dy;
+        if (y < 0 || y > 179) continue;
+        for (let dx = -1; dx <= 1; dx++) {
+          const x = (lonCell + dx + 360) % 360;
+          const key = y + ':' + x;
+          if (!craterSpatialIndex.has(key)) craterSpatialIndex.set(key, []);
+          craterSpatialIndex.get(key).push(crater);
+        }
+      }
+    }
+    craterSpatialIndexCount = records.length;
+  }
+  return craterSpatialIndex.get(craterCell(lat, lon)) ?? [];
+}
 // The PDS MEGDR topography image is a headerless, signed 16-bit big-endian grid
 // in metres, simple cylindrical projection, 0–360°E and 90°N–90°S.
 export async function loadMolaTopography() {
@@ -59,8 +91,7 @@ export function terrainRadiusOffset(lat, lon, verticalExaggeration = 1) {
   if (!molaElevationAt) throw new Error('MOLA terrain requested before NASA elevation data finished loading');
   const base = molaElevationAt(lat, lon);
   let deltaM = 0;
-  for (const crater of terrainWorldState?.terrain?.geologicalModifications ?? []) {
-    if (crater.kind !== 'impact-crater') continue;
+  for (const crater of getCraterCandidates(lat, lon)) {
     const d = angularDistance(lat, lon, crater.lat, crater.lon) * 3_389_500;
     const radius = Math.max(0.5, crater.craterDiameterM / 2);
     if (d > radius * 2.2) continue;
