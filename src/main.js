@@ -192,7 +192,19 @@ function saveCampaign(reason = 'autosave') {
   worldState.terrain ??= {source:'NASA MOLA MEGDR 4 pixels/degree',geologicalModifications:[],depositSites:[]};
   worldState.terrain.geologicalModifications ??= [];
   worldState.terrain.depositSites ??= [];
-  const payload = {version:1,savedAt:new Date().toISOString(),reason,elapsedGameSeconds,worldState};
+  // Keep the local save below browser storage limits; aggregate stocks and permanent terrain remain complete.
+  const saveState = JSON.parse(JSON.stringify(worldState));
+  const ledger = saveState.materials?.ledger;
+  if (Array.isArray(ledger) && ledger.length > 1500) {
+   const omitted = ledger.length - 1500;
+   const prior = saveState.materials.ledgerArchive?.entriesOmitted ?? 0;
+   saveState.materials.ledgerArchive = {
+    entriesOmitted: prior + omitted,
+    throughSol: ledger[omitted - 1]?.sol ?? saveState.materials.ledgerArchive?.throughSol ?? 0
+   };
+   saveState.materials.ledger = ledger.slice(-1500);
+  }
+  const payload = {version:1,savedAt:new Date().toISOString(),reason,elapsedGameSeconds,worldState:saveState};
   localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
   saveStatus = 'Saved · Sol ' + (worldState.time?.sol ?? 0);
   if(saveStatusElement) saveStatusElement.textContent = saveStatus;
