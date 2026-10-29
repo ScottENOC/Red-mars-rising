@@ -1,6 +1,6 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js';
 import { createInitialWorldState } from './world/world-state.js';
-import { terrainHeight, terrainRadiusOffset, loadMolaTopography, updatePolarCaps } from './world/terrain.js';
+import { terrainHeight, terrainRadiusOffset, loadMolaTopography, updatePolarCaps, setTerrainWorldState } from './world/terrain.js';
 import { createColonyAndLogistics } from './world/colony-logistics.js';
 import { STARTING_LOCATIONS, SPONSORS, startCampaign } from './world/campaign-options.js';
 import { processWorldTick, commissionProject } from './world/world-tick.js';
@@ -8,9 +8,30 @@ import { METEOROID_TYPES } from './world/material-inventories.js';
 
 const TEXTURE_URL=new URL('../data/mars/8k_mars.jpg', import.meta.url).href;
 const worldState = createInitialWorldState();
+const SAVE_KEY = 'red-mars-rising-campaign-v1';
+let savedGameLoaded = false;
+let saveStatus = 'Not saved';
+let saveStatusElement = null;
+try {
+ const rawSave = localStorage.getItem(SAVE_KEY);
+ if (rawSave) {
+  const save = JSON.parse(rawSave);
+  if (save?.version === 1 && save.worldState && typeof save.worldState === 'object') {
+   Object.assign(worldState, save.worldState);
+   worldState.terrain ??= {source:'NASA MOLA MEGDR 4 pixels/degree',geologicalModifications:[],depositSites:[]};
+   worldState.terrain.geologicalModifications ??= [];
+   worldState.terrain.depositSites ??= [];
+   savedGameLoaded = true;
+   saveStatus = 'Loaded · Sol ' + (worldState.time?.sol ?? 0);
+   window.__RMR_LOADED_SAVE = {elapsedGameSeconds:Math.max(0,Number(save.elapsedGameSeconds)||0)};
+  }
+ }
+} catch (error) {
+ console.warn('Could not load saved Red Mars Rising campaign; starting fresh.', error);
+}
 let colonyLogistics = null;
 let terrainReady = false;
-let lastProcessedClockSol = 0;
+let lastProcessedClockSol = Math.max(0, Number(worldState.time?.sol) || 0);
 const SHOW_GENERATED_POLAR_CAPS = true;
 let lastIceSolarLongitude = -1;
 
@@ -18,7 +39,7 @@ let lastIceSolarLongitude = -1;
 const MISSION_ARRIVAL_UTC = Date.UTC(2027, 6, 22, 0);
 const ARRIVAL_LOCAL_SOL_SECONDS = 9 * 3600;
 const MARS_SOL_SECONDS = 88775.244;
-let elapsedGameSeconds = 0;
+let elapsedGameSeconds = Math.max(0, Number(window.__RMR_LOADED_SAVE?.elapsedGameSeconds) || 0);
 let clockRunning = false;
 let clockSpeed = 60; // one game minute per real second by default
 let clockUiElapsed = 0;
@@ -111,9 +132,13 @@ function renderCampaignPanel(){
  '<div class="cp-metrics"><strong>'+home.name+'</strong><br>'+sponsor.name+' · '+worldState.settlements.length+' settlement(s)<br>Earth link: '+(worldState.pointsOfInterest.filter(p=>p.kind==='mars-orbit-comms'&&p.status==='operational').length)+' Mars relays · ~12.5 min one-way light time<br>Transfer vehicle: '+(worldState.pointsOfInterest.find(p=>p.id==='mars-crewship')?.status??'unknown')+' in Mars orbit<br>Funds '+worldState.economy.funds+' · Materials '+worldState.economy.materials+' · Water '+worldState.economy.water.toFixed(1)+'<br>Morale '+worldState.colonists.morale.toFixed(1)+' · Sponsor patience '+worldState.campaign.sponsorPatience.toFixed(1)+'<br>Global heat contribution: '+tempAnomaly.toExponential(3)+' °C anomaly</div>'+
  materialPanel+
  '<div class="cp-heading"><span>Projects</span><span>'+worldState.infrastructure.projects.filter(p=>p.status==='active').length+' active</span></div>'+
- worldState.infrastructure.projects.map(p=>'<div class="cp-project"><strong>'+p.name+'</strong><small>'+p.description+'<br>Cost: '+Object.entries(p.cost).map(([k,v])=>k+' '+v).join(' · ')+'<br>'+ (p.status==='active'?'Progress '+Math.round(p.progress*100)+'%'+(p.pausedReason?' · '+p.pausedReason:''):p.status==='complete'?'Completed':'Build time '+p.durationSols+' sols')+'</small><button data-project="'+p.id+'" '+(p.status!=='available'?'disabled':'')+'>'+(p.status==='active'?'In progress':p.status==='complete'?'Complete':'Commission project')+'</button></div>').join('');
+ worldState.infrastructure.projects.map(p=>'<div class="cp-project"><strong>'+p.name+'</strong><small>'+p.description+'<br>Cost: '+Object.entries(p.cost).map(([k,v])=>k+' '+v).join(' · ')+'<br>'+ (p.status==='active'?'Progress '+Math.round(p.progress*100)+'%'+(p.pausedReason?' · '+p.pausedReason:''):p.status==='complete'?'Completed':'Build time '+p.durationSols+' sols')+'</small><button data-project="'+p.id+'" '+(p.status!=='available'?'disabled':'')+'>'+(p.status==='active'?'In progress':p.status==='complete'?'Complete':'Commission project')+'</button></div>').join('')+
+ '<div class="cp-project"><strong>Campaign save</strong><small id="saveStatusText">'+saveStatus+'</small><button data-save-now="1">Save now</button></div>';
+ saveStatusElement=campaignPanel.querySelector('#saveStatusText');
 }
 campaignPanel.addEventListener('click',event=>{
+ const saveButton=event.target.closest('[data-save-now]');
+ if(saveButton){const ok=saveCampaign('manual');notify(ok?'Campaign saved on this device':'Could not save campaign; check browser storage');return;}
  const button=event.target.closest('[data-project]');if(!button)return;
  const result=commissionProject(worldState,button.dataset.project);notify(result.ok?'Project commissioned':result.reason);renderCampaignPanel();
 });
@@ -132,6 +157,13 @@ function beginSelectedCampaign(){
  if(terrainReady)focusPlace('colony');
 }
 campaignStart.querySelector('#csStart').addEventListener('click',beginSelectedCampaign);
+if(savedGameLoaded && worldState.campaign.started){
+ const home=worldState.settlements.find(s=>s.kind==='primary-colony');
+ const site=STARTING_LOCATIONS.find(s=>s.id===home?.locationId);
+ if(home&&site)locations.colony={name:home.name,lat:site.lat,lon:site.lon,zoom:.15,description:'Saved first settlement at '+site.name+'.'};
+ campaignStart.hidden=true;campaignPanel.hidden=false;clockRunning=false;
+ renderCampaignPanel();
+}
 
 const clockPanel = document.createElement('section');
 clockPanel.id = 'missionClock';
@@ -151,6 +183,24 @@ document.querySelector('#mcSpeed').addEventListener('click', () => {
   document.querySelector('#mcSpeed').textContent = '×' + clockSpeed;
 });
 const dateFormatter = new Intl.DateTimeFormat('en-AU', {day:'2-digit', month:'short', year:'numeric', timeZone:'UTC'});
+function saveCampaign(reason = 'autosave') {
+ if (!worldState.campaign?.started) return false;
+ try {
+  worldState.terrain ??= {source:'NASA MOLA MEGDR 4 pixels/degree',geologicalModifications:[],depositSites:[]};
+  worldState.terrain.geologicalModifications ??= [];
+  worldState.terrain.depositSites ??= [];
+  const payload = {version:1,savedAt:new Date().toISOString(),reason,elapsedGameSeconds,worldState};
+  localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
+  saveStatus = 'Saved · Sol ' + (worldState.time?.sol ?? 0);
+  if(saveStatusElement) saveStatusElement.textContent = saveStatus;
+  return true;
+ } catch (error) {
+  saveStatus = 'Save failed';
+  if(saveStatusElement) saveStatusElement.textContent = saveStatus;
+  console.error('Red Mars Rising autosave failed.', error);
+  return false;
+ }
+}
 function updateMissionClock(deltaSeconds) {
   if (clockRunning) elapsedGameSeconds += deltaSeconds * clockSpeed;
   const completedSols=Math.floor(elapsedGameSeconds/MARS_SOL_SECONDS);
@@ -160,6 +210,7 @@ function updateMissionClock(deltaSeconds) {
       for(const event of tickEvents)if(['rival-colony-founded','rival-assessment','rival-plan-revised','rival-launch','cargo-drop-landed','project-complete','sponsor-pressure','support-anniversary'].includes(event.type))notify(event.description);
     }
     renderCampaignPanel();
+    saveCampaign('sol-autosave');
     const temp=worldState.climate.meanSurfaceTemperatureC;
     document.querySelector('#meanTemp').textContent=(temp<0?'−':'')+Math.abs(temp).toFixed(12)+'°C';
   }
@@ -359,6 +410,7 @@ function applyMarsTexture(texture){
 }
 // Do not create or display a globe until the measured elevation grid has passed validation.
 loadMolaTopography().then(info=>{
+ setTerrainWorldState(worldState);
  mars=new THREE.Mesh(buildTerrainGeometry(),new THREE.MeshStandardMaterial({color:0x9c5138,roughness:1}));
  mars.castShadow=true;
  mars.receiveShadow=true;
@@ -504,6 +556,8 @@ space.addEventListener('pointerup',endPointer);space.addEventListener('pointerca
 space.addEventListener('click',e=>{if(dragged)return;const rect=renderer.domElement.getBoundingClientRect();pointerNdc.x=((e.clientX-rect.left)/rect.width)*2-1;pointerNdc.y=-((e.clientY-rect.top)/rect.height)*2+1;raycaster.setFromCamera(pointerNdc,camera);const hits=raycaster.intersectObjects([...markerGroup.children,...Object.values(moonObjects).map(m=>m.marker),...(zoom>=1.6&&zoom<8.5?(colonyLogistics?.settlementPickTargets??[]):[]),...(zoom>=1.6?(colonyLogistics?.poiPickTargets??[]).filter(p=>p.visible):[]),...(zoom>11.5?(colonyLogistics?.shipPickTargets??[]):[])],false);if(hits.length){const hit=hits[0].object;if(hit.userData.kind==='supply-ship'){notify(hit.userData.cargo+' · inbound · about '+Math.ceil(hit.userData.etaSols??0)+' sols remaining');}else if(hit.userData.kind==='point-of-interest'||hit.userData.kind==='natural-impact-crater'){notify(hit.userData.name+' · '+hit.userData.status+' · '+hit.userData.description);}else if(hit.userData.kind==='settlement')focusPlace('colony');else if(hit.userData.id)focusPlace(hit.userData.id);else for(const [id,m] of Object.entries(moonObjects))if(hit===m.marker){focusMoon(id);break;}}});
 function resize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);}
 addEventListener('resize',resize);
+addEventListener('pagehide',()=>saveCampaign('pagehide'));
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')saveCampaign('background')});
 let previousFrameTime=performance.now();
 function updateSolarLighting() {
  const missionDateMs=MISSION_ARRIVAL_UTC+elapsedGameSeconds*1000;
