@@ -2,22 +2,24 @@
 
 A browser-based Mars strategy/simulation game exploring the social, political, scientific and ecological choices of humanity's arrival on Mars.
 
-## Prototype 001 — The untouched world
+## Prototype 002 — The first settlement
 
-The opening prototype is a pre-arrival Mars atlas:
+The current prototype shows Mars at the arrival of humanity's first expedition, with a starter colony and a first pass at interplanetary logistics:
 
 - A textured 3D globe with drag-to-rotate controls.
 - Pinch and wheel zoom, plus on-screen zoom/reset controls.
-- A flat global surface map with clickable landmark pins.
 - Optional latitude/longitude grid and landmark markers.
-- Six notable places to focus on: Olympus Mons, Valles Marineris, Hellas Planitia, Gale Crater, the north polar cap and Jezero Crater.
+- Focusable landmarks plus the Jezero Base starter-colony location.
+- A stylised colony surface layer with habitats, greenhouse, laboratory, workshop, solar arrays, landing pad, rover and local tracks, revealed at close zoom.
+- A compressed interplanetary view that reveals Earth, inbound cargo ships and transfer trajectories at wide zoom. These are visual placeholders, not a physical ephemeris or calibrated transfer simulation.
 - Responsive layouts for phones and desktop.
 
 ## Code structure
 
 - `index.html` is the page shell and styling; application logic lives in ES modules.
 - `src/main.js` wires up the prototype interface and Three.js scene.
-- `src/world/world-state.js` defines scenario-owned initial conditions, including separate residual polar deposits and seasonal frost, climate metadata, celestial bodies and an event log.
+- `src/world/world-state.js` defines scenario-owned initial conditions, including the initial population and infrastructure of Jezero Base, illustrative supply-ship manifests, separate residual polar deposits and seasonal frost, climate metadata, celestial bodies and an event log.
+- `src/world/colony-logistics.js` renders the initial colony and zoom-dependent Earth-to-Mars cargo traffic. The colony is a visual prototype; project requirements, sponsor obligations and a working road network between multiple settlements are not implemented yet.
 - `src/world/terrain.js` loads NASA MOLA MEGDR global topography at 4 pixels per degree (when the source is reachable), converts measured elevations in metres to globe radius without vertical exaggeration, and retains procedural relief as a fallback. Polar ice is rendered from world state and follows the active terrain surface.
 
 Polar ice now has two distinct render layers: persistent residual deposits (north: water ice; south: water ice plus residual CO2) and seasonal CO2 frost. Seasonal frost expands in each hemisphere's winter and retreats toward its equinox using the mission clock's calculated solar longitude. This is a first-pass sinusoidal seasonal rule, not a calibrated climate model; its maximum extents and irregular outlines remain provisional visual approximations, not scientific boundary data. The southern seasonal cap is expected to be prominent near the July 2027 arrival, which occurs during southern winter. Climate simulation and persistent geological deformation are not implemented yet. The globe starts with procedural fallback terrain, then attempts to load NASA's official MOLA MEGDR 4-pixel-per-degree global topography grid. If the data host blocks browser access or the request fails, the prototype keeps the approximate fallback; successful loading has not yet been confirmed in a browser.
