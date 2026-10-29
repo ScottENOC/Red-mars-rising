@@ -62,6 +62,7 @@ This is a foundation, not a full political simulation. The indices and drift rat
 - `src/world/material-inventories.js` defines planetary and colony material inventories, a water-transfer ledger, conservation diagnostics and continuous natural meteoroid influx.
 - `src/world/campaign-options.js` defines the five candidate landing sites, sponsor profiles and the campaign-start function.
 - `src/world/world-tick.js` contains the sol-based simulation and project commissioning rules.
+- `src/world/colony-politics.js` stores colony-level political agency and pairwise relationships, advances identity/autonomy indices, and resolves the first player influence initiatives.
 - `src/world/colony-logistics.js` renders settlement modules and zoom-dependent Earth-to-Mars cargo traffic. The interplanetary view compresses distance for readability; ship trajectories are illustrative, not a physical ephemeris.
 - `src/world/terrain.js` loads NASA MOLA MEGDR global topography when the source is reachable and uses the terrain surface for the globe and polar ice layers.
 
