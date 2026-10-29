@@ -164,3 +164,12 @@ The diagnostics now include water-derived mass and hydrogen/oxygen balance check
 2. Refine atmospheric ablation chemistry and connect atmospheric composition changes to climate feedbacks.
 3. Add geographic impact locations, crater formation and optional player-directed ice-rich asteroid missions.
 
+## Reusable orbital capability and one-off asteroid missions
+
+The first orbital-industrial project separates a durable capability from the missions that use it:
+
+- **Mars orbital operations system (recurring capability):** a reusable surface-to-orbit vehicle, propellant infrastructure, navigation, communications, servicing and capture robotics. It is commissioned once, takes 180 sols in the current prototype, and remains available for later missions.
+- **Asteroid NMA-01 capture (one-off mission):** a separately funded 120-sol mission that uses the completed orbital system to rendezvous with and redirect a small near-Mars asteroid into a stable, accessible orbit. Completion adds a persistent captured-asteroid asset to campaign state.
+- **Follow-on work:** detailed prospecting, extraction, processing, orbital transport and maintenance/expansion of the reusable system are deliberately separate future projects. Capturing an asteroid does not automatically create a mine or deliver useful materials to the colony.
+
+The operations panel exposes the capability and mission as separate decisions. The simulation pauses progress during a colony power shortfall. Costs, durations and the notional target designation are gameplay assumptions. Vehicle mass, propellant chemistry, orbital mechanics, launch windows, payload limits, mission risk, capture probabilities and physical resource yields are not yet modelled. This is a strategic gameplay loop, not a validated aerospace mission design.
