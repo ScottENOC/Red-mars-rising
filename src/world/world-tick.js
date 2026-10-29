@@ -1,3 +1,5 @@
+import { SHORTLISTED_SITES } from './campaign-options.js';
+
 const MARS_RADIUS_M = 3_389_500;
 const MARS_SURFACE_AREA_M2 = 4 * Math.PI * MARS_RADIUS_M ** 2;
 const MARS_SOL_SECONDS = 88775.244;
@@ -70,22 +72,46 @@ export function processWorldTick(w) {
     w.campaign.sponsorPressure = Math.min(100, w.campaign.sponsorPressure + (sponsor?.pressure ?? 40) / 100 * .3);
     if (w.campaign.sponsorPatience < 30 && sol % 100 === 0) events.push({type:'sponsor-pressure',sol,description:'Your sponsor is losing patience and may attach conditions to future support.'});
   }
-  if (sol >= 180 && sol % 90 === 0) {
-    const sponsor = w.sponsors.find(s => s.id !== w.campaign.startingSponsorId && !s.colonyFounded);
-    if (sponsor) {
-      const sites = [
-        {id:'rival-arcadia',name:'Arcadia Outpost',lat:46.7,lon:164},
-        {id:'rival-elysium',name:'Elysium Industrial Camp',lat:4.5,lon:154.5},
-        {id:'rival-hellas',name:'Hellas Research Station',lat:-42.4,lon:70.5},
-        {id:'rival-valles',name:'Valles Survey Camp',lat:-13.9,lon:-59.2},
-        {id:'rival-gale',name:'Gale Science Station',lat:-5.4,lon:137.8}
-      ];
-      const candidate = sites.find(p => !w.settlements.some(s => Math.abs(s.lat-p.lat)<3 && Math.abs(s.lon-p.lon)<3));
-      if (candidate) {
-        sponsor.colonyFounded = true; sponsor.status = 'colony-founded';
-        w.settlements.push({...candidate,kind:'rival-colony',population:45,status:'established',sponsorId:sponsor.id,infrastructure:['habitats','power-array']});
-        events.push({type:'rival-colony-founded',sol,description:sponsor.name+' has established '+candidate.name+'.'});
-      }
+  // Rival crews observe the first colony for at least 60 sols before reassessing.
+  // They then wait for an Earth-Mars transfer opportunity (~780 sols) and spend
+  // roughly 240 sols in transit. Cargo precursors can land before crewed missions.
+  for (const sponsor of w.sponsors) {
+    if (sponsor.id === w.campaign.startingSponsorId || sponsor.colonyFounded) continue;
+    sponsor.rivalPlan ??= {status:'observing',assessment:null,launchSol:null,arrivalSol:null,siteId:null};
+    const plan = sponsor.rivalPlan;
+    if (plan.status === 'observing' && sol >= 60) {
+      const healthy = w.colonists.health >= 45 && w.colonists.morale >= 40 && w.economy.powerCapacity >= w.economy.powerDemand;
+      plan.assessment = healthy ? 'cautiously-encouraged' : 'high-risk';
+      plan.assessedAtSol = sol;
+      plan.status = healthy ? 'awaiting-launch-window' : 'reviewing-failure-risk';
+      plan.launchSol = Math.max(780, Math.ceil((sol + (healthy ? 0 : 180)) / 780) * 780);
+      plan.arrivalSol = plan.launchSol + 240;
+      const reserved = new Set(w.sponsors.map(other => other.rivalPlan?.siteId).filter(Boolean));
+      const site = (w.shortlistedSites ?? SHORTLISTED_SITES).find(p => !reserved.has(p.id) && !w.settlements.some(s => Math.abs(s.lat-p.lat)<4 && Math.abs(((s.lon-p.lon+540)%360)-180)<4));
+      if (site) { plan.siteId = site.id; plan.siteName = site.name; }
+      events.push({type:'rival-assessment',sol,description:sponsor.name+' has completed its first 60-sol safety review: '+(healthy?'the mission remains viable, pending the next launch window.':'the colony is showing warning signs; its crewed plan is under extended review.')});
+    }
+    if (plan.status === 'reviewing-failure-risk' && plan.launchSol && sol >= plan.launchSol - 240) {
+      plan.status = 'awaiting-launch-window';
+      events.push({type:'rival-plan-revised',sol,description:sponsor.name+' has approved a revised crewed mission after reviewing the first colony’s difficulties.'});
+    }
+    if (plan.status === 'awaiting-launch-window' && plan.launchSol && sol >= plan.launchSol) {
+      plan.status = 'in-transit';
+      events.push({type:'rival-launch',sol,description:sponsor.name+' has launched its crewed Mars expedition; estimated arrival in about eight months.'});
+    }
+    if (plan.status === 'in-transit' && plan.arrivalSol && sol >= plan.arrivalSol) {
+      const reserved = new Set(w.sponsors.filter(other => other.id !== sponsor.id).map(other => other.rivalPlan?.siteId).filter(Boolean));
+      const site = (w.shortlistedSites ?? SHORTLISTED_SITES).find(p => p.id === plan.siteId && !w.settlements.some(s => s.id===p.id)) ?? (w.shortlistedSites ?? SHORTLISTED_SITES).find(p => !reserved.has(p.id) && !w.settlements.some(s => Math.abs(s.lat-p.lat)<4 && Math.abs(((s.lon-p.lon+540)%360)-180)<4));
+      if (!site) continue;
+      sponsor.colonyFounded = true; sponsor.status = 'colony-founded'; plan.status = 'established';
+      w.settlements.push({...site,kind:'rival-colony',population:45,status:'established',sponsorId:sponsor.id,infrastructure:['habitats','power-array']});
+      events.push({type:'rival-colony-founded',sol,description:sponsor.name+' has established '+site.name+' after an eight-month voyage.'});
+    }
+  }
+  for (const drop of (w.logistics?.plannedCargoDrops ?? [])) {
+    if (drop.status === 'scheduled' && sol >= drop.arrivalSol) {
+      drop.status = 'landed';
+      events.push({type:'cargo-drop-landed',sol,description:drop.sponsorName+' cargo landed at '+drop.siteName+'; no crewed colony has been established.'});
     }
   }
   w.time.lastProcessedSol = sol;
