@@ -124,6 +124,50 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
   }
 
   const builtSettlements = settlements.map(buildSettlement);
+  const routeMeshes = [];
+  function rebuildSettlementRoutes() {
+    for (const mesh of routeMeshes) {
+      root.remove(mesh);
+      mesh.geometry.dispose();
+      mesh.material.dispose();
+    }
+    routeMeshes.length = 0;
+    const byId = new Map(settlements.map(item => [item.id, item]));
+    for (const routeSpec of worldState.infrastructure?.routes ?? []) {
+      const from = byId.get(routeSpec.from);
+      const to = byId.get(routeSpec.to);
+      if (!from || !to) continue;
+      const toUnit = (place) => {
+        const lat = THREE.MathUtils.degToRad(place.lat);
+        const lon = THREE.MathUtils.degToRad(place.lon);
+        return new THREE.Vector3(-Math.cos(lat) * Math.sin(lon), Math.sin(lat), Math.cos(lat) * Math.cos(lon)).normalize();
+      };
+      const a = toUnit(from);
+      const b = toUnit(to);
+      const angle = a.angleTo(b);
+      const points = [];
+      for (let i = 0; i <= 96; i++) {
+        const t = i / 96;
+        let direction;
+        if (angle < 1e-5) direction = a.clone();
+        else direction = a.clone().multiplyScalar(Math.sin((1 - t) * angle) / Math.sin(angle))
+          .add(b.clone().multiplyScalar(Math.sin(t * angle) / Math.sin(angle))).normalize();
+        const lat = Math.asin(THREE.MathUtils.clamp(direction.y, -1, 1)) * 180 / Math.PI;
+        const lon = Math.atan2(-direction.x, direction.z) * 180 / Math.PI;
+        points.push(surfacePoint(lat, lon, 0.0035));
+      }
+      const curve = new THREE.CatmullRomCurve3(points);
+      const road = new THREE.Mesh(
+        new THREE.TubeGeometry(curve, 96, 0.0015, 5, false),
+        new THREE.MeshStandardMaterial({ color: 0x49352b, roughness: 1 })
+      );
+      road.name = routeSpec.name ?? 'Inter-settlement road';
+      road.userData = { kind: 'settlement-route', id: routeSpec.id };
+      root.add(road);
+      routeMeshes.push(road);
+    }
+  }
+  rebuildSettlementRoutes();
 
   // Earth and transfer paths are intentionally shown only at wide zoom. The
   // scene compresses interplanetary distances so both destinations fit on screen.
@@ -182,6 +226,7 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
       group.visible = detailVisible;
       markerGroup.visible = markerVisible;
     }
+    for (const road of routeMeshes) road.visible = zoom < 8.5;
     const logisticsVisible = zoom > 11.5;
     orbitalGroup.visible = logisticsVisible;
     if (logisticsVisible) {
@@ -201,6 +246,8 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
     settlements: builtSettlements,
     shipPickTargets,
     settlementPickTargets,
+    routeMeshes,
+    rebuildSettlementRoutes,
     update,
     getSettlement(id) { return builtSettlements.find(item => item.settlement.id === id); }
   };
