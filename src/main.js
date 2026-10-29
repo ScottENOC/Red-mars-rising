@@ -6,6 +6,8 @@ const TEXTURE_URL=new URL('../data/mars/8k_mars.jpg', import.meta.url).href;
 const worldState = createInitialWorldState();
 // Temporary diagnostic: hide generated caps so the underlying colour texture can be inspected.
 const SHOW_GENERATED_POLAR_CAPS = false;
+// Temporary diagnostic: use strong ambient fill so both poles remain visible regardless of season or local time.
+const FORCE_FULL_SUNLIGHT = true;
 
 // Mission timeline: the first crew leaves Earth in late 2026 and arrives in July 2027.
 const MISSION_ARRIVAL_UTC = Date.UTC(2027, 6, 22, 0);
@@ -96,7 +98,7 @@ renderer.shadowMap.enabled=true;
 renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 space.appendChild(renderer.domElement);
 const root=new THREE.Group();scene.add(root);
-const ambient=new THREE.AmbientLight(0x777b84,0.12);scene.add(ambient);
+const ambient=new THREE.AmbientLight(0x777b84,FORCE_FULL_SUNLIGHT?2.0:0.12);scene.add(ambient);
 const key=new THREE.DirectionalLight(0xffdfc1,2.8);
 key.position.set(0,0,4);key.castShadow=true;
 key.shadow.mapSize.set(2048,2048);
