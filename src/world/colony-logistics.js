@@ -23,7 +23,8 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
   const orbitPoiMarkers = [];
   const earthPoiMarkers = [];
   const impactMarkerById = new Map();
-  const craterMeshById = new Map();
+  let craterInstanceMesh = null;
+  let craterInstanceCapacity = 0;
   let lastCraterRecordCount = -1;
   function pointOnMars(lat, lon, extra = 0.012) {
     const a = THREE.MathUtils.degToRad(lat), b = THREE.MathUtils.degToRad(lon);
@@ -265,25 +266,14 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
   }
 
   const poiPickTargets = [...shortlistMarkers,...surfacePoiMarkers,...cargoDropMarkers.map(x=>x.marker),...orbitPoiMarkers.map(x=>x.marker),...earthPoiMarkers.map(x=>x.marker)];
-  function buildImpactCraterMesh(impact) {
-    const radiusM = Math.max(0.5, Number(impact.craterDiameterM || 10) / 2);
-    const marsRadiusM = 3_389_500;
-    const lat = THREE.MathUtils.degToRad(impact.lat), lon = THREE.MathUtils.degToRad(impact.lon);
-    const centre = new THREE.Vector3(-Math.cos(lat) * Math.sin(lon), Math.sin(lat), Math.cos(lat) * Math.cos(lon));
-    const east = new THREE.Vector3(-Math.cos(lon), 0, -Math.sin(lon));
-    const north = new THREE.Vector3(Math.sin(lat) * Math.sin(lon), Math.cos(lat), -Math.sin(lat) * Math.cos(lon));
+  function buildUnitCraterGeometry() {
     const vertices = [], indices = [], rings = 4, segments = 12;
     const radii = [0, 0.42, 0.78, 1.0, 1.9];
-    const heightsM = [-radiusM * 0.32, -radiusM * 0.23, -radiusM * 0.025, radiusM * 0.07, radiusM * 0.012];
-    const surfaceBase = 1 + terrainRadiusOffset(impact.lat, impact.lon);
+    const heights = [-0.32, -0.23, -0.025, 0.07, 0.012];
     for (let j = 0; j <= rings; j++) {
       for (let i = 0; i <= segments; i++) {
         const angle = i / segments * Math.PI * 2;
-        const tangent = east.clone().multiplyScalar(Math.cos(angle) * radii[j] * radiusM / marsRadiusM)
-          .add(north.clone().multiplyScalar(Math.sin(angle) * radii[j] * radiusM / marsRadiusM));
-        const direction = centre.clone().add(tangent).normalize();
-        const point = direction.multiplyScalar(surfaceBase + heightsM[j] / marsRadiusM);
-        vertices.push(point.x, point.y, point.z);
+        vertices.push(Math.cos(angle) * radii[j], Math.sin(angle) * radii[j], heights[j]);
       }
     }
     for (let j = 0; j < rings; j++) for (let i = 0; i < segments; i++) {
@@ -294,30 +284,54 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
+    return geometry;
+  }
+  function syncPermanentCraters() {
+    const records = (worldState.terrain?.geologicalModifications ?? []).filter(x=>x.kind==='impact-crater');
+    if (records.length === lastCraterRecordCount) return;
+    const oldCount = lastCraterRecordCount;
+    lastCraterRecordCount = records.length;
+    const needsRebuild = !craterInstanceMesh || records.length > craterInstanceCapacity;
+    if (needsRebuild) {
+      if (craterInstanceMesh) {
+        root.remove(craterInstanceMesh);
+        craterInstanceMesh.geometry.dispose();
+        craterInstanceMesh.material.dispose();
+      }
+      craterInstanceCapacity = Math.max(64, 2 ** Math.ceil(Math.log2(Math.max(1, records.length))));
+      craterInstanceMesh = new THREE.InstancedMesh(
+        buildUnitCraterGeometry(),
+        new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:1,metalness:0,side:THREE.DoubleSide}),
+        craterInstanceCapacity
+      );
+      craterInstanceMesh.name = 'permanent-impact-craters';
+      craterInstanceMesh.frustumCulled = false;
+      root.add(craterInstanceMesh);
+    }
+    const from = needsRebuild ? 0 : Math.max(0, oldCount);
+    const centreNormal = new THREE.Vector3(0,0,1);
+    const quaternion = new THREE.Quaternion();
+    const position = new THREE.Vector3();
+    const scale = new THREE.Vector3();
+    const matrix = new THREE.Matrix4();
     const colourByType = {
       'carbonaceous-chondrite':0x443b35,'ordinary-chondrite':0x77665a,'enstatite-chondrite':0x625c51,
       'basaltic-achondrite':0x6e5145,'iron-stony-iron':0x4d4542,'cometary-dust':0x9a8171
     };
-    const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
-      color:colourByType[impact.impactorTypeId] ?? 0x705b50, roughness:1, metalness:0, side:THREE.DoubleSide
-    }));
-    mesh.userData = {kind:'terrain-impact-crater', id:impact.id, impact};
-    return mesh;
-  }
-  function syncPermanentCraters() {
-    const records = worldState.terrain?.geologicalModifications ?? [];
-    if (records.length === lastCraterRecordCount) return;
-    lastCraterRecordCount = records.length;
-    const liveIds = new Set(records.filter(x=>x.kind==='impact-crater').map(x=>x.id));
-    for (const [id,mesh] of craterMeshById) {
-      if (liveIds.has(id)) continue;
-      root.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); craterMeshById.delete(id);
+    for (let i = from; i < records.length; i++) {
+      const crater = records[i];
+      const lat = THREE.MathUtils.degToRad(crater.lat), lon = THREE.MathUtils.degToRad(crater.lon);
+      const normal = new THREE.Vector3(-Math.cos(lat)*Math.sin(lon),Math.sin(lat),Math.cos(lat)*Math.cos(lon));
+      position.copy(normal).multiplyScalar(1 + terrainRadiusOffset(crater.lat,crater.lon));
+      quaternion.setFromUnitVectors(centreNormal,normal);
+      scale.setScalar(Math.max(0.5,Number(crater.craterDiameterM||10)/2)/3_389_500);
+      matrix.compose(position,quaternion,scale);
+      craterInstanceMesh.setMatrixAt(i,matrix);
+      craterInstanceMesh.setColorAt(i,new THREE.Color(colourByType[crater.impactorTypeId] ?? 0x705b50));
     }
-    for (const crater of records) {
-      if (crater.kind!=='impact-crater' || craterMeshById.has(crater.id)) continue;
-      const mesh = buildImpactCraterMesh(crater);
-      root.add(mesh); craterMeshById.set(crater.id,mesh);
-    }
+    craterInstanceMesh.count = records.length;
+    craterInstanceMesh.instanceMatrix.needsUpdate = true;
+    if (craterInstanceMesh.instanceColor) craterInstanceMesh.instanceColor.needsUpdate = true;
   }
   function syncImpactMarkers() {
     const impacts = worldState.materials?.planetary?.meteoroids?.recentImpacts ?? [];
