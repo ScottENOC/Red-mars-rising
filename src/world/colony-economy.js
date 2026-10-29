@@ -90,13 +90,13 @@ function deliverShipments(w,sol,events){
     }
     destination.economy.inventory[ship.good]=round3((destination.economy.inventory[ship.good]??0)+ship.amount);
     ship.status='delivered';
-    if(ship.kind==='earth-import'){destination.economy.importDependence=clamp(destination.economy.importDependence+0.1);destination.economy.pendingImports=(destination.economy.pendingImports??[]).filter(good=>good!==ship.good);destination.economy.pendingImport=destination.economy.pendingImports.length>0;}
+    if(ship.kind==='earth-import'){destination.economy.importDependence=clamp(destination.economy.importDependence+1);destination.economy.pendingImports=(destination.economy.pendingImports??[]).filter(good=>good!==ship.good);destination.economy.pendingImport=destination.economy.pendingImports.length>0;}
     addTradeLog(w,{sol,kind:'delivered',shipmentId:ship.id,fromId:ship.fromId,toId:ship.toId,good:ship.good,amount:ship.amount,description:ship.amount+' units of '+ship.good+' arrived at '+destination.name+'.'});
     events.push({type:'colony-shipment-arrived',sol,description:ship.amount+' units of '+ship.good+' arrived at '+destination.name+(ship.kind==='trade'?' from '+(w.settlements.find(s=>s.id===ship.fromId)?.name??'another colony'):' from its Earth sponsor')+'.'});
     if(ship.kind==='trade'){
       const from=w.settlements.find(s=>s.id===ship.fromId);
-      if(from&&from.economy)from.economy.importDependence=clamp(from.economy.importDependence-0.12);
-      destination.economy.importDependence=clamp(destination.economy.importDependence-0.2);
+      if(from&&from.economy)from.economy.importDependence=clamp(from.economy.importDependence-0.5);
+      destination.economy.importDependence=clamp(destination.economy.importDependence-0.5);
     }
   }
   w.colonyTrade.shipments=w.colonyTrade.shipments.filter(s=>s.status==='in-transit'||sol-s.arrivalSol<30);
@@ -128,16 +128,23 @@ function operateColonies(w,sol,events){
       e.inventory.machinery=Math.max(0,Math.min(150,e.inventory.machinery));
       e.inventory.electronics=Math.max(0,Math.min(120,e.inventory.electronics));
     }
-    if(sol%90===0&&e.importDependence>35&&e.inventory.food<40&&!e.pendingImport){
-      const sponsor=s.sponsorId;
-      const ship={id:'colony-haul-'+w.colonyTrade.nextShipmentId++,kind:'earth-import',fromId:'earth:'+sponsor,toId:s.id,good:'food',amount:55,departSol:sol,arrivalSol:sol+240,travelSols:240,distanceKm:null,status:'in-transit'};
-      e.pendingImport=true;
-      e.lastImportSol=sol;
-      w.colonyTrade.shipments.push(ship);
-      addTradeLog(w,{sol,kind:'ordered-earth-import',shipmentId:ship.id,toId:s.id,good:'food',amount:55,description:s.name+' requested sponsor food cargo; estimated arrival in 240 sols.'});
-      events.push({type:'colony-import-ordered',sol,description:s.name+' requested an emergency food shipment from its Earth sponsor.'});
+    if(sol%30===0&&e.importDependence>35){
+      const thresholds={food:40,components:8,machinery:5,electronics:4,aggregate:8};
+      const amounts={food:55,components:18,machinery:12,electronics:10,aggregate:30};
+      for(const good of GOODS){
+        const pending=w.colonyTrade.shipments.some(x=>x.toId===s.id&&x.kind==='earth-import'&&x.good===good&&x.status==='in-transit');
+        if(e.inventory[good]>=thresholds[good]||pending)continue;
+        const ship={id:'colony-haul-'+w.colonyTrade.nextShipmentId++,kind:'earth-import',fromId:'earth:'+s.sponsorId,toId:s.id,good,amount:amounts[good],departSol:sol,arrivalSol:sol+240,travelSols:240,distanceKm:null,status:'in-transit'};
+        e.pendingImports=[...new Set([...(e.pendingImports??[]),good])];
+        e.pendingImport=true;
+        e.lastImportSol=sol;
+        w.colonyTrade.shipments.push(ship);
+        addTradeLog(w,{sol,kind:'ordered-earth-import',shipmentId:ship.id,toId:s.id,good,amount:ship.amount,description:s.name+' requested sponsor cargo of '+ship.amount+' units of '+good+'; estimated arrival in 240 sols.'});
+        events.push({type:'colony-import-ordered',sol,description:s.name+' requested '+good+' cargo from its Earth sponsor.'});
+      }
     }
-    if(e.pendingImport&&!w.colonyTrade.shipments.some(x=>x.toId===s.id&&x.kind==='earth-import'&&x.status==='in-transit'))e.pendingImport=false;
+    e.pendingImports=(e.pendingImports??[]).filter(good=>w.colonyTrade.shipments.some(x=>x.toId===s.id&&x.kind==='earth-import'&&x.good===good&&x.status==='in-transit'));
+    e.pendingImport=e.pendingImports.length>0;
   }
 }
 function dispatchIntercolonyTrade(w,sol){
