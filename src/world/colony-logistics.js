@@ -23,6 +23,8 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
   const orbitPoiMarkers = [];
   const earthPoiMarkers = [];
   const impactMarkerById = new Map();
+  const craterMeshById = new Map();
+  let lastCraterRecordCount = -1;
   function pointOnMars(lat, lon, extra = 0.012) {
     const a = THREE.MathUtils.degToRad(lat), b = THREE.MathUtils.degToRad(lon);
     const r = 1 + terrainRadiusOffset(lat, lon) + extra;
@@ -263,6 +265,60 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
   }
 
   const poiPickTargets = [...shortlistMarkers,...surfacePoiMarkers,...cargoDropMarkers.map(x=>x.marker),...orbitPoiMarkers.map(x=>x.marker),...earthPoiMarkers.map(x=>x.marker)];
+  function buildImpactCraterMesh(impact) {
+    const radiusM = Math.max(0.5, Number(impact.craterDiameterM || 10) / 2);
+    const marsRadiusM = 3_389_500;
+    const lat = THREE.MathUtils.degToRad(impact.lat), lon = THREE.MathUtils.degToRad(impact.lon);
+    const centre = new THREE.Vector3(-Math.cos(lat) * Math.sin(lon), Math.sin(lat), Math.cos(lat) * Math.cos(lon));
+    const east = new THREE.Vector3(-Math.cos(lon), 0, -Math.sin(lon));
+    const north = new THREE.Vector3(Math.sin(lat) * Math.sin(lon), Math.cos(lat), -Math.sin(lat) * Math.cos(lon));
+    const vertices = [], indices = [], rings = 4, segments = 12;
+    const radii = [0, 0.42, 0.78, 1.0, 1.9];
+    const heightsM = [-radiusM * 0.32, -radiusM * 0.23, -radiusM * 0.025, radiusM * 0.07, radiusM * 0.012];
+    const surfaceBase = 1 + terrainRadiusOffset(impact.lat, impact.lon);
+    for (let j = 0; j <= rings; j++) {
+      for (let i = 0; i <= segments; i++) {
+        const angle = i / segments * Math.PI * 2;
+        const tangent = east.clone().multiplyScalar(Math.cos(angle) * radii[j] * radiusM / marsRadiusM)
+          .add(north.clone().multiplyScalar(Math.sin(angle) * radii[j] * radiusM / marsRadiusM));
+        const direction = centre.clone().add(tangent).normalize();
+        const point = direction.multiplyScalar(surfaceBase + heightsM[j] / marsRadiusM);
+        vertices.push(point.x, point.y, point.z);
+      }
+    }
+    for (let j = 0; j < rings; j++) for (let i = 0; i < segments; i++) {
+      const a = j * (segments + 1) + i, b = a + segments + 1;
+      indices.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    const colourByType = {
+      'carbonaceous-chondrite':0x443b35,'ordinary-chondrite':0x77665a,'enstatite-chondrite':0x625c51,
+      'basaltic-achondrite':0x6e5145,'iron-stony-iron':0x4d4542,'cometary-dust':0x9a8171
+    };
+    const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
+      color:colourByType[impact.impactorTypeId] ?? 0x705b50, roughness:1, metalness:0, side:THREE.DoubleSide
+    }));
+    mesh.userData = {kind:'terrain-impact-crater', id:impact.id, impact};
+    return mesh;
+  }
+  function syncPermanentCraters() {
+    const records = worldState.terrain?.geologicalModifications ?? [];
+    if (records.length === lastCraterRecordCount) return;
+    lastCraterRecordCount = records.length;
+    const liveIds = new Set(records.filter(x=>x.kind==='impact-crater').map(x=>x.id));
+    for (const [id,mesh] of craterMeshById) {
+      if (liveIds.has(id)) continue;
+      root.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); craterMeshById.delete(id);
+    }
+    for (const crater of records) {
+      if (crater.kind!=='impact-crater' || craterMeshById.has(crater.id)) continue;
+      const mesh = buildImpactCraterMesh(crater);
+      root.add(mesh); craterMeshById.set(crater.id,mesh);
+    }
+  }
   function syncImpactMarkers() {
     const impacts = worldState.materials?.planetary?.meteoroids?.recentImpacts ?? [];
     const currentIds = new Set(impacts.map(impact=>impact.id));
@@ -294,6 +350,7 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
   function update(zoom, elapsedGameSeconds) {
     while (builtSettlements.length < settlements.length) builtSettlements.push(buildSettlement(settlements[builtSettlements.length]));
     syncImpactMarkers();
+    syncPermanentCraters();
     const detailVisible = zoom < 1.6;
     const markerVisible = zoom >= 1.6 && zoom < 8.5;
     for (const { group, markerGroup } of builtSettlements) {
