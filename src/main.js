@@ -56,15 +56,15 @@ let clockSpeed = 60; // one game minute per real second by default
 let clockUiElapsed = 0;
 const clockStyle = document.createElement('style');
 clockStyle.textContent = `
-#missionClock{position:absolute;z-index:4;top:86px;right:clamp(14px,3.5vw,48px);display:flex;align-items:center;gap:12px;padding:8px 10px;background:#0b1018d9;border:1px solid #ffffff24;backdrop-filter:blur(16px);box-shadow:0 12px 40px #0005;font-variant-numeric:tabular-nums}
+#missionClock{position:absolute;z-index:4;top:calc(8px + env(safe-area-inset-top));right:12px;display:flex;align-items:center;gap:7px;padding:5px 7px;background:#0b1018d9;border:1px solid #ffffff24;backdrop-filter:blur(16px);box-shadow:0 12px 40px #0005;font-variant-numeric:tabular-nums}
 #missionClock .mc-now{display:flex;flex-direction:column;gap:3px;min-width:100px}
 #missionClock .mc-date{font-size:12px;letter-spacing:.06em;color:#f1e8df}
 #missionClock .mc-sol{font-size:10px;color:#b5b4b1;letter-spacing:.04em}
 #missionClock .mc-controls{display:flex;gap:5px}
 #missionClock button{border:1px solid #ffffff25;background:#ffffff08;padding:7px 8px;font-size:9px;letter-spacing:.05em;color:#ded6ce;white-space:nowrap}
 #missionClock button:hover{border-color:#c17b60;color:#fff}
-@media(max-width:760px){#missionClock{top:68px;right:12px;gap:6px;padding:6px 7px}#missionClock .mc-now{min-width:82px}#missionClock .mc-date{font-size:10px}#missionClock .mc-sol{font-size:9px}#missionClock .mc-controls{gap:3px}#missionClock button{padding:7px 5px;font-size:8px}}
-@media(max-width:390px){#missionClock{top:63px;right:8px;gap:5px;padding:5px}#missionClock .mc-now{min-width:70px}#missionClock .mc-date{font-size:9px}#missionClock .mc-sol{font-size:8px}#missionClock button{padding:6px 4px;font-size:7px}}
+@media(max-width:760px){#missionClock{top:calc(8px + env(safe-area-inset-top));right:10px;gap:5px;padding:4px 6px}#missionClock .mc-now{min-width:82px}#missionClock .mc-date{font-size:10px}#missionClock .mc-sol{font-size:9px}#missionClock .mc-controls{gap:3px}#missionClock button{padding:7px 5px;font-size:8px}}
+@media(max-width:390px){#missionClock{top:calc(6px + env(safe-area-inset-top));right:8px;gap:4px;padding:4px}#missionClock .mc-now{min-width:70px}#missionClock .mc-date{font-size:9px}#missionClock .mc-sol{font-size:8px}#missionClock button{padding:6px 4px;font-size:7px}}
 `;
 document.head.appendChild(clockStyle);
 
@@ -104,13 +104,12 @@ campaignStart.id='campaignStart';
 campaignStart.innerHTML=`
  <div class="cs-card">
   <div class="cs-kicker">Red Mars Rising · First Expedition</div>
-  <h2>Choose where humanity begins.</h2>
-  <p class="cs-intro">Five years of expedition supplies are committed to the site you select. Every sponsor remains active in the wider Mars programme; your choice changes your starting support, political obligations and the relationships you inherit.</p>
+  <h2>First expedition</h2>
   <div class="cs-grid">
    <div class="cs-field"><label for="csSite">Starting site</label><select id="csSite"></select><div class="cs-detail" id="csSiteDetail"></div></div>
    <div class="cs-field"><label for="csSponsor">Starting sponsor</label><select id="csSponsor"></select><div class="cs-detail" id="csSponsorDetail"></div></div>
   </div>
-  <div class="cs-footer"><div class="cs-note">These are strategic abstractions, not guarantees: local water, construction conditions and future inundation depend on later surveys and the evolving climate model.</div><button id="csStart" type="button">Begin expedition</button></div>
+  <div class="cs-footer"><button id="csStart" type="button">Begin expedition</button></div>
  </div>`;
 document.querySelector('#app').appendChild(campaignStart);
 const siteSelect=campaignStart.querySelector('#csSite');
@@ -127,6 +126,10 @@ function refreshStartDetails(){
 }
 siteSelect.addEventListener('change',refreshStartDetails);sponsorSelect.addEventListener('change',refreshStartDetails);refreshStartDetails();
 const campaignPanel=document.createElement('section');campaignPanel.id='campaignPanel';campaignPanel.hidden=true;document.querySelector('#app').appendChild(campaignPanel);
+const managementNav=document.querySelector('#managementNav');
+document.querySelector('#navColony').addEventListener('click',()=>{campaignPanel.hidden=!campaignPanel.hidden;document.querySelector('#navColony').classList.toggle('active',!campaignPanel.hidden);});
+document.querySelector('#navExplore').addEventListener('click',()=>{landmarksMenu.hidden=!landmarksMenu.hidden;document.querySelector('#navExplore').classList.toggle('active',!landmarksMenu.hidden);});
+document.querySelector('#navEnvironment').addEventListener('click',()=>{dataMenu.hidden=!dataMenu.hidden;document.querySelector('#navEnvironment').classList.toggle('active',!dataMenu.hidden);});
 function buildHabitatComponentReport(){
  const project=worldState.infrastructure.projects.find(p=>p.id==='buried-habitat');
  if(!project)return '';
@@ -289,7 +292,7 @@ function beginSelectedCampaign(){
  locations.colony={name:worldState.settlements[0].name,lat:site.lat,lon:site.lon,zoom:.15,description:'The first settlement at '+site.name+'. Five years of expedition supplies are committed to this site.'};
  const colonyNav=document.querySelector('[data-place="colony"] .place-name');if(colonyNav)colonyNav.textContent=worldState.settlements[0].name+' · First colony';
  const jezeroNav=document.querySelector('[data-place="jezero"]');if(jezeroNav&&site.id==='jezero')jezeroNav.querySelector('.place-name').textContent='Jezero Crater · First colony';
- campaignStart.hidden=true;campaignPanel.hidden=false;
+ campaignStart.hidden=true;campaignPanel.hidden=true;managementNav.hidden=false;
  clockRunning=true;document.querySelector('#mcPlay').textContent='Ⅱ PAUSE';
  if(terrainReady&&!colonyLogistics)colonyLogistics=createColonyAndLogistics(THREE,{root,scene,worldState,terrainRadiusOffset,notify});
  if(site.id==='elysium'||site.id==='arcadia')notify('Expedition landed at '+site.name+' · '+sponsor.name+' sponsorship');
@@ -302,7 +305,7 @@ if(savedGameLoaded && worldState.campaign.started){
  const home=worldState.settlements.find(s=>s.kind==='primary-colony');
  const site=STARTING_LOCATIONS.find(s=>s.id===home?.locationId);
  if(home&&site)locations.colony={name:home.name,lat:site.lat,lon:site.lon,zoom:.15,description:'Saved first settlement at '+site.name+'.'};
- campaignStart.hidden=true;campaignPanel.hidden=false;clockRunning=false;
+ campaignStart.hidden=true;campaignPanel.hidden=true;managementNav.hidden=false;clockRunning=false;
  renderCampaignPanel();
 }
 
