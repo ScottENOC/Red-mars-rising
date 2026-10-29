@@ -77,6 +77,28 @@ export function transferWater(w,{from,to,massKg,sol=0,process='transfer',note=''
   return {ok:true,massKg,from,to};
 }
 
+function addRetainedMeteoroidComposition(m,type,massKg,sol){
+  const mineral=m.planetary.mineralDepositsKg;
+  for(const [component,fraction] of Object.entries(type.composition)){
+    const mass=massKg*fraction;
+    if(component==='silicates')mineral.silicates+=mass;
+    else if(component==='ironNickel')mineral.ironNickel+=mass;
+    else if(component==='sulfides')mineral.sulfides+=mass;
+    else if(component==='carbonOrganics')mineral.carbonOrganics+=mass;
+    else if(component==='otherMinerals')mineral.otherMinerals+=mass;
+    else if(component==='carbonDioxideIce')mineral.carbonDioxideIce+=mass;
+    else if(component==='otherVolatiles')mineral.otherVolatiles+=mass;
+    else if(component==='waterIce'){
+      const vapour=mass*.8;
+      m.planetary.waterKg.atmosphericVapour.mass+=vapour;
+      m.planetary.waterKg.surfaceIce.mass+=mass-vapour;
+      m.planetary.externalWaterInputsKg+=mass;
+      m.externalFlows.importedWaterKg+=mass;
+      m.ledger.push({sol,substance:'H2O',massKg:mass,from:'space:impact-body',to:'planet:water-reservoirs',process:'impact-volatile-delivery',note:'Impact-delivered ice split between atmospheric vapour and surface ice by a scenario assumption.'});
+    }
+  }
+}
+
 export function processNaturalMeteoroidFlux(w,sol){
   const m=ensureMaterialInventories(w),r=m.planetary.meteoroids;
   const incomingKg=METEOROID_MASS_FLUX_KG_PER_EARTH_YEAR*EARTH_DAYS_PER_MARS_SOL/365.25;
@@ -109,7 +131,25 @@ export function processNaturalMeteoroidFlux(w,sol){
   r.surfaceDepositsKg+=retainedKg;r.atmosphericTransientKg=Math.max(0,r.atmosphericTransientKg-incomingKg);
   r.impactFractionalAccumulator+=320*EARTH_DAYS_PER_MARS_SOL/365.25;
   let impacts=0;while(r.impactFractionalAccumulator>=1){r.impactFractionalAccumulator-=1;impacts++;}
-  if(impacts){r.craterImpactsGreaterThan8mCumulative+=impacts;r.lastImpactSol=sol;}
+  if(impacts){
+    r.craterImpactsGreaterThan8mCumulative+=impacts;r.lastImpactSol=sol;
+    for(let i=0;i<impacts;i++){
+      // Deterministic quasi-random size/type variation makes tests reproducible without flattening the population.
+      const selector=Math.abs(Math.sin((sol+i*17.17)*12.9898)*43758.5453)%1;
+      let cumulative=0,chosen=METEOROID_TYPES[0];
+      for(const type of METEOROID_TYPES){cumulative+=type.fraction;if(selector<cumulative){chosen=type;break;}}
+      const sizeSelector=(Math.sin((sol*17+i*31)*.123)+1)/2;
+      const diameterM=.35+sizeSelector*1.1;
+      const impactMassKg=(4/3)*Math.PI*(diameterM/2)**3*chosen.densityKgM3;
+      const retainedImpactKg=impactMassKg*.85;
+      const stock=r.types[chosen.id];
+      stock.massKg+=impactMassKg;stock.retainedKg+=retainedImpactKg;stock.escapedOrAblatedKg+=impactMassKg-retainedImpactKg;
+      r.incomingCumulativeKg+=impactMassKg;r.retainedCumulativeKg+=retainedImpactKg;r.escapedOrAblatedCumulativeKg+=impactMassKg-retainedImpactKg;
+      r.pendingIncomingKg+=impactMassKg;r.surfaceDepositsKg+=retainedImpactKg;m.externalFlows.meteoroidMatterKg+=impactMassKg;
+      addRetainedMeteoroidComposition(m,chosen,retainedImpactKg,sol);
+      m.ledger.push({sol,substance:chosen.label,massKg:impactMassKg,from:'space',to:'planet:impact-site',process:'natural-crater-impact',note:'Modelled impactor diameter '+diameterM.toFixed(2)+' m; assumed density '+chosen.densityKgM3+' kg/m3; 15% entry/impact mass loss.'});
+    }
+  }
   if(sol%30===0){
     m.ledger.push({sol,substance:'mixed meteoroid matter',massKg:r.pendingIncomingKg,from:'space',to:'planet:meteoroid-deposits',process:'natural-flux',note:'30-sol aggregate across modelled meteoroid classes.'});
     r.pendingIncomingKg=0;
