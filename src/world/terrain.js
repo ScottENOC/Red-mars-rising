@@ -87,11 +87,11 @@ export async function loadMolaTopography() {
 
 // Elevation is converted from metres to a fraction of Mars' mean radius.
 // Keep the globe at true vertical scale; no artistic terrain exaggeration.
-export function terrainRadiusOffset(lat, lon, verticalExaggeration = 1) {
+export function terrainRadiusOffset(lat, lon, verticalExaggeration = 1, applyGeologicalModifications = true) {
   if (!molaElevationAt) throw new Error('MOLA terrain requested before NASA elevation data finished loading');
   const base = molaElevationAt(lat, lon);
   let deltaM = 0;
-  for (const crater of getCraterCandidates(lat, lon)) {
+  if (applyGeologicalModifications) for (const crater of getCraterCandidates(lat, lon)) {
     const d = angularDistance(lat, lon, crater.lat, crater.lon) * 3_389_500;
     const radius = Math.max(0.5, crater.craterDiameterM / 2);
     if (d > radius * 2.2) continue;
