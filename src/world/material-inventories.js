@@ -66,7 +66,7 @@ export function ensureMaterialInventories(w) {
       colony.foodKg=Math.max(1000,Math.max(0,Number(home.population??10))*0.62*(88775.244/86400)*90);
       colony.biomassKg=0;
       colony.solidWasteKg=0;
-      colony.materialsKg={regolith:0,aggregate:0,metalConcentrate:0,tailings:0,constructionComponents:0,slag:0,nutrients:500,spareParts:250,polymers:100};
+      colony.materialsKg={regolith:0,aggregate:0,metalConcentrate:0,tailings:0,constructionComponents:0,constructionInProgress:0,slag:0,nutrients:500,spareParts:250,polymers:100};
       colony.gasesKg.oxygen=(colony.gasesKg.oxygen??0)+5000;
       colony.thermal??={storedEnergyJ:0,capacityJPerK:2e9,referenceTemperatureC:20,temperatureC:20,heatInputCumulativeJ:0,heatLossCumulativeJ:0};
       colony.physicalStocksVersion=1;
@@ -82,7 +82,9 @@ export function ensureMaterialInventories(w) {
     colony.gasesKg.carbonMonoxide??=0;
     colony.solidWasteKg??=0;
     colony.biomassKg??=0;
-    colony.materialsKg??={regolith:0,aggregate:0,metalConcentrate:0,tailings:0,constructionComponents:0,slag:0,nutrients:500,spareParts:250,polymers:100};
+    colony.materialsKg??={regolith:0,aggregate:0,metalConcentrate:0,tailings:0,constructionComponents:0,constructionInProgress:0,slag:0,nutrients:500,spareParts:250,polymers:100};
+    colony.materialsKg.constructionComponents??=0;
+    colony.materialsKg.constructionInProgress??=0;
     colony.thermal??={storedEnergyJ:0,capacityJPerK:2e9,referenceTemperatureC:20,temperatureC:20,heatInputCumulativeJ:0,heatLossCumulativeJ:0};
   }
   m.energy.thermalHeatInputJ??=0;m.energy.thermalHeatLostJ??=0;m.energy.storedThermalEnergyJ??=0;
