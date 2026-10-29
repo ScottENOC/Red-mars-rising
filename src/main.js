@@ -2,7 +2,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.m
 import { createInitialWorldState } from './world/world-state.js';
 import { terrainHeight, terrainRadiusOffset, loadMolaTopography, updatePolarCaps, setTerrainWorldState } from './world/terrain.js';
 import { createColonyAndLogistics } from './world/colony-logistics.js';
-import { STARTING_LOCATIONS, SPONSORS, STRATEGIC_PROGRAMS, HABITAT_CONSTRUCTION_RECIPES, ensureConstructionRecipeOptions, startCampaign } from './world/campaign-options.js';
+import { STARTING_LOCATIONS, SPONSORS, STRATEGIC_PROGRAMS, ensureConstructionRecipeOptions, startCampaign } from './world/campaign-options.js';
 import { processWorldTick, commissionProject, commissionStrategicProgram } from './world/world-tick.js';
 import { METEOROID_TYPES } from './world/material-inventories.js';
 
