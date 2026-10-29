@@ -2,7 +2,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.m
 import { createInitialWorldState } from './world/world-state.js';
 import { terrainHeight, terrainRadiusOffset, loadMolaTopography, updatePolarCaps, setTerrainWorldState } from './world/terrain.js';
 import { createColonyAndLogistics } from './world/colony-logistics.js';
-import { STARTING_LOCATIONS, SPONSORS, startCampaign } from './world/campaign-options.js';
+import { STARTING_LOCATIONS, SPONSORS, STRATEGIC_PROGRAMS, startCampaign } from './world/campaign-options.js';
 import { processWorldTick, commissionProject, commissionStrategicProgram } from './world/world-tick.js';
 import { METEOROID_TYPES } from './world/material-inventories.js';
 
@@ -28,6 +28,12 @@ try {
  }
 } catch (error) {
  console.warn('Could not load saved Red Mars Rising campaign; starting fresh.', error);
+}
+if (worldState.campaign?.started) {
+ worldState.campaign.strategicPrograms ??= STRATEGIC_PROGRAMS.map(p=>({...p,cost:{...p.cost},status:'available',remainingSols:p.durationSols,progress:0}));
+ worldState.campaign.dependencyPolicy ??= 'accept-for-now';
+ worldState.campaign.localManufacturingAssessment ??= null;
+ worldState.campaign.logisticsReliability ??= 0.5;
 }
 let colonyLogistics = null;
 let terrainReady = false;
