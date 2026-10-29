@@ -4,6 +4,8 @@ import { terrainHeight, terrainRadiusOffset, loadMolaTopography, updatePolarCaps
 
 const TEXTURE_URL=new URL('../data/mars/8k_mars.jpg', import.meta.url).href;
 const worldState = createInitialWorldState();
+// Temporary diagnostic: hide generated caps so the underlying colour texture can be inspected.
+const SHOW_GENERATED_POLAR_CAPS = false;
 
 // Mission timeline: the first crew leaves Earth in late 2026 and arrives in July 2027.
 const MISSION_ARRIVAL_UTC = Date.UTC(2027, 6, 22, 0);
@@ -221,7 +223,8 @@ loadMolaTopography().then(info=>{
  mars=new THREE.Mesh(buildTerrainGeometry(),new THREE.MeshStandardMaterial({color:0x9c5138,roughness:1}));
  mars.castShadow=true;
  mars.receiveShadow=true;
- root.add(mars);updatePolarCaps(THREE,root,worldState);
+ root.add(mars);
+ if(SHOW_GENERATED_POLAR_CAPS)updatePolarCaps(THREE,root,worldState);
  worldState.terrain.source=info.source;
  if(marsTexture)applyMarsTexture(marsTexture);
  document.querySelector('#loading p').textContent='NASA MOLA topography loaded';
