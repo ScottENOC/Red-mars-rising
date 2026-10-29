@@ -34,11 +34,14 @@ def make_mesh(body, table_path):
     lats = latitudes[lat_idx]
     lons = longitudes[lon_idx]
     vertices = []
+    uvs = []
+    mean_radius = float(np.mean(sampled))
     for i, lat in enumerate(lats):
         lr = np.deg2rad(lat)
         for j, lon in enumerate(lons):
             lo = np.deg2rad(lon)
-            radius = float(sampled[i, j])
+            radius = float(sampled[i, j]) / mean_radius
+            uvs.append([float(lons[j] / 360.0), float((lat + 90.0) / 180.0)])
             # Three.js convention: longitude zero faces +Z, east longitude turns toward -X.
             vertices.append([round(-radius*np.cos(lr)*np.sin(lo), 6),
                              round(radius*np.sin(lr), 6),
@@ -51,7 +54,7 @@ def make_mesh(body, table_path):
             a, b = i*cols+j, i*cols+j2
             c, d = (i+1)*cols+j, (i+1)*cols+j2
             faces.extend([[a, c, b], [b, c, d]])
-    payload = {"units": "km", "vertices": vertices, "indices": [v for face in faces for v in face]}
+    payload = {"units": "mean-radius", "vertices": vertices, "uvs": uvs, "indices": [v for face in faces for v in face]}
     path = OUT / f"{body}-mesh.json"
     path.write_text(json.dumps(payload, separators=(",", ":")))
     print(f"{path}: {path.stat().st_size:,} bytes; {len(vertices):,} vertices, {len(faces):,} triangles")
