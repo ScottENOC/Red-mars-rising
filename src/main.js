@@ -181,6 +181,8 @@ document.querySelector('#planetAge').textContent = (worldState.planet.ageYears /
 document.querySelector('#pressure').textContent = worldState.climate.atmosphere.pressurePa + ' Pa';
 const locations={
  olympus:{name:'Olympus Mons',lat:18.65,lon:-133.8,zoom:1.7,description:'A shield volcano rising roughly 22 kilometres above the surrounding plains.'},
+ elysium:{name:'Elysium Planitia',lat:4.5,lon:154.5,zoom:1.75,description:'Near-equatorial plains with relatively favourable conditions for industry and a future space-elevator programme.'},
+ arcadia:{name:'Arcadia Planitia',lat:46.7,lon:164,zoom:1.75,description:'Northern plains with promising buried water-ice prospects.'},
  valles:{name:'Valles Marineris',lat:-13.9,lon:-59.2,zoom:1.85,description:'A canyon system stretching thousands of kilometres across the Martian equator.'},
  hellas:{name:'Hellas Planitia',lat:-42.4,lon:70.5,zoom:1.65,description:'An immense impact basin whose low floor can gather frost and atmospheric haze.'},
  gale:{name:'Gale Crater',lat:-5.4,lon:137.8,zoom:2.1,description:'A layered mountain of sediment inside a crater explored by the Curiosity rover.'},
@@ -444,6 +446,7 @@ function notify(message){const t=document.querySelector('#toast');t.textContent=
 function setActivePlace(id){document.querySelectorAll('.place').forEach(el=>el.classList.toggle('active',el.dataset.place===id));}
 function resetView(announce=true){focusedMoon=null;focusedSurface=null;cameraFocus.set(0,0,0);for(const [id,m] of Object.entries(moonObjects)){m.focusedScale=false;m.body.scale.setScalar(moonSpecs[id].radius);}document.querySelectorAll('[data-moon]').forEach(el=>el.classList.remove('active'));targetRotation.setFromEuler(new THREE.Euler(THREE.MathUtils.degToRad(-8),THREE.MathUtils.degToRad(18),0,'YXZ'));setZoom(4.2);setActivePlace('global');if(announce)notify('Mars global view restored');}
 function focusPlace(id){if(id==='global'){resetView();return;}const p=locations[id];if(!p)return;focusedMoon=null;focusedSurface=id==='colony'?xyz(p.lat,p.lon,1+terrainRadiusOffset(p.lat,p.lon)+0.002):null;cameraFocus.set(0,0,0);for(const [mid,m] of Object.entries(moonObjects)){m.focusedScale=false;m.body.scale.setScalar(moonSpecs[mid].radius);}document.querySelectorAll('[data-moon]').forEach(el=>el.classList.remove('active'));const v=xyz(p.lat,p.lon,1);const yaw=Math.atan2(-v.x,v.z);const pitch=Math.asin(v.y);targetRotation.setFromEuler(new THREE.Euler(pitch,yaw,0,'YXZ'));setZoom(id==='colony'?0.12:p.zoom+0.45);setActivePlace(id);notify(p.name+' · '+p.description);}
+siteSelect.addEventListener('change',()=>{if(terrainReady)focusPlace(siteSelect.value);});
 document.querySelectorAll('[data-place]').forEach(el=>el.addEventListener('click',()=>{focusPlace(el.dataset.place);landmarksMenu.hidden=true;labelsBtn.setAttribute('aria-expanded','false');}));
 document.querySelectorAll('[data-moon]').forEach(el=>el.addEventListener('click',()=>{focusMoon(el.dataset.moon);landmarksMenu.hidden=true;labelsBtn.setAttribute('aria-expanded','false');}));
 const landmarksMenu=document.querySelector('#landmarksMenu'),labelsBtn=document.querySelector('#labelsBtn');
