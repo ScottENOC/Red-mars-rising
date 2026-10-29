@@ -1,0 +1,86 @@
+name: Extract Phobos and Deimos NASA PDS data
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [development]
+    paths:
+      - '.github/workflows/extract-mars-moons.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  extract-moons:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out development
+        uses: actions/checkout@v4
+        with:
+          ref: development
+          fetch-depth: 0
+
+      - name: Download and extract only Phobos and Deimos data products
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/thomas-shape-models.zip"
+          unpack="$RUNNER_TEMP/thomas-shape-models"
+          dest="data/moons/nasa-pds-thomas"
+          mkdir -p "$unpack" "$dest"
+
+          curl --fail --location --retry 3 --retry-delay 2 \
+            'https://sbnarchive.psi.edu/pds4/non_mission/ast-sat.thomas.shape-models_V1_0.zip' \
+            --output "$archive"
+
+          echo "Original PDS archive: $(wc -c < "$archive" | tr -d ' ') bytes"
+          unzip -q "$archive" -d "$unpack"
+
+          # Keep only data and the labels needed to interpret it for the two target bodies.
+          mapfile -d '' files < <(find "$unpack" -type f \
+            \( -iname '*phobos*' -o -iname '*deimos*' \) \
+            \( -iname '*.tab' -o -iname '*.fit' -o -iname '*.fits' -o -iname '*.img' \
+               -o -iname '*.lbl' -o -iname '*.xml' -o -iname '*.csv' -o -iname '*.txt' \) \
+            -print0 | sort -z)
+
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No Phobos/Deimos data files matched expected PDS product names." >&2
+            echo "Archive inventory:" >&2
+            unzip -Z1 "$archive" >&2
+            exit 1
+          fi
+
+          for file in "${files[@]}"; do
+            name="$(basename "$file")"
+            cp "$file" "$dest/$name"
+            printf '%10s bytes  %s\n' "$(wc -c < "$dest/$name" | tr -d ' ')" "$name"
+          done
+
+          cat > "$dest/README.md" <<'EOF'
+          # Phobos and Deimos — source data
+
+          Source: NASA Planetary Data System Small Bodies Node, *Small Body Optical Shape Models Bundle V1.0* (Peter Thomas et al., 2021), DOI: https://doi.org/10.26033/g5e0-kh52
+
+          Dataset landing page: https://sbn.psi.edu/pds/resource/oshape.html
+
+          This folder contains only archive files whose names identify Phobos or Deimos, plus their PDS labels/metadata where provided. The upstream archive also contains several unrelated small bodies, which are not included here.
+
+          These are source products, not yet converted into Three.js-ready meshes or optimised web textures. Preserve the PDS labels when interpreting table columns, coordinate conventions, and units.
+          EOF
+
+          echo "Extracted files:"
+          find "$dest" -maxdepth 1 -type f -printf '%s bytes  %f\n' | sort -k2
+
+      - name: Commit extracted moon source data to development
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/moons/nasa-pds-thomas/
+          if git diff --cached --quiet; then
+            echo 'Phobos and Deimos source files are already up to date.'
+            exit 0
+          fi
+          git commit -m 'Add NASA PDS shape data for Phobos and Deimos'
+          git push origin HEAD:development
