@@ -123,7 +123,7 @@ function refreshStartDetails(){
 }
 siteSelect.addEventListener('change',refreshStartDetails);sponsorSelect.addEventListener('change',refreshStartDetails);refreshStartDetails();
 const campaignPanel=document.createElement('section');campaignPanel.id='campaignPanel';campaignPanel.hidden=true;document.querySelector('#app').appendChild(campaignPanel);
-function buildHabitatComponentReport(home,physicalStocks,fmtMass){
+function buildHabitatComponentReport(){
  const project=worldState.infrastructure.projects.find(p=>p.id==='buried-habitat');
  if(!project)return '';
  const recipe=(project.recipeOptions??[]).find(r=>r.id===project.selectedRecipeId)??project.recipeOptions?.[0];
@@ -172,7 +172,7 @@ function renderCampaignPanel(){
  campaignPanel.innerHTML='<div class="cp-heading"><span>Colony operations</span><span>Sol '+worldState.time.sol+'</span></div>'+
  '<div class="cp-metrics"><strong>'+home.name+'</strong><br>'+sponsor.name+' · '+worldState.settlements.length+' settlement(s)<br>Earth link: '+(worldState.pointsOfInterest.filter(p=>p.kind==='mars-orbit-comms'&&p.status==='operational').length)+' Mars relays · ~12.5 min one-way light time<br>Transfer vehicle: '+(worldState.pointsOfInterest.find(p=>p.id==='mars-crewship')?.status??'unknown')+' in Mars orbit<br>Funds '+worldState.economy.funds+' · Materials '+worldState.economy.materials+' · Water '+worldState.economy.water.toFixed(1)+'<br>Morale '+worldState.colonists.morale.toFixed(1)+' · Sponsor patience '+worldState.campaign.sponsorPatience.toFixed(1)+'<br>Global heat contribution: '+tempAnomaly.toExponential(3)+' °C anomaly</div>'+
  materialPanel+
- buildHabitatComponentReport(home,physicalStocks,fmtMass)+
+ buildHabitatComponentReport()+
  '<div class="cp-heading"><span>Strategic priorities</span><span>Colony-level decisions</span></div>'+
  '<div class="cp-metrics"><strong>Import dependence</strong><br>Current policy: '+({ 'accept-for-now':'Accept dependence for now', 'investigate-local-production':'Investigate local production', 'strengthen-supply-chain':'Strengthen supply chain' }[worldState.campaign.dependencyPolicy]??'Accept dependence for now')+'<br>Imported specialist components remain a potential bottleneck. Local regolith processing currently produces aggregate and metal-bearing concentrate, not qualified metal parts or finished components. The player sets priorities; the colony handles day-to-day execution.</div>'+
  (worldState.campaign.localManufacturingAssessment?'<div class="cp-project"><strong>Local manufacturing assessment</strong><small>Preliminary estimate: '+worldState.campaign.localManufacturingAssessment.potentialSubstitutionRange[0]+'–'+worldState.campaign.localManufacturingAssessment.potentialSubstitutionRange[1]+'% substitution potential for '+worldState.campaign.localManufacturingAssessment.category+'. Confidence: low. This is not current production capacity; processing, quality assurance and component qualification are still needed.</small></div>':'')+
