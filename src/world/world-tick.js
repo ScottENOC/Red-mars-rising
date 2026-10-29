@@ -1,5 +1,5 @@
 import { ensureMaterialInventories, processNaturalMeteoroidFlux, processWaterClimate, settleAtmosphericMeteoroidDust, syncAtmosphereFromInventories, recycleColonyWater, transferWater, checkMaterialConservation, consumeColonyWaterForReaction, addColonyWaterFromReaction } from './material-inventories.js';
-import { SHORTLISTED_SITES } from './campaign-options.js';
+import { SHORTLISTED_SITES, ensureConstructionRecipeOptions } from './campaign-options.js';
 
 const MARS_RADIUS_M = 3_389_500;
 const MARS_SURFACE_AREA_M2 = 4 * Math.PI * MARS_RADIUS_M ** 2;
@@ -161,6 +161,15 @@ export function processWorldTick(w) {
     if (project.remainingSols !== 0) continue;
     project.status = 'complete';
     const home = w.settlements.find(s => s.kind === 'primary-colony');
+    if(home&&project.constructionMassKg>0){
+      const stock=w.materials.colonies[home.id]?.materialsKg;
+      if(stock){
+        const mass=Math.min(stock.constructionInProgress??0,project.constructionMassKg);
+        stock.constructionInProgress=Math.max(0,(stock.constructionInProgress??0)-mass);
+        stock.constructionComponents=(stock.constructionComponents??0)+mass;
+        w.materials.ledger.push({sol,process:'construction-installation',substance:'installed construction material',massKg:mass,from:'colony:'+home.id+':materials.constructionInProgress',to:'colony:'+home.id+':materials.constructionComponents',recipeId:project.selectedRecipeId??null,note:'Construction materials move from work in progress to installed infrastructure at project completion.'});
+      }
+    }
     if (project.id === 'solar-expansion') { w.economy.powerCapacity += 35; w.economy.powerDemand += 4; }
     if (project.id === 'water-extractor') {
       if (home && !home.infrastructure.includes('water-extractor')) home.infrastructure.push('water-extractor');
@@ -305,13 +314,37 @@ export function commissionStrategicProgram(w, programId) {
 }
 
 export function commissionProject(w, projectId) {
+  ensureConstructionRecipeOptions(w);
   const project = w.infrastructure.projects.find(p => p.id === projectId);
   if (!project || project.status !== 'available') return {ok:false,reason:'Project is not available.'};
-  for (const [resource, amount] of Object.entries(project.cost)) {
+  const recipe = project.recipeOptions?.find(r => r.id === project.selectedRecipeId) ?? null;
+  const effectiveCost = recipe?.economyCost ?? project.cost;
+  for (const [resource, amount] of Object.entries(effectiveCost)) {
     if ((w.economy[resource] ?? 0) < amount) return {ok:false,reason:'Insufficient '+resource+'.'};
   }
-  for (const [resource, amount] of Object.entries(project.cost)) w.economy[resource] -= amount;
-  project.status = 'active'; project.remainingSols = project.durationSols; project.progress = 0;
-  w.events.push({type:'project-start',sol:w.time.sol,description:project.name+' commissioned.'});
-  return {ok:true,project};
+  let colony=null,localMassKg=0,importedMassKg=0;
+  if(recipe){
+    const home=w.settlements.find(s=>s.kind==='primary-colony');
+    colony=home&&w.materials.colonies[home.id];
+    if(!colony?.materialsKg)return {ok:false,reason:'Colony physical material inventory is unavailable.'};
+    for(const [material,amount] of Object.entries(recipe.localMaterialsKg??{})){
+      const available=Number(colony.materialsKg[material]??0);
+      if(available+1e-9<amount)return {ok:false,reason:'Needs '+amount.toLocaleString('en-AU')+' kg of '+material+'; only '+Math.floor(available).toLocaleString('en-AU')+' kg available.'};
+      localMassKg+=amount;
+    }
+    importedMassKg=Object.values(recipe.importedMaterialsKg??{}).reduce((sum,amount)=>sum+Number(amount||0),0);
+  }
+  for (const [resource, amount] of Object.entries(effectiveCost)) w.economy[resource] -= amount;
+  if(recipe&&colony){
+    for(const [material,amount] of Object.entries(recipe.localMaterialsKg??{}))colony.materialsKg[material]-=amount;
+    colony.materialsKg.constructionInProgress=(colony.materialsKg.constructionInProgress??0)+localMassKg+importedMassKg;
+    w.materials.externalFlows.colonyMatterImportsKg=(w.materials.externalFlows.colonyMatterImportsKg??0)+importedMassKg;
+    project.constructionMassKg=localMassKg+importedMassKg;
+    w.materials.ledger.push({sol:w.time.sol,process:'construction-material-commitment',substance:'construction feedstock',massKg:localMassKg,from:'colony:'+w.settlements.find(s=>s.kind==='primary-colony').id+':local-material-stocks',to:'colony:'+w.settlements.find(s=>s.kind==='primary-colony').id+':materials.constructionInProgress',inputsKg:{...(recipe.localMaterialsKg??{})},recipeId:recipe.id,note:'Local material stocks are committed to this construction project; their mass remains inside the colony boundary.'});
+    if(importedMassKg>0)w.materials.ledger.push({sol:w.time.sol,process:'construction-component-import',substance:'imported construction components',massKg:importedMassKg,from:'sponsor-cargo',to:'colony:'+w.settlements.find(s=>s.kind==='primary-colony').id+':materials.constructionInProgress',inputsKg:{...(recipe.importedMaterialsKg??{})},recipeId:recipe.id,note:'Imported component mass enters the colony inventory when construction is commissioned; actual launch mass and transit timing are abstracted.'});
+  }
+  project.status = 'active'; project.durationSols=recipe?.durationSols??project.durationSols; project.remainingSols = project.durationSols; project.progress = 0;
+  project.selectedRecipeName=recipe?.name??null;
+  w.events.push({type:'project-start',sol:w.time.sol,description:project.name+' commissioned'+(recipe?' using '+recipe.name:'')+'.'});
+  return {ok:true,project,recipe};
 }
