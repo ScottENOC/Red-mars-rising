@@ -213,13 +213,13 @@ const groundSun=new THREE.DirectionalLight(0xffd5b5,2);groundSun.position.set(-8
 let groundMode=false,savedGroundView=null;
 {
  const size=6000,n=120,pos=[],idx=[];
- for(let z=0;z<=n;z++)for(let x=0;x<=n;x++){const px=(x/n-.5)*size,pz=(z/n-.5)*size;const y=Math.sin(px*.00115+1.3)*19+Math.cos(pz*.0014-.7)*15+Math.sin((px+pz)*.00075)*10+Math.cos((px-pz)*.0011)*7+Math.sin(px*.009+Math.cos(pz*.006))*1.4-36.7;pos.push(px,y,pz);}
+ for(let z=0;z<=n;z++)for(let x=0;x<=n;x++){const px=(x/n-.5)*size,pz=(z/n-.5)*size;const y=Math.sin(px*.00115+1.3)*19+Math.cos(pz*.0014-.7)*15+Math.sin((px+pz)*.00075)*10+Math.cos((px-pz)*.0011)*7+Math.sin(px*.009+Math.cos(pz*.006))*1.4-38;pos.push(px,y,pz);}
  for(let z=0;z<n;z++)for(let x=0;x<n;x++){const a=z*(n+1)+x,b=a+1,c=a+n+1,d=c+1;idx.push(a,c,b,b,c,d);}
  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();
  groundScene.add(new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:0x9a6048,roughness:1})));
  let seed=1827;const rand=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
  const rockGeo=new THREE.DodecahedronGeometry(1,0),rockMat=new THREE.MeshStandardMaterial({color:0x62463a,roughness:1,flatShading:true});
- for(let i=0;i<110;i++){const x=(rand()-.5)*size*.9,z=(rand()-.5)*size*.9,scale=.8+rand()*4;const y=Math.sin(x*.00115+1.3)*19+Math.cos(z*.0014-.7)*15+Math.sin((x+z)*.00075)*10+Math.cos((x-z)*.0011)*7-36.7;const rock=new THREE.Mesh(rockGeo,rockMat);rock.position.set(x,y+scale*.3,z);rock.scale.set(scale*1.3,scale*.65,scale);rock.rotation.set(rand()*.5,rand()*Math.PI,rand()*.4);groundScene.add(rock);}
+ for(let i=0;i<110;i++){const x=(rand()-.5)*size*.9,z=(rand()-.5)*size*.9,scale=.8+rand()*4;const y=Math.sin(x*.00115+1.3)*19+Math.cos(z*.0014-.7)*15+Math.sin((x+z)*.00075)*10+Math.cos((x-z)*.0011)*7-38;const rock=new THREE.Mesh(rockGeo,rockMat);rock.position.set(x,y+scale*.3,z);rock.scale.set(scale*1.3,scale*.65,scale);rock.rotation.set(rand()*.5,rand()*Math.PI,rand()*.4);groundScene.add(rock);}
 }
 function enterGroundView(){if(groundMode)return;savedGroundView={position:camera.position.clone(),focus:cameraFocus.clone(),zoom,rotation:targetRotation.clone(),far:camera.far};groundMode=true;document.body.classList.add('ground-mode');camera.far=10000;camera.updateProjectionMatrix();camera.position.set(0,1.7,0);camera.up.set(0,1,0);camera.lookAt(0,1.7,-1000);}
 function exitGroundView(){if(!groundMode)return;groundMode=false;document.body.classList.remove('ground-mode');if(savedGroundView){camera.position.copy(savedGroundView.position);cameraFocus.copy(savedGroundView.focus);zoom=savedGroundView.zoom;targetRotation.copy(savedGroundView.rotation);camera.far=savedGroundView.far;camera.updateProjectionMatrix();}savedGroundView=null;camera.lookAt(cameraFocus);}
