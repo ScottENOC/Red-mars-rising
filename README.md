@@ -26,6 +26,7 @@ For scale, one 100 W heat source spread over Mars corresponds to roughly 6.93 ×
 - `index.html` is the page shell and styling; application logic lives in ES modules.
 - `src/main.js` wires up the Three.js scene, campaign selection, mission clock, operations panel and map interactions.
 - `src/world/world-state.js` defines the scenario state, climate and energy-budget fields, initial resources, settlements, sponsor state and event log.
+- `src/world/material-inventories.js` defines planetary and colony material inventories, a water-transfer ledger, conservation diagnostics and continuous natural meteoroid influx.
 - `src/world/campaign-options.js` defines the five candidate landing sites, sponsor profiles and the campaign-start function.
 - `src/world/world-tick.js` contains the sol-based simulation and project commissioning rules.
 - `src/world/colony-logistics.js` renders settlement modules and zoom-dependent Earth-to-Mars cargo traffic. The interplanetary view compresses distance for readability; ship trajectories are illustrative, not a physical ephemeris.
