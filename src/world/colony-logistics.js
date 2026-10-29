@@ -212,7 +212,7 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
     const cargo = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.08, 0.08), new THREE.MeshStandardMaterial({ color: 0x777f84, roughness: 0.8 }));
     cargo.position.x = -0.06;
     ship.add(cargo);
-    ship.userData = { kind: 'supply-ship', id: spec.id, cargo: spec.name };
+    ship.userData = { kind: 'supply-ship', id: spec.id, cargo: spec.cargo ?? spec.name ?? 'Expedition supplies' };
     orbitalGroup.add(ship);
     shipMeshes.push({ spec, ship });
     shipPickTargets.push(hull);
