@@ -157,11 +157,7 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
   route.computeLineDistances();
   orbitalGroup.add(route);
 
-  const shipSpecs = [
-    { id: 'supply-ship-1', name: 'Construction robots', phase: 0.22, cycleSols: 52 },
-    { id: 'supply-ship-2', name: 'Greenhouse modules', phase: 0.58, cycleSols: 67 },
-    { id: 'supply-ship-3', name: 'Life-support spares', phase: 0.82, cycleSols: 59 }
-  ];
+  const shipSpecs = worldState.logistics?.supplyShips ?? [];
   const shipMeshes = [];
   const shipPickTargets = [];
   for (const spec of shipSpecs) {
