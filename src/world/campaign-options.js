@@ -5,6 +5,21 @@ export const STARTING_LOCATIONS = [
  {id:'valles',name:'Valles Marineris',lat:-13.9,lon:-59.2,terrain:'Deep equatorial canyon',climate:'Low latitude, but local conditions are complex',water:'Uncertain; investigate local deposits first',construction:'Difficult; cliffs and vertical transport complicate expansion',security:'Potentially defensible, but access routes are vulnerable',opportunity:'Terraced and excavated habitats can gain shielding and defensible approaches.',heatDemand:.9,waterAccess:.4,buildEase:.35,vulnerability:.4,elevationKm:-4},
  {id:'hellas',name:'Hellas Planitia',lat:-42.4,lon:70.5,terrain:'Vast, deep impact basin',climate:'Higher atmospheric column than much of Mars, but still harsh and cold',water:'Potential frost and subsurface prospects; verify locally',construction:'Moderate; basin scale creates long transport links',security:'Open basin; low terrain may matter under future climate change',opportunity:'A test bed for atmospheric and climate experiments; monitor future inundation risk.',heatDemand:1.25,waterAccess:.55,buildEase:.7,vulnerability:.75,elevationKm:-7}
 ];
+export const SHORTLISTED_SITES = [
+ {id:'utopia',name:'Utopia Planitia',lat:45.0,lon:118.0,terrain:'Vast northern lowland',water:'Buried ice prospects',rationale:'Large flat logistics corridor; a natural industrial landing candidate.'},
+ {id:'amazonis',name:'Amazonis Planitia',lat:24.0,lon:196.0,terrain:'Smooth volcanic plain',water:'Uncertain shallow ice',rationale:'Low-relief landing zone with room for cargo dispersal.'},
+ {id:'chryse',name:'Chryse Planitia',lat:25.0,lon:320.0,terrain:'Ancient outflow plain',water:'Local deposits require survey',rationale:'Accessible terrain and major geological history.'},
+ {id:'isidis',name:'Isidis Planitia',lat:12.9,lon:87.0,terrain:'Impact basin',water:'Mixed; site-specific survey required',rationale:'Science value and broad plains near an ancient basin rim.'},
+ {id:'arcadia-west',name:'Western Arcadia',lat:42.0,lon:145.0,terrain:'Northern volcanic plain',water:'Buried ice prospects',rationale:'A second northern ice-prospecting corridor, separated from the player shortlist.'},
+ {id:'deuteronilus',name:'Deuteronilus Mensae',lat:40.0,lon:25.0,terrain:'Glacially modified terrain',water:'Strong ice evidence, rugged local terrain',rationale:'Ice-rich target for a sponsor willing to accept more difficult construction.'},
+ {id:'amazonis-north',name:'Northern Amazonis',lat:35.0,lon:205.0,terrain:'Northern plains',water:'Possible buried ice',rationale:'A lower-latitude alternative with room for a dispersed cargo landing zone.'},
+ {id:'sirenum',name:'Terra Sirenum',lat:-35.0,lon:210.0,terrain:'Southern highlands',water:'Uncertain',rationale:'Geology-focused site with more difficult terrain and longer supply routes.'},
+ {id:'memnonia',name:'Memnonia Fossae',lat:-10.0,lon:155.0,terrain:'Fractured volcanic uplands',water:'Uncertain',rationale:'Geological survey target; construction and mobility risks are higher.'},
+ {id:'noachis',name:'Noachis Terra',lat:-45.0,lon:25.0,terrain:'Ancient southern highlands',water:'Local ice uncertain',rationale:'High-value ancient geology, less attractive for rapid industrial growth.'},
+ {id:'elysium-north',name:'Northern Elysium',lat:25.0,lon:147.0,terrain:'Volcanic plains',water:'Mixed local prospects',rationale:'Near the Elysium volcanic province but separated from the main landing site.'},
+ {id:'tyrrhena',name:'Tyrrhena Terra',lat:-20.0,lon:105.0,terrain:'Ancient volcanic highlands',water:'Uncertain',rationale:'Science-led alternative with rougher construction conditions.'},
+ {id:'pavonis',name:'Pavonis Foothills',lat:0.0,lon:247.0,terrain:'Volcanic flank',water:'Uncertain',rationale:'Long-term equatorial infrastructure candidate; not a near-term space elevator.'}
+];
 export const SPONSORS = [
  {id:'nasa',name:'NASA',type:'national',country:'United States',patience:58,support:88,pressure:58,autonomy:42,description:'Strong technical and logistics support; visible US mission milestones matter.',strengths:'Engineering, science and logistics',obligations:'Demonstrate US leadership and deliver visible results',relations:{esa:8,roscosmos:-15,cnsa:-8,un:10}},
  {id:'esa',name:'European Space Agency (ESA)',type:'national',country:'European multinational agency',patience:64,support:78,pressure:45,autonomy:55,description:'Science-led multinational programme with coalition politics and technical standards.',strengths:'Science and cooperation',obligations:'Share findings and maintain coalition support',relations:{nasa:12,roscosmos:-8,cnsa:2,un:12}},
@@ -25,6 +40,9 @@ export function startCampaign(w,locationId,sponsorId) {
  w.campaign.started=true;w.campaign.startingLocationId=site.id;w.campaign.startingSponsorId=sponsor.id;
  w.campaign.sponsorPatience=sponsor.patience;w.campaign.sponsorPressure=sponsor.pressure;w.campaign.autonomy=sponsor.autonomy;
  w.campaign.supportYearsRemaining=5;
+ w.shortlistedSites=SHORTLISTED_SITES.map(x=>({...x}));
+ if(w.logistics?.plannedCargoDrops) for(const drop of w.logistics.plannedCargoDrops){const target=SHORTLISTED_SITES.find(x=>x.id===drop.siteId);if(target){drop.lat=target.lat;drop.lon=target.lon;}}
+ for(const poi of (w.pointsOfInterest??[])) poi.compromised=false;
  w.sponsors=SPONSORS.map(s=>({...s,patience:s.patience,relationship:s.id===sponsor.id?75:(sponsor.relations?.[s.id]??s.relations?.[sponsor.id]??(s.type==='corporate'?45:50)),status:'active',colonyFounded:false}));
  w.settlements=[{id:'first-colony',name:site.id==='jezero'?'Jezero Base':site.name+' Base',kind:'primary-colony',locationId:site.id,lat:site.lat,lon:site.lon,terrainType:site.terrain,population:w.colonists.population,status:'operational',sponsorId:sponsor.id,infrastructure:['habitats','landing-pad','greenhouse','power-array','laboratory','workshop','rovers'],siteModifiers:{heatDemand:site.heatDemand,waterAccess:site.waterAccess,buildEase:site.buildEase,vulnerability:site.vulnerability,elevationKm:site.elevationKm}}];
  w.infrastructure.projects=[
