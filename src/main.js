@@ -1,9 +1,11 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js';
 import { createInitialWorldState } from './world/world-state.js';
 import { terrainHeight, terrainRadiusOffset, loadMolaTopography, updatePolarCaps } from './world/terrain.js';
+import { createColonyAndLogistics } from './world/colony-logistics.js';
 
 const TEXTURE_URL=new URL('../data/mars/8k_mars.jpg', import.meta.url).href;
 const worldState = createInitialWorldState();
+let colonyLogistics = null;
 const SHOW_GENERATED_POLAR_CAPS = true;
 let lastIceSolarLongitude = -1;
 
@@ -82,7 +84,8 @@ const locations={
  hellas:{name:'Hellas Planitia',lat:-42.4,lon:70.5,zoom:1.65,description:'An immense impact basin whose low floor can gather frost and atmospheric haze.'},
  gale:{name:'Gale Crater',lat:-5.4,lon:137.8,zoom:2.1,description:'A layered mountain of sediment inside a crater explored by the Curiosity rover.'},
  north:{name:'North polar cap',lat:82,lon:15,zoom:1.55,description:'Seasonal frost and layered deposits preserve a record of changing Martian climate.'},
- jezero:{name:'Jezero Crater',lat:18.38,lon:77.58,zoom:2.0,description:'A preserved delta records a time when water flowed across the Martian surface.'}
+ jezero:{name:'Jezero Crater',lat:18.38,lon:77.58,zoom:2.0,description:'A preserved delta records a time when water flowed across the Martian surface.'},
+ colony:{name:'Jezero Base',lat:18.38,lon:77.58,zoom:0.15,description:'The first settlement: habitats, greenhouse, laboratory, landing pad and autonomous equipment.'}
 };
 const space=document.querySelector('#space');
 const scene=new THREE.Scene();
@@ -232,6 +235,7 @@ loadMolaTopography().then(info=>{
   lastIceSolarLongitude = Math.floor(arrivalLs);
  }
  worldState.terrain.source=info.source;
+ colonyLogistics=createColonyAndLogistics(THREE,{root,scene,worldState,terrainRadiusOffset,notify});
  if(marsTexture)applyMarsTexture(marsTexture);
  document.querySelector('#loading p').textContent='NASA MOLA topography loaded';
  document.querySelector('#loading').classList.add('hidden');
@@ -253,6 +257,7 @@ function xyz(lat,lon,r=1.009){const a=THREE.MathUtils.degToRad(lat),b=THREE.Math
 markerGroup=new THREE.Group();root.add(markerGroup);
 const markerMeshes={};
 Object.entries(locations).forEach(([id,p],i)=>{
+ if(id==='colony')return; // The colony layer supplies its own zoom-aware marker.
  const pos=xyz(p.lat,p.lon,1.008);
  const pin=new THREE.Mesh(new THREE.SphereGeometry(.012,12,10),new THREE.MeshBasicMaterial({color:0xf1b08d}));
  pin.position.copy(pos);pin.userData={id};markerGroup.add(pin);markerMeshes[id]=pin;
@@ -342,7 +347,7 @@ space.addEventListener('pointerdown',e=>{space.setPointerCapture(e.pointerId);po
 space.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2){const a=[...pointers.values()];const dist=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);if(pinchStart>0)setZoom(pinchZoom*pinchStart/dist);dragged=true;return;}if(pointer===e.pointerId){const next=trackballPoint(e.clientX,e.clientY);if(lastTrackball){const delta=new THREE.Quaternion().setFromUnitVectors(lastTrackball,next);if(focusedMoon&&moonObjects[focusedMoon])targetViewRotation.premultiply(delta).normalize();else targetRotation.premultiply(delta).normalize();}lastTrackball=next;if(pointers.size===1)dragged=true;}});
 function endPointer(e){pointers.delete(e.pointerId);if(pointer===e.pointerId){pointer=null;lastTrackball=null;}if(pointers.size<2)pinchStart=0;if(!pointers.size)space.classList.remove('dragging');}
 space.addEventListener('pointerup',endPointer);space.addEventListener('pointercancel',endPointer);
-space.addEventListener('click',e=>{if(dragged)return;const rect=renderer.domElement.getBoundingClientRect();pointerNdc.x=((e.clientX-rect.left)/rect.width)*2-1;pointerNdc.y=-((e.clientY-rect.top)/rect.height)*2+1;raycaster.setFromCamera(pointerNdc,camera);const hits=raycaster.intersectObjects([...markerGroup.children,...Object.values(moonObjects).map(m=>m.marker)],false);if(hits.length){const hit=hits[0].object;if(hit.userData.id)focusPlace(hit.userData.id);else for(const [id,m] of Object.entries(moonObjects))if(hit===m.marker){focusMoon(id);break;}}});
+space.addEventListener('click',e=>{if(dragged)return;const rect=renderer.domElement.getBoundingClientRect();pointerNdc.x=((e.clientX-rect.left)/rect.width)*2-1;pointerNdc.y=-((e.clientY-rect.top)/rect.height)*2+1;raycaster.setFromCamera(pointerNdc,camera);const hits=raycaster.intersectObjects([...markerGroup.children,...Object.values(moonObjects).map(m=>m.marker),...(colonyLogistics?.shipPickTargets??[])],false);if(hits.length){const hit=hits[0].object;if(hit.userData.kind==='supply-ship'){notify(hit.userData.cargo+' · inbound · about '+Math.ceil(hit.userData.etaSols??0)+' sols remaining');}else if(hit.userData.id)focusPlace(hit.userData.id);else for(const [id,m] of Object.entries(moonObjects))if(hit===m.marker){focusMoon(id);break;}}});
 function resize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);}
 addEventListener('resize',resize);
 let previousFrameTime=performance.now();
@@ -377,6 +382,7 @@ function animate(now=performance.now()){
  updateMissionClock(dt);
  if(!focusedMoon)root.quaternion.slerp(targetRotation,.09);
  updateMoonOrbits();
+ if(colonyLogistics)colonyLogistics.update(zoom,elapsedGameSeconds);
  const cameraOffset=new THREE.Vector3(0,0,zoom).applyQuaternion(focusedMoon?targetViewRotation:new THREE.Quaternion());
   const desiredCameraPosition=cameraFocus.clone().add(cameraOffset);
   camera.position.lerp(desiredCameraPosition,.12);camera.lookAt(cameraFocus);
