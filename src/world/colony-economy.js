@@ -2,7 +2,7 @@ const GOODS = ['food','components','machinery','electronics','aggregate'];
 const clamp = (v,min=0,max=100)=>Math.max(min,Math.min(max,Number(v)||0));
 const round3 = v=>Math.round(v*1000)/1000;
 const SPECIALISATIONS = {
-  agriculture: {label:'Agriculture',produces:{food:0.9},description:'Greenhouse and biological production'},
+  agriculture: {label:'Agriculture',produces:{food:0.35},description:'Greenhouse and biological production'},
   fabrication: {label:'Fabrication',produces:{components:0.34,aggregate:0.12},description:'Construction components and processed local feedstock'},
   engineering: {label:'Engineering',produces:{machinery:0.24,components:0.12},description:'Machinery repair and component fabrication'},
   electronics: {label:'Electronics and science',produces:{electronics:0.22,components:0.08},description:'Electronics repair, laboratory work and precision parts'},
@@ -47,7 +47,7 @@ export function ensureColonyEconomies(w){
     e.importDependence ??=s.kind==='primary-colony'?72:85;
     e.shortages ??={};
     e.lastImportSol ??= -10000;
-    e.pendingImport ??=false;
+    e.pendingImport ??=false;\n    e.pendingImports ??=[];
     e.lastTradeSol ??= -10000;
     e.stability ??=70;
     e.specialisationLabel ??=SPECIALISATIONS[e.specialisation]?.label??'General settlement';
@@ -89,7 +89,7 @@ function deliverShipments(w,sol,events){
     }
     destination.economy.inventory[ship.good]=round3((destination.economy.inventory[ship.good]??0)+ship.amount);
     ship.status='delivered';
-    if(ship.kind==='earth-import')destination.economy.importDependence=clamp(destination.economy.importDependence+0.1);
+    if(ship.kind==='earth-import'){destination.economy.importDependence=clamp(destination.economy.importDependence+0.1);destination.economy.pendingImports=(destination.economy.pendingImports??[]).filter(good=>good!==ship.good);destination.economy.pendingImport=destination.economy.pendingImports.length>0;}
     addTradeLog(w,{sol,kind:'delivered',shipmentId:ship.id,fromId:ship.fromId,toId:ship.toId,good:ship.good,amount:ship.amount,description:ship.amount+' units of '+ship.good+' arrived at '+destination.name+'.'});
     events.push({type:'colony-shipment-arrived',sol,description:ship.amount+' units of '+ship.good+' arrived at '+destination.name+(ship.kind==='trade'?' from '+(w.settlements.find(s=>s.id===ship.fromId)?.name??'another colony'):' from its Earth sponsor')+'.'});
     if(ship.kind==='trade'){
@@ -106,7 +106,7 @@ function operateColonies(w,sol,events){
     const e=s.economy, spec=SPECIALISATIONS[e.specialisation]??SPECIALISATIONS.agriculture;
     const pop=Math.max(0,Number(s.population)||0);
     for(const good of GOODS){
-      const produced=(spec.produces[good]??0)*(Math.max(0.25,pop/45));
+      const baselineFood=good==='food'?0.45*Math.max(0.25,pop/45):0;\n      const produced=((spec.produces[good]??0)*(Math.max(0.25,pop/45)))+baselineFood;
       const consumed=good==='food'?pop*0.018:good==='components'?0.035:good==='machinery'?0.018:good==='electronics'?0.012:0.025;
       e.inventory[good]=round3(Math.max(0,e.inventory[good]+produced-consumed));
       e.shortages[good]=e.inventory[good]< (good==='food'?12:good==='components'?3:good==='machinery'?2:good==='electronics'?1.5:3);
