@@ -79,7 +79,7 @@ export function processNaturalMeteoroidFlux(w, sol) {
   m.planetary.meteoroidMatterKg += kgThisSol;
   m.planetary.pendingMeteoroidInputKg += kgThisSol;
   m.externalFlows.meteoroidMatterKg += kgThisSol;
-  m.planetary.naturalImpactFractionalAccumulator += 320 / MARS_SOLS_PER_YEAR;
+  m.planetary.naturalImpactFractionalAccumulator += 320 * EARTH_DAYS_PER_MARS_SOL / 365.25;
   let impacts = 0;
   while (m.planetary.naturalImpactFractionalAccumulator >= 1) {
     m.planetary.naturalImpactFractionalAccumulator -= 1;
