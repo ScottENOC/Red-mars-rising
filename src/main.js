@@ -343,6 +343,7 @@ loadMolaTopography().then(info=>{
  worldState.terrain.source=info.source;
  terrainReady=true;
  if(worldState.campaign.started&&!colonyLogistics)colonyLogistics=createColonyAndLogistics(THREE,{root,scene,worldState,terrainRadiusOffset,notify});
+ if(worldState.campaign.started)focusPlace('colony');else focusPlace(siteSelect.value);
  if(marsTexture)applyMarsTexture(marsTexture);
  document.querySelector('#loading p').textContent='NASA MOLA topography loaded';
  document.querySelector('#loading').classList.add('hidden');
