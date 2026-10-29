@@ -96,7 +96,7 @@ campaignStyle.textContent=`
 .cp-project small{display:block;color:#899197;font-size:9px;line-height:1.5;margin:4px 0 7px}
 .cp-project button{border:1px solid #ffffff24;background:#ffffff08;color:#d9c2b3;font-size:9px;letter-spacing:.08em;padding:7px 9px}
 .cp-project button:disabled{opacity:.5}
-@media(max-width:760px){#campaignStart{padding:10px}.cs-card{max-height:calc(100dvh - 20px);padding:18px}.cs-grid{grid-template-columns:1fr;gap:12px}.cs-detail{min-height:0}.cs-footer{align-items:flex-start;flex-direction:column}.cs-note{max-width:none}#csStart{width:100%}#campaignPanel{top:112px;left:10px;width:min(260px,calc(100vw - 20px));max-height:45vh;padding:10px}}
+@media(max-width:760px){#campaignStart{padding:10px}.cs-card{max-height:calc(100dvh - 20px);padding:18px}.cs-grid{grid-template-columns:1fr;gap:12px}.cs-detail{min-height:0}.cs-footer{align-items:flex-start;flex-direction:column}.cs-note{max-width:none}#csStart{width:100%}#campaignPanel{top:auto;bottom:calc(68px + env(safe-area-inset-bottom));left:10px;width:calc(100vw - 20px);max-height:min(68vh,620px);padding:12px;overflow:auto}}
 `;
 document.head.appendChild(campaignStyle);
 const campaignStart=document.createElement('section');
