@@ -2,7 +2,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.m
 import { createInitialWorldState } from './world/world-state.js';
 import { terrainHeight, terrainRadiusOffset, loadMolaTopography, updatePolarCaps, setTerrainWorldState } from './world/terrain.js';
 import { createColonyAndLogistics } from './world/colony-logistics.js';
-import { STARTING_LOCATIONS, SPONSORS, STRATEGIC_PROGRAMS, ensureConstructionRecipeOptions, startCampaign } from './world/campaign-options.js';
+import { STARTING_LOCATIONS, SPONSORS, STRATEGIC_PROGRAMS, HABITAT_COMPONENT_CATALOGUE, ensureConstructionRecipeOptions, startCampaign } from './world/campaign-options.js';
 import { processWorldTick, commissionProject, commissionStrategicProgram } from './world/world-tick.js';
 import { METEOROID_TYPES } from './world/material-inventories.js';
 
@@ -123,6 +123,24 @@ function refreshStartDetails(){
 }
 siteSelect.addEventListener('change',refreshStartDetails);sponsorSelect.addEventListener('change',refreshStartDetails);refreshStartDetails();
 const campaignPanel=document.createElement('section');campaignPanel.id='campaignPanel';campaignPanel.hidden=true;document.querySelector('#app').appendChild(campaignPanel);
+function buildHabitatComponentReport(home,physicalStocks,fmtMass){
+ const project=worldState.infrastructure.projects.find(p=>p.id==='buried-habitat');
+ if(!project)return '';
+ const recipe=(project.recipeOptions??[]).find(r=>r.id===project.selectedRecipeId)??project.recipeOptions?.[0];
+ if(!recipe)return '';
+ const study=worldState.campaign.localManufacturingAssessment;
+ const studyProgram=(worldState.campaign.strategicPrograms??[]).find(p=>p.id==='local-components-study');
+ const cargoProgram=(worldState.campaign.strategicPrograms??[]).find(p=>p.id==='cargo-pipeline');
+ const rows=HABITAT_COMPONENT_CATALOGUE.map(component=>{
+  const provision=component.provision[recipe.id]??'Not specified in the selected recipe.';
+  const imported=/imported/i.test(provision);
+  const gap=/not separately specified/i.test(provision);
+  return '<div style="padding:7px 0;border-top:1px solid #ffffff12"><strong>'+component.name+'</strong><div>'+component.function+'</div><div style="color:'+(gap?'#e0b47b':imported?'#d49a7e':'#b8c6b0')+'">'+provision+'</div><div style="opacity:.72">'+component.constraint+'</div></div>';
+ }).join('');
+ const studyStatus=study?'Assessment complete: low-confidence scenario estimate of '+study.potentialSubstitutionRange[0]+'–'+study.potentialSubstitutionRange[1]+'% substitution for selected non-critical components. This does not qualify or produce a pressure liner, structural frame or other finished part.':studyProgram?.status==='active'?'Local component study in progress; no manufacturing capability is created until further processing and qualification work is funded.':'No local component feasibility assessment completed.';
+ const cargoStatus='Cargo reliability: '+Math.round((worldState.campaign.logisticsReliability??0.5)*100)+'% model score'+(cargoProgram?.status==='complete'?' (pipeline programme complete).':cargoProgram?.status==='active'?' (pipeline programme in progress).':'.');
+ return '<details style="margin:8px 0;padding:9px;background:#111923;border:1px solid #ffffff22;border-radius:8px"><summary style="cursor:pointer;font-weight:700">Habitat component dependencies · '+recipe.name+'</summary><div style="margin-top:8px;font-size:11px;line-height:1.55">'+rows+'<div style="padding:8px 0;border-top:1px solid #ffffff20"><strong>Strategic implications</strong><div>'+studyStatus+'</div><div>'+cargoStatus+'</div><div style="margin-top:5px">Current recipe still relies on imported qualified pressure/critical hardware. To reduce this dependency, investigate component-specific feedstock processing, fabrication, inspection and qualification; do not assume 3D printing or the study alone makes parts usable.</div></div></div></details>';
+}
 function renderCampaignPanel(){
  if(!worldState.campaign.started)return;
  const sponsor=worldState.sponsors.find(x=>x.id===worldState.campaign.startingSponsorId);
@@ -154,6 +172,7 @@ function renderCampaignPanel(){
  campaignPanel.innerHTML='<div class="cp-heading"><span>Colony operations</span><span>Sol '+worldState.time.sol+'</span></div>'+
  '<div class="cp-metrics"><strong>'+home.name+'</strong><br>'+sponsor.name+' · '+worldState.settlements.length+' settlement(s)<br>Earth link: '+(worldState.pointsOfInterest.filter(p=>p.kind==='mars-orbit-comms'&&p.status==='operational').length)+' Mars relays · ~12.5 min one-way light time<br>Transfer vehicle: '+(worldState.pointsOfInterest.find(p=>p.id==='mars-crewship')?.status??'unknown')+' in Mars orbit<br>Funds '+worldState.economy.funds+' · Materials '+worldState.economy.materials+' · Water '+worldState.economy.water.toFixed(1)+'<br>Morale '+worldState.colonists.morale.toFixed(1)+' · Sponsor patience '+worldState.campaign.sponsorPatience.toFixed(1)+'<br>Global heat contribution: '+tempAnomaly.toExponential(3)+' °C anomaly</div>'+
  materialPanel+
+ buildHabitatComponentReport(home,physicalStocks,fmtMass)+
  '<div class="cp-heading"><span>Strategic priorities</span><span>Colony-level decisions</span></div>'+
  '<div class="cp-metrics"><strong>Import dependence</strong><br>Current policy: '+({ 'accept-for-now':'Accept dependence for now', 'investigate-local-production':'Investigate local production', 'strengthen-supply-chain':'Strengthen supply chain' }[worldState.campaign.dependencyPolicy]??'Accept dependence for now')+'<br>Imported specialist components remain a potential bottleneck. Local regolith processing currently produces aggregate and metal-bearing concentrate, not qualified metal parts or finished components. The player sets priorities; the colony handles day-to-day execution.</div>'+
  (worldState.campaign.localManufacturingAssessment?'<div class="cp-project"><strong>Local manufacturing assessment</strong><small>Preliminary estimate: '+worldState.campaign.localManufacturingAssessment.potentialSubstitutionRange[0]+'–'+worldState.campaign.localManufacturingAssessment.potentialSubstitutionRange[1]+'% substitution potential for '+worldState.campaign.localManufacturingAssessment.category+'. Confidence: low. This is not current production capacity; processing, quality assurance and component qualification are still needed.</small></div>':'')+
