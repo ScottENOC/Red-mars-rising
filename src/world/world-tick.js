@@ -49,7 +49,11 @@ export function processWorldTick(w) {
   const requestedWaterUseUnits = Math.min(w.economy.water, .12 * (1 - site.waterAccess));
   const waterUseUnits = stores ? Math.min(requestedWaterUseUnits, stores.tanks / 1000) : requestedWaterUseUnits;
   if (homeColony && waterUseUnits > 0) {
-    transferWater(w, {from:'colony:' + homeColony.id + ':tanks',to:'colony:' + homeColony.id + ':wastewater',massKg:waterUseUnits * 1000,sol,process:'daily-use',note:'Used water enters wastewater pending treatment or disposal.'});
+    const usedWaterKg = waterUseUnits * 1000;
+    const humidityKg = usedWaterKg * 0.05;
+    const wastewaterKg = usedWaterKg - humidityKg;
+    if (wastewaterKg > 0) transferWater(w, {from:'colony:' + homeColony.id + ':tanks',to:'colony:' + homeColony.id + ':wastewater',massKg:wastewaterKg,sol,process:'daily-use',note:'Used water enters wastewater pending treatment.'});
+    if (humidityKg > 0) transferWater(w, {from:'colony:' + homeColony.id + ':tanks',to:'colony:' + homeColony.id + ':habitatHumidity',massKg:humidityKg,sol,process:'evaporation-in-habitat',note:'A fraction of used water enters habitat air as humidity.'});
   }
   w.economy.water = Math.max(0, w.economy.water - waterUseUnits);
   w.colonists.cumulativeWork += w.colonists.population * (w.colonists.morale / 100) * (powerShortfall ? .45 : 1);
