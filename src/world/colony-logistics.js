@@ -22,6 +22,7 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
   const cargoDropMarkers = [];
   const orbitPoiMarkers = [];
   const earthPoiMarkers = [];
+  const impactMarkerById = new Map();
   function pointOnMars(lat, lon, extra = 0.012) {
     const a = THREE.MathUtils.degToRad(lat), b = THREE.MathUtils.degToRad(lon);
     const r = 1 + terrainRadiusOffset(lat, lon) + extra;
@@ -261,8 +262,28 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
     hull.userData = ship.userData;
   }
 
+  const poiPickTargets = [...shortlistMarkers,...surfacePoiMarkers,...cargoDropMarkers.map(x=>x.marker),...orbitPoiMarkers.map(x=>x.marker),...earthPoiMarkers.map(x=>x.marker)];
+  function syncImpactMarkers() {
+    const impacts = worldState.materials?.planetary?.meteoroids?.recentImpacts ?? [];
+    for (const impact of impacts) {
+      if (impactMarkerById.has(impact.id)) continue;
+      const poi = {
+        id: impact.id,
+        name: 'Natural impact crater',
+        kind: 'natural-impact-crater',
+        status: 'formed',
+        description: impact.craterDiameterM.toFixed(1)+' m crater · '+impact.typeLabel+' · sol '+impact.sol
+      };
+      const marker = addPoiMarker(root,poi,pointOnMars(impact.lat,impact.lon,0.014),0xd58c63,0.006);
+      marker.userData.impact = impact;
+      impactMarkerById.set(impact.id,marker);
+      poiPickTargets.push(marker);
+    }
+  }
+
   function update(zoom, elapsedGameSeconds) {
     while (builtSettlements.length < settlements.length) builtSettlements.push(buildSettlement(settlements[builtSettlements.length]));
+    syncImpactMarkers();
     const detailVisible = zoom < 1.6;
     const markerVisible = zoom >= 1.6 && zoom < 8.5;
     for (const { group, markerGroup } of builtSettlements) {
@@ -274,6 +295,7 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
     orbitalGroup.visible = logisticsVisible;
     for (const marker of shortlistMarkers) marker.visible = zoom >= 1.6 && zoom < 8.5;
     for (const marker of surfacePoiMarkers) marker.visible = zoom >= 1.6 && zoom < 8.5;
+    for (const marker of impactMarkerById.values()) marker.visible = zoom >= 1.6 && zoom < 8.5;
     for (const {drop,marker} of cargoDropMarkers) {
       marker.visible = zoom >= 1.6 && zoom < 8.5;
       marker.userData.status = drop.status;
@@ -305,7 +327,8 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
     shortlistMarkers,
     orbitPoiMarkers,
     earthPoiMarkers,
-    poiPickTargets: [...shortlistMarkers,...surfacePoiMarkers,...cargoDropMarkers.map(x=>x.marker),...orbitPoiMarkers.map(x=>x.marker),...earthPoiMarkers.map(x=>x.marker)],
+    poiPickTargets,
+    impactMarkers: impactMarkerById,
     routeMeshes,
     rebuildSettlementRoutes,
     update,
