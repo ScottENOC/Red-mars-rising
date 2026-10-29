@@ -150,7 +150,6 @@ export function processWorldTick(w) {
       w.campaign.dependencyPolicy = 'strengthen-supply-chain';
       events.push({type:'strategic-program-complete',sol,description:'Sponsor cargo pipeline strengthened: shipment coordination is more reliable and sponsor confidence has improved, but material dependence remains.'});
     }
-    events.push({type:'project-complete',sol,description:program.name+' completed.'});
   }
 
   for (const project of w.infrastructure.projects) {
