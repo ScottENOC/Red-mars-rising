@@ -8,6 +8,7 @@ import { METEOROID_TYPES } from './world/material-inventories.js';
 import { ensureColonyPoliticalState, influenceColony, getColonyPoliticalSummary } from './world/colony-politics.js';
 import { ensureColonyEconomies, getColonyEconomySummary } from './world/colony-economy.js';
 import { getSponsorCommitmentSummary, requestSponsorProject } from './world/sponsor-commitments.js';
+import { getAsteroidOperationsSummary, commissionOrbitalOperations, launchAsteroidCapture } from './world/asteroid-operations.js';
 
 const TEXTURE_URL=new URL('../data/mars/8k_mars.jpg', import.meta.url).href;
 const worldState = createInitialWorldState();
@@ -183,6 +184,7 @@ function buildColonyEconomyReport(){
  const aidRecent=(worldState.colonyTrade.aidHistory??[]).slice(-5).reverse().map(item=>'<div>Sol '+item.sol+' · '+item.description+'</div>').join('');
  const recent=worldState.colonyTrade.tradeLog.slice(-5).reverse().map(item=>'<div>Sol '+item.sol+' · '+item.description+'</div>').join('');
  const sponsorSummary=getSponsorCommitmentSummary(worldState);
+ const orbitalSummary=getAsteroidOperationsSummary(worldState);
  const projectOptions=sponsorSummary.availableProjects.map(p=>'<option value="'+p.id+'">'+p.name+' · '+p.category+'</option>').join('');
  const sponsorCommitmentRows=sponsorSummary.commitments.map(item=>'<div style="padding:7px 0;border-top:1px solid #ffffff12"><strong>'+item.name+'</strong><div>Status: '+(item.suspendedReason?'SUSPENDED · '+item.suspendedReason:'Active')+' · project approved (physical construction not yet modelled) · support mode: '+item.supportMode.replaceAll('-',' ')+'</div><div>Operations, maintenance and repairs: '+(item.suspendedReason?'not currently funded':'committed')+' · next support cycle '+(item.nextSupportSol??'pending')+' sol</div><div>Operating grant: '+(item.operatingGrant??0)+' funds per 30-sol support cycle</div><div>Equipment capability: '+(item.capabilityOperational?'delivered on sol '+item.capabilityDeliveredSol:'awaiting machinery delivery')+'</div><div>Support package: '+Object.entries(item.goods).map(([g,n])=>n+' '+g).join(', ')+'</div><div style="opacity:.75">'+item.terms+'</div></div>').join('');
  const sponsorRequestRows=sponsorSummary.requests.map(item=>'<div>Sol '+item.requestedSol+' · '+item.name+' · <strong>'+item.status+'</strong>'+(item.reason?' · '+item.reason:'')+'</div>').join('');
@@ -222,6 +224,7 @@ function renderCampaignPanel(){
  campaignPanel.innerHTML='<div class="cp-heading"><span>Colony operations</span><span>Management</span></div>'+
  '<div class="cp-metrics"><strong>'+home.name+'</strong><br>'+sponsor.name+' · '+worldState.settlements.length+' settlement(s)<br>Earth link: '+(worldState.pointsOfInterest.filter(p=>p.kind==='mars-orbit-comms'&&p.status==='operational').length)+' Mars relays · ~12.5 min one-way light time<br>Transfer vehicle: '+(worldState.pointsOfInterest.find(p=>p.id==='mars-crewship')?.status??'unknown')+' in Mars orbit<br>Funds '+worldState.economy.funds+' · Materials '+worldState.economy.materials+' · Water '+worldState.economy.water.toFixed(1)+'<br>Morale '+worldState.colonists.morale.toFixed(1)+' · Sponsor patience '+worldState.campaign.sponsorPatience.toFixed(1)+'<br>Global heat contribution: '+tempAnomaly.toExponential(3)+' °C anomaly</div>'+
  materialPanel+
+ '<details style="margin:8px 0;padding:9px;background:#111923;border:1px solid #ffffff22;border-radius:8px"><summary style="cursor:pointer;font-weight:700">Mars orbital operations & asteroid capture</summary><div style="margin-top:8px;font-size:12px;line-height:1.55"><div><strong>Reusable capability — Mars orbital operations system</strong><div>Surface-to-orbit reusable vehicle, propellant infrastructure, navigation, communications, servicing and capture robotics. This is persistent infrastructure, not a one-off mission.</div><div>Status: '+(orbitalSummary.programme.status==='available'?'Not built':orbitalSummary.programme.status==='active'?'Under construction · '+Math.round(orbitalSummary.programme.progress*100)+'%'+(orbitalSummary.programme.pausedReason?' · '+orbitalSummary.programme.pausedReason:''):'Operational')+' · 180 sols · 90 funds, 35 materials, 24 machinery</div><button data-orbital-programme="1" '+(orbitalSummary.programme.status!=='available'?'disabled':'')+'>Commission orbital operations system</button></div><div style="border-top:1px solid #ffffff18;margin-top:8px;padding-top:8px"><strong>One-off mission — capture asteroid NMA-01</strong><div>Survey and rendezvous with a small near-Mars asteroid, then redirect it into a stable accessible orbit. Detailed prospecting and mining are separate follow-on projects.</div><div>Status: '+(orbitalSummary.missions.length?orbitalSummary.missions.map(m=>m.status==='active'?'Mission in progress · '+Math.round(m.progress*100)+'%': 'Mission complete · asteroid in stable Mars orbit').join('; '):'Not launched')+' · 120 sols · 55 funds, 12 materials, 10 machinery</div><button data-asteroid-mission="1" '+(!orbitalSummary.missionAvailable?'disabled':'')+'>Launch asteroid capture mission</button></div><div style="opacity:.72;margin-top:7px">Prototype abstraction: costs, durations and target designation are gameplay assumptions. Vehicle mass, propellant chemistry, orbital mechanics, launch windows, payload limits, capture probabilities and physical resource yields are not yet modelled. The orbital system is reusable; each capture is a separately funded mission.</div></div></details>'+
  buildColonyPoliticsReport()+
  buildColonyEconomyReport()+
  buildHabitatComponentReport()+
@@ -272,6 +275,10 @@ campaignPanel.addEventListener('click',event=>{
   if(result.ok)saveCampaign('colony-diplomacy');
   return;
  }
+ const orbitalButton=event.target.closest('[data-orbital-programme]');
+ if(orbitalButton){const result=commissionOrbitalOperations(worldState);notify(result.reason);renderCampaignPanel();if(result.ok)saveCampaign('orbital-operations');return;}
+ const asteroidButton=event.target.closest('[data-asteroid-mission]');
+ if(asteroidButton){const result=launchAsteroidCapture(worldState);notify(result.reason);renderCampaignPanel();if(result.ok)saveCampaign('asteroid-capture');return;}
  const saveButton=event.target.closest('[data-save-now]');
  if(saveButton){const ok=saveCampaign('manual');notify(ok?'Campaign saved on this device':'Could not save campaign; check browser storage');return;}
  const sponsorRequestButton=event.target.closest('[data-sponsor-project-request]');
