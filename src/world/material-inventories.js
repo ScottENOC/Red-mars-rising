@@ -222,17 +222,24 @@ export function importWater(w,{massKg,to='planet:atmosphericVapour',sol=0,source
 
 export function checkMaterialConservation(w){
   const m=ensureMaterialInventories(w),p=m.planetary.waterKg;
-  const planetary=Object.values(p).reduce((sum,x)=>sum+x.mass,0);
-  const colony=Object.values(m.colonies).reduce((sum,c)=>sum+Object.values(c.waterKg).reduce((a,x)=>a+x,0),0);
-  const total=planetary+colony;
-  const initial=m.diagnostics.initialTotalWaterKg??total;m.diagnostics.initialTotalWaterKg??=total;
+  const planetaryWater=Object.values(p).reduce((sum,x)=>sum+x.mass,0);
+  const colonyWater=Object.values(m.colonies).reduce((sum,c)=>sum+Object.values(c.waterKg).reduce((a,x)=>a+x,0),0);
+  const hydrogenGas=Object.values(m.colonies).reduce((sum,c)=>sum+(c.gasesKg.hydrogen??0),0);
+  const oxygenGas=Object.values(m.colonies).reduce((sum,c)=>sum+(c.gasesKg.oxygen??0),0);
+  const waterMass=planetaryWater+colonyWater;
+  const totalWaterDerivedMassKg=waterMass+hydrogenGas+oxygenGas;
+  const initial=m.diagnostics.initialTotalWaterKg??totalWaterDerivedMassKg;
+  m.diagnostics.initialTotalWaterKg??=totalWaterDerivedMassKg;
   const expected=initial+m.externalFlows.importedWaterKg-m.externalFlows.exportedWaterKg;
-  m.diagnostics.waterBalanceErrorKg=total-expected;m.diagnostics.lastWaterBalanceCheckSol=w.time?.sol??0;
-  const waterH=total*WATER_H_MASS_FRACTION+Object.values(m.colonies).reduce((a,c)=>a+(c.gasesKg.hydrogen??0),0);
-  const waterO=total*WATER_O_MASS_FRACTION+Object.values(m.colonies).reduce((a,c)=>a+(c.gasesKg.oxygen??0),0);
-  const initialH=m.diagnostics.initialHydrogenEquivalentKg??waterH;m.diagnostics.initialHydrogenEquivalentKg??=waterH;
-  const initialO=m.diagnostics.initialOxygenEquivalentKg??waterO;m.diagnostics.initialOxygenEquivalentKg??=waterO;
+  m.diagnostics.waterBalanceErrorKg=totalWaterDerivedMassKg-expected;
+  m.diagnostics.lastWaterBalanceCheckSol=w.time?.sol??0;
+  const waterH=waterMass*WATER_H_MASS_FRACTION+hydrogenGas;
+  const waterO=waterMass*WATER_O_MASS_FRACTION+oxygenGas;
+  const initialH=m.diagnostics.initialHydrogenEquivalentKg??waterH;
+  const initialO=m.diagnostics.initialOxygenEquivalentKg??waterO;
+  m.diagnostics.initialHydrogenEquivalentKg??=waterH;
+  m.diagnostics.initialOxygenEquivalentKg??=waterO;
   m.diagnostics.hydrogenBalanceErrorKg=waterH-(initialH+(m.externalFlows.importedWaterKg-m.externalFlows.exportedWaterKg)*WATER_H_MASS_FRACTION);
   m.diagnostics.oxygenBalanceErrorKg=waterO-(initialO+(m.externalFlows.importedWaterKg-m.externalFlows.exportedWaterKg)*WATER_O_MASS_FRACTION);
-  return {totalWaterKg:total,waterBalanceErrorKg:m.diagnostics.waterBalanceErrorKg,hydrogenBalanceErrorKg:m.diagnostics.hydrogenBalanceErrorKg,oxygenBalanceErrorKg:m.diagnostics.oxygenBalanceErrorKg};
+  return {totalWaterDerivedMassKg,waterBalanceErrorKg:m.diagnostics.waterBalanceErrorKg,hydrogenBalanceErrorKg:m.diagnostics.hydrogenBalanceErrorKg,oxygenBalanceErrorKg:m.diagnostics.oxygenBalanceErrorKg};
 }
