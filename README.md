@@ -31,7 +31,7 @@ The first strategic-priority prototype includes two contrasting programmes:
 - **Strengthen the sponsor cargo pipeline** funds a 25-sol effort focused on cargo handling, shipment coordination and sponsor confidence. This improves the modelled reliability score and sponsor standing, while retaining import dependence.
 - **Accept dependence for now** is a valid choice: preserve funds and materials for other priorities while accepting exposure to shipment delays or interruptions.
 
-Neither self-sufficiency nor dependence is treated as the universally correct strategy. The material simulation currently distinguishes local regolith, aggregate and metal-bearing concentrate, but does not yet manufacture qualified metal parts or finished construction components. These strategic initiatives are a first decision layer; component-specific material recipes, processing capacity, recycling and explicit stockpile/transport constraints remain future work. The player expresses intent and accepts trade-offs while the colony handles routine execution.
+Neither self-sufficiency nor dependence is treated as the universally correct strategy. The material simulation currently distinguishes local regolith, aggregate and metal-bearing concentrate, but does not yet manufacture qualified metal parts or finished construction components. These strategic initiatives are a first decision layer. The habitat project now has two explicit material recipes, but a general component catalogue, additional processing capabilities, recycling and explicit stockpile/transport constraints remain future work. The player expresses intent and accepts trade-offs while the colony handles routine execution.
 
 ## Alternative construction materials — first implementation
 
@@ -42,7 +42,7 @@ The regolith-shielded habitat project now offers two material recipes, selected 
 
 Both recipes check physical stock availability before commissioning. The workshop's illustrative 70% aggregate yield means the player may need to wait for local processing to build up enough aggregate before starting. On commissioning, local stocks are committed to construction-in-progress and imported components enter the colony matter ledger; on completion, that mass moves to installed construction stock. The inventory panel displays both quantities. These transitions are included in the colony matter accounting.
 
-This is a first end-to-end example, not a universal construction system. The economy's abstract funds/materials/machinery costs remain separate from the kilogram inventory, and material quality, component qualification, actual energy requirements, pressure-shell engineering, and construction waste/recycling are not yet simulated. The recipe yields, masses, durations and risk labels are prototype assumptions, not engineering design values.
+This is a first end-to-end example, not a universal construction system. The selected recipe charges the abstract funds/materials/machinery economy as well as checking and consuming kilogram stocks; those two cost systems are not reconciled. Material quality, component qualification, actual energy requirements, pressure-shell engineering, and construction waste/recycling are not yet simulated. The recipe yields, masses, durations and risk labels are prototype assumptions, not engineering design values.
 
 ## Code structure
 
