@@ -169,7 +169,7 @@ function buildColonyEconomyReport(){
   const e=getColonyEconomySummary(worldState,colony);
   const shortages=goods.filter(([key])=>e.shortages[key]).map(([,label])=>label);
   const inventory=goods.map(([key,label])=>label+' '+Number(e.inventory[key]??0).toFixed(1)).join(' · ');
-  const freight=worldState.colonyTrade.shipments.filter(s=>s.status==='in-transit'&&(s.fromId===colony.id||s.toId===colony.id)).map(s=>(s.toId===colony.id?'Inbound':'Outbound')+' '+s.amount+' '+s.good+' · '+Math.max(0,s.arrivalSol-worldState.time.sol)+' sols'+(s.fromId.startsWith('earth:')?' · Earth cargo':'' )).join('<br>')||'No freight currently in transit';
+  const freight=worldState.colonyTrade.shipments.filter(s=>s.status==='in-transit'&&(s.fromId===colony.id||s.toId===colony.id)).map(s=>(s.toId===colony.id?'Inbound':'Outbound')+' '+s.amount+' '+s.good+' · '+Math.max(0,s.arrivalSol-worldState.time.sol)+' sols'+(s.distanceKm!==null&&s.distanceKm!==undefined?' · '+s.distanceKm+' km':'')+(s.fromId.startsWith('earth:')?' · Earth cargo':'' )).join('<br>')||'No freight currently in transit';
   return '<div style="padding:9px 0;border-top:1px solid #ffffff18"><strong>'+colony.name+'</strong><div>'+e.specialisation+' · population '+Math.round(colony.population??0)+' · local stability '+e.stability+' · Earth dependence index '+e.importDependence+'</div><div>'+inventory+'</div><div>'+(shortages.length?'Low stocks: '+shortages.join(', '):'No stock currently below its warning threshold')+'</div><div>'+freight+'</div></div>';
  }).join('');
  const recent=worldState.colonyTrade.tradeLog.slice(-5).reverse().map(item=>'<div>Sol '+item.sol+' · '+item.description+'</div>').join('');
