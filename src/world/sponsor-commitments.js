@@ -126,10 +126,14 @@ export function processSponsorCommitments(w,sol,events=[]){
  if(criticallyLow.length&&(!state.survivalGuaranteeActive||w.campaign?.sponsorCommitmentsSuspended===true)){
   for(const good of criticallyLow){
    if(state.externalAppeals.some(a=>a.good===good&&['open','in-transit'].includes(a.status)))continue;
-   const appeal={id:'external-appeal-'+state.nextId++,openedSol:sol,good,status:'in-transit',source:'international-relief',amount:good==='food'?45:good==='components'?8:good==='machinery'?5:4,arrivalSol:sol+240};
+   const alternatives=(w.sponsors??[]).filter(item=>item.id!==w.campaign.startingSponsorId).map(item=>({item,relation:Number(item.relations?.[w.campaign.startingSponsorId]??item.relations?.[sponsor.id]??50),multilateral:item.type==='multilateral'?1:0})).sort((a,b)=>b.relation-a.relation||b.multilateral-a.multilateral);
+   const alternative=alternatives[0]?.item??null;
+   const sourceName=alternative?.name??'International relief';
+   const sourceId=alternative?'earth:'+alternative.id:'earth:international-relief';
+   const appeal={id:'external-appeal-'+state.nextId++,openedSol:sol,good,status:'in-transit',source:sourceName,sourceSponsorId:alternative?.id??null,amount:good==='food'?45:good==='components'?8:good==='machinery'?5:4,arrivalSol:sol+240};
    state.externalAppeals.push(appeal);
-   const ship=createSponsorShipment(w,home,good,appeal.amount,sol,'external-humanitarian-aid','earth:international-relief','International relief dispatched '+appeal.amount+' units of '+good+' after the founding sponsor guarantee was suspended; estimated arrival in 240 sols.');
-   if(ship){ship.kind='external-humanitarian-aid';ship.externalAppealId=appeal.id;events.push({type:'external-aid-appeal',sol,description:'The colony appealed to international relief for emergency '+good+' supplies; estimated arrival in 240 sols.'});}
+   const ship=createSponsorShipment(w,home,good,appeal.amount,sol,'external-humanitarian-aid',sourceId,sourceName+' dispatched '+appeal.amount+' units of '+good+' after the founding sponsor guarantee was suspended; estimated arrival in 240 sols.');
+   if(ship){ship.kind='external-humanitarian-aid';ship.externalAppealId=appeal.id;events.push({type:'external-aid-appeal',sol,description:'The colony appealed to '+sourceName+' for emergency '+good+' supplies; estimated arrival in 240 sols.'});}
   }
  }
  state.externalAppeals=state.externalAppeals.map(a=>{
