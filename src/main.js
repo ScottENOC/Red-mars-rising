@@ -3,7 +3,7 @@ import { createInitialWorldState } from './world/world-state.js';
 import { terrainHeight, terrainRadiusOffset, loadMolaTopography, updatePolarCaps, setTerrainWorldState } from './world/terrain.js';
 import { createColonyAndLogistics } from './world/colony-logistics.js';
 import { STARTING_LOCATIONS, SPONSORS, startCampaign } from './world/campaign-options.js';
-import { processWorldTick, commissionProject } from './world/world-tick.js';
+import { processWorldTick, commissionProject, commissionStrategicProgram } from './world/world-tick.js';
 import { METEOROID_TYPES } from './world/material-inventories.js';
 
 const TEXTURE_URL=new URL('../data/mars/8k_mars.jpg', import.meta.url).href;
@@ -137,12 +137,21 @@ function renderCampaignPanel(){
  campaignPanel.innerHTML='<div class="cp-heading"><span>Colony operations</span><span>Sol '+worldState.time.sol+'</span></div>'+
  '<div class="cp-metrics"><strong>'+home.name+'</strong><br>'+sponsor.name+' · '+worldState.settlements.length+' settlement(s)<br>Earth link: '+(worldState.pointsOfInterest.filter(p=>p.kind==='mars-orbit-comms'&&p.status==='operational').length)+' Mars relays · ~12.5 min one-way light time<br>Transfer vehicle: '+(worldState.pointsOfInterest.find(p=>p.id==='mars-crewship')?.status??'unknown')+' in Mars orbit<br>Funds '+worldState.economy.funds+' · Materials '+worldState.economy.materials+' · Water '+worldState.economy.water.toFixed(1)+'<br>Morale '+worldState.colonists.morale.toFixed(1)+' · Sponsor patience '+worldState.campaign.sponsorPatience.toFixed(1)+'<br>Global heat contribution: '+tempAnomaly.toExponential(3)+' °C anomaly</div>'+
  materialPanel+
+ '<div class="cp-heading"><span>Strategic priorities</span><span>Colony-level decisions</span></div>'+
+ '<div class="cp-metrics"><strong>Import dependence</strong><br>Current policy: '+({ 'accept-for-now':'Accept dependence for now', 'investigate-local-production':'Investigate local production', 'strengthen-supply-chain':'Strengthen supply chain' }[worldState.campaign.dependencyPolicy]??'Accept dependence for now')+'<br>Imported specialist components remain a potential bottleneck. Local regolith processing currently produces aggregate and metal-bearing concentrate, not qualified metal parts or finished components. The player sets priorities; the colony handles day-to-day execution.</div>'+
+ (worldState.campaign.localManufacturingAssessment?'<div class="cp-project"><strong>Local manufacturing assessment</strong><small>Preliminary estimate: '+worldState.campaign.localManufacturingAssessment.potentialSubstitutionRange[0]+'–'+worldState.campaign.localManufacturingAssessment.potentialSubstitutionRange[1]+'% substitution potential for '+worldState.campaign.localManufacturingAssessment.category+'. Confidence: low. This is not current production capacity; processing, quality assurance and component qualification are still needed.</small></div>':'')+
+ (worldState.campaign.strategicPrograms??[]).map(p=>'<div class="cp-project"><strong>'+p.name+'</strong><small>'+p.description+'<br>Cost: '+Object.entries(p.cost).map(([k,v])=>k+' '+v).join(' · ')+'<br>'+ (p.status==='active'?'Progress '+Math.round(p.progress*100)+'%'+(p.pausedReason?' · '+p.pausedReason:''):p.status==='complete'?'Completed · '+p.outcome:'Duration '+p.durationSols+' sols')+'</small><button data-strategic-program="'+p.id+'" '+(p.status!=='available'?'disabled':'')+'>'+(p.status==='active'?'In progress':p.status==='complete'?'Complete':'Fund investigation')+'</button></div>').join('')+
+ '<div class="cp-project"><strong>Accept dependence for now</strong><small>Do not fund either initiative yet. Preserve funds and materials for other priorities; continue relying on sponsor deliveries and accept the risk of delays or interruptions.</small><button data-dependency-policy="accept-for-now">Accept for now</button></div>'+
  '<div class="cp-heading"><span>Projects</span><span>'+worldState.infrastructure.projects.filter(p=>p.status==='active').length+' active</span></div>'+
  worldState.infrastructure.projects.map(p=>'<div class="cp-project"><strong>'+p.name+'</strong><small>'+p.description+'<br>Cost: '+Object.entries(p.cost).map(([k,v])=>k+' '+v).join(' · ')+'<br>'+ (p.status==='active'?'Progress '+Math.round(p.progress*100)+'%'+(p.pausedReason?' · '+p.pausedReason:''):p.status==='complete'?'Completed':'Build time '+p.durationSols+' sols')+'</small><button data-project="'+p.id+'" '+(p.status!=='available'?'disabled':'')+'>'+(p.status==='active'?'In progress':p.status==='complete'?'Complete':'Commission project')+'</button></div>').join('')+
  '<div class="cp-project"><strong>Campaign save</strong><small id="saveStatusText">'+saveStatus+'</small><button data-save-now="1">Save now</button></div>';
  saveStatusElement=campaignPanel.querySelector('#saveStatusText');
 }
 campaignPanel.addEventListener('click',event=>{
+ const policyButton=event.target.closest('[data-dependency-policy]');
+ if(policyButton){worldState.campaign.dependencyPolicy=policyButton.dataset.dependencyPolicy;notify('Strategic policy updated');renderCampaignPanel();saveCampaign('strategic-policy');return;}
+ const strategicButton=event.target.closest('[data-strategic-program]');
+ if(strategicButton){const result=commissionStrategicProgram(worldState,strategicButton.dataset.strategicProgram);notify(result.ok?'Strategic programme commissioned':result.reason);renderCampaignPanel();return;}
  const saveButton=event.target.closest('[data-save-now]');
  if(saveButton){const ok=saveCampaign('manual');notify(ok?'Campaign saved on this device':'Could not save campaign; check browser storage');return;}
  const button=event.target.closest('[data-project]');if(!button)return;
