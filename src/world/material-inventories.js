@@ -153,7 +153,14 @@ export function processNaturalMeteoroidFlux(w,sol){
       const lat=Math.asin(2*pseudoRandom01(sol*91+i*7.1)-1)*180/Math.PI;
       const lon=pseudoRandom01(sol*113+i*13.7)*360-180;
       const craterDiameterM=8+sizeSelector*12;
-      const impact={id:'impact-'+sol+'-'+i,sol,lat,lon,impactorDiameterM:diameterM,craterDiameterM,typeId:chosen.id,typeLabel:chosen.label,massKg:impactMassKg};
+      const impact={id:'impact-'+sol+'-'+i,sol,lat,lon,impactorDiameterM:diameterM,craterDiameterM,typeId:chosen.id,typeLabel:chosen.label,massKg:impactMassKg,depositKg:retainedImpactKg,depositComposition:{...chosen.composition}};
+      w.terrain??={source:'NASA MOLA MEGDR 4 pixels/degree',geologicalModifications:[],depositSites:[]};
+      w.terrain.geologicalModifications??=[];
+      const depositStocksKg=Object.fromEntries(Object.entries(chosen.composition).map(([component,fraction])=>[component,retainedImpactKg*fraction]));
+      const geologicalRecord={id:impact.id,kind:'impact-crater',sol,lat,lon,craterDiameterM,impactorDiameterM:diameterM,impactorTypeId:chosen.id,impactorTypeLabel:chosen.label,impactorMassKg:impactMassKg,retainedDepositKg:retainedImpactKg,depositComposition:{...chosen.composition},depositStocksKg,terrainDeltaM:{floor:-craterDiameterM*0.16,rim:craterDiameterM*0.035,ejecta:craterDiameterM*0.006},status:'permanent'};
+      w.terrain.geologicalModifications.push(geologicalRecord);
+      w.terrain.depositSites??=[];
+      w.terrain.depositSites.push({id:impact.id+'-deposit',impactId:impact.id,sol,lat,lon,sourceType:chosen.id,sourceLabel:chosen.label,stocksKg:{...depositStocksKg},totalMassKg:Object.values(depositStocksKg).reduce((sum,mass)=>sum+mass,0),accessibility:'unassessed'});
       r.recentImpacts.push(impact);if(r.recentImpacts.length>200)r.recentImpacts.shift();
       m.ledger.push({sol,substance:chosen.label,massKg:impactMassKg,from:'space',to:'planet:impact-site',process:'natural-crater-impact',note:'Modelled '+craterDiameterM.toFixed(1)+' m crater from '+diameterM.toFixed(2)+' m impactor; assumed density '+chosen.densityKgM3+' kg/m3 and 15% entry/impact mass loss.',impactId:impact.id,lat,lon});
     }
