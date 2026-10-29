@@ -5,6 +5,7 @@ import { terrainHeight, terrainRadiusOffset, loadMolaTopography, updatePolarCaps
 const TEXTURE_URL=new URL('../data/mars/8k_mars.jpg', import.meta.url).href;
 const worldState = createInitialWorldState();
 const SHOW_GENERATED_POLAR_CAPS = true;
+let lastIceSolarLongitude = -1;
 
 // Mission timeline: the first crew leaves Earth in late 2026 and arrives in July 2027.
 const MISSION_ARRIVAL_UTC = Date.UTC(2027, 6, 22, 0);
@@ -57,15 +58,17 @@ function updateMissionClock(deltaSeconds) {
 }
 // Approximate Mars solar longitude from its mean orbital motion and equation of centre.
 // This gives seasonal solar declination; the sol clock drives the subsolar longitude.
-function marsSolarDeclination(dateMs) {
+function marsSolarLongitude(dateMs) {
   const daysSinceJ2000 = (dateMs - Date.UTC(2000, 0, 1, 12)) / 86400000;
   const rad = Math.PI / 180;
   const meanAnomaly = (19.3870 + 0.52402075 * daysSinceJ2000) * rad;
   const fictitiousMeanSun = (270.3863 + 0.5240384 * daysSinceJ2000) * rad;
   const equationOfCentre = (10.691 + 3.0 * Math.sin(meanAnomaly) + 0.623 * Math.sin(2 * meanAnomaly) +
     0.050 * Math.sin(3 * meanAnomaly) + 0.005 * Math.sin(4 * meanAnomaly) + 0.0005 * Math.sin(5 * meanAnomaly)) * rad;
-  const solarLongitude = fictitiousMeanSun + equationOfCentre;
-  return Math.asin(Math.sin(25.19 * rad) * Math.sin(solarLongitude));
+  return ((fictitiousMeanSun + equationOfCentre) / rad % 360 + 360) % 360;
+}
+function marsSolarDeclination(dateMs) {
+  return Math.asin(Math.sin(25.19 * Math.PI / 180) * Math.sin(marsSolarLongitude(dateMs) * Math.PI / 180));
 }
 
 const initialTemp = worldState.climate.meanSurfaceTemperatureC;
@@ -223,7 +226,11 @@ loadMolaTopography().then(info=>{
  mars.castShadow=true;
  mars.receiveShadow=true;
  root.add(mars);
- if(SHOW_GENERATED_POLAR_CAPS)updatePolarCaps(THREE,root,worldState);
+ if(SHOW_GENERATED_POLAR_CAPS) {
+  const arrivalLs = marsSolarLongitude(MISSION_ARRIVAL_UTC);
+  updatePolarCaps(THREE,root,worldState,arrivalLs);
+  lastIceSolarLongitude = Math.floor(arrivalLs);
+ }
  worldState.terrain.source=info.source;
  if(marsTexture)applyMarsTexture(marsTexture);
  document.querySelector('#loading p').textContent='NASA MOLA topography loaded';
@@ -341,6 +348,12 @@ addEventListener('resize',resize);
 let previousFrameTime=performance.now();
 function updateSolarLighting() {
  const missionDateMs=MISSION_ARRIVAL_UTC+elapsedGameSeconds*1000;
+ const solarLongitude = marsSolarLongitude(missionDateMs);
+ const iceLongitude = Math.floor(solarLongitude);
+ if(mars && SHOW_GENERATED_POLAR_CAPS && iceLongitude !== lastIceSolarLongitude) {
+  updatePolarCaps(THREE,root,worldState,solarLongitude);
+  lastIceSolarLongitude = iceLongitude;
+ }
  const declination=marsSolarDeclination(missionDateMs);
  const localSolSeconds=((ARRIVAL_LOCAL_SOL_SECONDS+elapsedGameSeconds)%MARS_SOL_SECONDS+MARS_SOL_SECONDS)%MARS_SOL_SECONDS;
  const localSolarHours=localSolSeconds/3600;
