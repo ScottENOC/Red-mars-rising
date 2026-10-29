@@ -119,7 +119,13 @@ function operateColonies(w,sol,events){
       if(sol%10===0){
         s.morale=clamp((s.morale??(s.kind==='primary-colony'?w.colonists.morale:65))-2);
         if(s.kind==='primary-colony')w.colonists.morale=clamp(w.colonists.morale-2);
-        else s.population=Math.max(0,Math.round((s.population??0)-1));
+        else {
+          s.population=Math.max(0,Math.round((s.population??0)-1));
+          if(s.population===0){
+            s.status='failed';
+            events.push({type:'colony-failed',sol,description:s.name+' has been abandoned after prolonged food shortages.'});
+          }
+        }
         events.push({type:'colony-food-crisis',sol,description:s.name+' is facing a severe food shortage; local stability is deteriorating.'});
       }
     }else e.stability=clamp(e.stability+0.01);
