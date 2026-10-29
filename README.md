@@ -46,6 +46,14 @@ This is a first end-to-end example, not a universal construction system. The sel
 
 The habitat component report separates the pressure boundary, primary structure, shielding, insulation/thermal control, and seals/ducts/fittings. It makes imported qualified hardware and unspecified requirements visible rather than treating a recipe as a complete engineering design. Some package masses are intentionally not allocated to individual components; the polymer and spare-parts inputs are generic allowances, not claims that they satisfy a particular component specification. The report links local-manufacturing assessment and cargo-pipeline status to the dependency picture, but the assessment does not unlock production. No material is treated as a qualified pressure liner, insulation system or seal merely because it is printable or locally available.
 
+## Independent Martian colonies and political agency
+
+Each settlement is modelled as a political actor distinct from its sponsor. Sponsor diplomacy provides a softened starting influence on inter-colony relations, but those relationships are stored on the colonies and can change independently. Colony state includes prototype indices for Martian identity, local autonomy, sponsor influence, political stability and cooperation, plus pairwise relationships with other colonies. These fields are migrated into older campaign saves when loaded.
+
+The first playable diplomacy slice adds two player initiatives against an established rival colony: a joint scientific programme (20 funds; 90-sol cooldown) improves bilateral relations and cooperation, while support for Martian self-government (15 funds; 120-sol cooldown) increases local autonomy and Martian identity while reducing sponsor influence. Their effects are immediate model changes, not a scripted path to independence or pan-Martian unity. Political indices drift slowly over time, and a common Martian identity is only one possible outcome.
+
+This is a foundation, not a full political simulation. The indices and drift rates are explicit prototype assumptions, not empirically calibrated forecasts. Internal factions, elections and leadership, sponsor coercion, actual trade and specialisation, treaties, sanctions, military alliances, secession and war are not implemented yet. In particular, colony trade does not yet transfer goods or change physical inventories; the current cooperation score is preparatory state for that later system.
+
 ## Code structure
 
 - `index.html` is the page shell and styling; application logic lives in ES modules.
