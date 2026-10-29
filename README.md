@@ -33,6 +33,17 @@ The first strategic-priority prototype includes two contrasting programmes:
 
 Neither self-sufficiency nor dependence is treated as the universally correct strategy. The material simulation currently distinguishes local regolith, aggregate and metal-bearing concentrate, but does not yet manufacture qualified metal parts or finished construction components. These strategic initiatives are a first decision layer; component-specific material recipes, processing capacity, recycling and explicit stockpile/transport constraints remain future work. The player expresses intent and accepts trade-offs while the colony handles routine execution.
 
+## Alternative construction materials — first implementation
+
+The regolith-shielded habitat project now offers two material recipes, selected at the strategic project level rather than by assigning individual workers:
+
+- **Imported metal frame + local shielding:** 1,200 kg of imported construction components, plus 12,000 kg of local aggregate, 40 kg of polymers and 10 kg of spare parts. It takes 35 sols and has lower fabrication uncertainty, but relies more heavily on imported finished components.
+- **Locally formed regolith shell + imported pressure liner:** 150 kg of imported pressure-liner/critical components, plus 18,000 kg of aggregate, 80 kg of polymers and 30 kg of spare parts. It takes 45 sols, uses less imported component mass, and has greater local process and quality-assurance risk. The regolith shell is explicitly non-pressure-bearing; the pressure boundary remains a qualified imported liner.
+
+Both recipes check physical stock availability before commissioning. The workshop's illustrative 70% aggregate yield means the player may need to wait for local processing to build up enough aggregate before starting. On commissioning, local stocks are committed to construction-in-progress and imported components enter the colony matter ledger; on completion, that mass moves to installed construction stock. The inventory panel displays both quantities. These transitions are included in the colony matter accounting.
+
+This is a first end-to-end example, not a universal construction system. The economy's abstract funds/materials/machinery costs remain separate from the kilogram inventory, and material quality, component qualification, actual energy requirements, pressure-shell engineering, and construction waste/recycling are not yet simulated. The recipe yields, masses, durations and risk labels are prototype assumptions, not engineering design values.
+
 ## Code structure
 
 - `index.html` is the page shell and styling; application logic lives in ES modules.
