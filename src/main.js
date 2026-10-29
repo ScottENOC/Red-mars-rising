@@ -531,9 +531,11 @@ function animate(now=performance.now()){
  if(colonyLogistics)colonyLogistics.update(zoom,elapsedGameSeconds);
  const scaleLabel=document.querySelector('#mapScaleLabel');
  if(scaleLabel)scaleLabel.textContent=zoom>22?'INTERPLANETARY TRANSIT · DISTANCES COMPRESSED':zoom>11.5?'WIDE ORBITAL VIEW':zoom<1.6?'SURFACE COLONY':'PLANETARY VIEW';
- const cameraOffset=new THREE.Vector3(0,0,zoom).applyQuaternion(focusedMoon?targetViewRotation:new THREE.Quaternion());
+ if(!groundMode){
+  const cameraOffset=new THREE.Vector3(0,0,zoom).applyQuaternion(focusedMoon?targetViewRotation:new THREE.Quaternion());
   const desiredCameraPosition=cameraFocus.clone().add(cameraOffset);
   camera.position.lerp(desiredCameraPosition,.12);camera.lookAt(cameraFocus);
+ }
  stars.rotation.y+=.00004;markerGroup.visible=showLabels&&zoom<8.5;gridGroup.visible=showGrid&&zoom<8.5;updateSolarLighting();
  renderer.render(groundMode?groundScene:scene,camera);
 }
