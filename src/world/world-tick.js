@@ -15,6 +15,7 @@ export function processWorldTick(w) {
   const sol = ++w.time.sol;
   const events = [];
   ensureMaterialInventories(w);
+  checkMaterialConservation(w); // Establish the baseline before any external inputs or transfers this sol.
   processNaturalMeteoroidFlux(w, sol);
   processWaterClimate(w, sol);
   const site = w.settlements.find(s => s.kind === 'primary-colony')?.siteModifiers ?? {waterAccess:.5,heatDemand:1};
