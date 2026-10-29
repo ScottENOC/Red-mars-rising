@@ -42,3 +42,8 @@ The Mars surface texture is from [Solar System Scope](https://www.solarsystemsco
 ## Development workflow
 
 Work on the `development` branch. Keep `main` for approved releases.
+
+
+## Ground-level exploration — phase 1
+
+The **Ground view** control opens a north-facing surface preview at Jezero Base. Use **Return to globe** to restore the orbital view. This first pass is a camera and interface prototype: the nearby terrain and rocks are procedural visual placeholders, not high-resolution MOLA data or a surveyed reconstruction of Jezero. Planned follow-on phases are camera panning, movement along designated paths, and free roaming.
