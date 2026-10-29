@@ -76,7 +76,7 @@ function createShipment(w,from,to,good,amount,sol,kind='trade'){
   const shipment={id:'colony-haul-'+w.colonyTrade.nextShipmentId++,kind,fromId:from.id,toId:to.id,good,amount:round3(amount),departSol:sol,arrivalSol:sol+travelSols,travelSols,distanceKm:Math.round(distanceKm),status:'in-transit'};
   from.economy.inventory[good]=round3(Math.max(0,from.economy.inventory[good]-amount));
   w.colonyTrade.shipments.push(shipment);
-  addTradeLog(w,{sol,kind:'departed',shipmentId:shipment.id,fromId:from.id,toId:to.id,good,amount:shipment.amount,description:amount+' units of '+good+' departed '+from.name+' for '+to.name+'.'});
+  addTradeLog(w,{sol,kind:'departed',shipmentId:shipment.id,fromId:from.id,toId:to.id,good,amount:shipment.amount,description:amount+' units of '+good+' departed '+from.name+' for '+to.name+' ('+Math.round(distanceKm)+' km, about '+travelSols+' sols in transit).'});
   return shipment;
 }
 function deliverShipments(w,sol,events){
