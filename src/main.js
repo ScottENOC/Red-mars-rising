@@ -102,6 +102,14 @@ key.shadow.camera.left=-1.12;key.shadow.camera.right=1.12;key.shadow.camera.top=
 key.shadow.camera.near=0.1;key.shadow.camera.far=8;key.shadow.camera.updateProjectionMatrix();
 key.shadow.bias=-0.00002;key.shadow.normalBias=0.002;key.shadow.radius=2;scene.add(key);
 const rim=new THREE.DirectionalLight(0x7189b1,0.07);rim.position.set(3,-1,-3);scene.add(rim);
+// A dedicated close-up light keeps the focused moon's day/night boundary legible.
+// It follows the solar direction, but aims at the moon rather than Mars' centre.
+const moonKeyTarget=new THREE.Object3D();scene.add(moonKeyTarget);
+const moonKey=new THREE.DirectionalLight(0xffdfc1,2.8);moonKey.target=moonKeyTarget;moonKey.castShadow=true;
+moonKey.shadow.mapSize.set(1024,1024);
+moonKey.shadow.camera.left=-0.065;moonKey.shadow.camera.right=0.065;moonKey.shadow.camera.top=0.065;moonKey.shadow.camera.bottom=-0.065;
+moonKey.shadow.camera.near=0.01;moonKey.shadow.camera.far=0.35;moonKey.shadow.camera.updateProjectionMatrix();
+moonKey.shadow.bias=-0.00005;moonKey.shadow.normalBias=0.001;moonKey.shadow.radius=2;scene.add(moonKey);
 const loader=new THREE.TextureLoader();loader.setCrossOrigin('anonymous');
 let mars,gridGroup,markerGroup,stars,textureLoaded=false,marsTexture=null,currentLod=-1;
 function buildTerrainGeometry(segments=360,rings=240,useElevation=true) {
@@ -222,7 +230,7 @@ for(const [id,spec] of Object.entries(moonSpecs)){
  const pts=[];for(let i=0;i<=240;i++){const a=i/240*Math.PI*2;pts.push(new THREE.Vector3(Math.cos(a)*spec.orbit,0,Math.sin(a)*spec.orbit));}
  const orbitLine=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:0xc2a18e,transparent:true,opacity:.24}));orbitLine.visible=false;scene.add(orbitLine);
  const group=new THREE.Group();scene.add(group);
- const body=new THREE.Mesh(new THREE.SphereGeometry(1,24,16),new THREE.MeshStandardMaterial({color:spec.color,roughness:1}));body.scale.setScalar(spec.radius);group.add(body);
+ const body=new THREE.Mesh(new THREE.SphereGeometry(1,24,16),new THREE.MeshStandardMaterial({color:spec.color,roughness:1}));body.scale.setScalar(spec.radius);body.castShadow=true;body.receiveShadow=true;group.add(body);
  const marker=new THREE.Mesh(new THREE.SphereGeometry(.035,12,10),new THREE.MeshBasicMaterial({color:spec.color,transparent:true,opacity:.8,depthWrite:false}));group.add(marker);
  const halo=new THREE.Mesh(new THREE.SphereGeometry(.055,12,10),new THREE.MeshBasicMaterial({color:spec.color,transparent:true,opacity:.12,depthWrite:false}));group.add(halo);
  moonObjects[id]={group,body,marker,halo,orbitLine,focusedScale:false};
@@ -285,6 +293,14 @@ function updateSolarLighting() {
  const sunLocal=new THREE.Vector3(-Math.cos(latitude)*Math.sin(longitude),Math.sin(latitude),Math.cos(latitude)*Math.cos(longitude)).normalize();
  const sunWorld=sunLocal.applyQuaternion(root.quaternion).multiplyScalar(4);
  key.position.copy(sunWorld);
+ if(focusedMoon&&moonObjects[focusedMoon]){
+  const focused=moonObjects[focusedMoon];
+  const direction=sunWorld.clone().normalize();
+  moonKey.position.copy(focused.group.position).addScaledVector(direction,0.22);
+  moonKeyTarget.position.copy(focused.group.position);
+  moonKey.visible=true;
+  moonKey.shadow.camera.left=-0.065;moonKey.shadow.camera.right=0.065;moonKey.shadow.camera.top=0.065;moonKey.shadow.camera.bottom=-0.065;
+ }else moonKey.visible=false;
 }
 function animate(now=performance.now()){
  requestAnimationFrame(animate);
