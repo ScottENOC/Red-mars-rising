@@ -75,6 +75,11 @@ export function processWorldTick(w) {
       w.materials.ledger.push({sol,process:'human-metabolism',substance:'food',massKg:foodEatenKg,from:'colony:'+homeColony.id+':food',to:'colony:'+homeColony.id+':biomass-and-products',note:'Food is partitioned into solid waste, CO₂ and metabolic water using a simplified glucose oxidation model.'});
     }
     metabolicHeatW=people*100;
+    if(foodEatenKg+1e-9<dailyFoodKg){
+      w.colonists.health=Math.max(0,w.colonists.health-0.25);
+      w.colonists.morale=Math.max(0,w.colonists.morale-0.35);
+      if(sol%10===0)events.push({type:'food-shortage',sol,description:'Food stocks and/or oxygen are insufficient for full rations; health and morale are declining.'});
+    }
 
     // Greenhouse photosynthesis is limited by actual CO₂ and tank water, and is paused by power shortfall.
     if(!powerShortfall && homeColony.infrastructure?.includes('greenhouse')){
@@ -235,6 +240,7 @@ export function processWorldTick(w) {
     colonyHeatLossW=heatLossW;
     w.materials.energy.thermalHeatInputJ+=heatInputJ;
     w.materials.energy.thermalHeatLostJ+=heatLossJ;
+    w.materials.energy.storedThermalEnergyJ=Object.values(w.materials.colonies).reduce((sum,c)=>sum+Math.max(0,c.thermal?.storedEnergyJ??0),0);
   }
 
   // Global thermal stock receives heat leaked from the colony and loses energy radiatively.
