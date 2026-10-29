@@ -14,6 +14,8 @@ export function processWorldTick(w) {
   if (!w.campaign?.started) return [];
   const sol = ++w.time.sol;
   const events = [];
+  ensureMaterialInventories(w);
+  processNaturalMeteoroidFlux(w, sol);
   const site = w.settlements.find(s => s.kind === 'primary-colony')?.siteModifiers ?? {waterAccess:.5,heatDemand:1};
   const climate = w.climate;
   climate.energyBalance ??= {};
