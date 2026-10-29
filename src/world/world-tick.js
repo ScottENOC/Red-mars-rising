@@ -138,7 +138,8 @@ export function processWorldTick(w) {
       events.push({type:'cargo-drop-landed',sol,description:drop.sponsorName+' cargo landed at '+drop.siteName+'; no crewed colony has been established.'});
     }
   }
-  checkWaterConservation(w);\n  w.time.lastProcessedSol = sol;
+  checkWaterConservation(w);
+  w.time.lastProcessedSol = sol;
   w.time.solOfYear = ((sol - 1) % 669) + 1;
   for (const event of events) w.events.push({...event,sol});
   return events;
