@@ -81,13 +81,12 @@ Sources: [Tomkins et al. (2019), micrometeoroid flux and mineralogy](https://agu
 - `electrolyseWater` converts water into stoichiometric H₂ and O₂ mass stocks and records electricity use. `recombineHydrogenOxygen` converts those gases back into water and records released heat. Their system-energy values are provisional engineering assumptions.
 - `importWater` supports explicit external water deliveries, so directed ice-bearing bodies can later add matter to a chosen reservoir through a recorded external input.
 
-The diagnostics now include water-derived mass and hydrogen/oxygen balance checks, including stored H₂ and O₂. Tiny nonzero residuals can still occur because the global stocks are around 10¹⁶ kg while the per-sol transfers are much smaller and JavaScript uses finite-precision floating-point numbers; the residuals must be surfaced, not silently rounded away. This is not yet a complete conservation model for every element: the atmospheric gas inventories, impact-ablation chemistry, minerals, manufactured goods and biological stocks still need to be linked into a unified elemental ledger.
+The diagnostics now include water-derived mass and hydrogen/oxygen balance checks, including stored H₂ and O₂. Reservoir updates use compensated summation so small transfers are less likely to disappear when applied to very large global stocks. Remaining tiny nonzero elemental residuals can still occur because JavaScript uses finite-precision floating-point numbers; they are surfaced rather than rounded away. Atmospheric pressure and broad gas fractions are now derived from the atmospheric mass inventory, including suspended meteoroid aerosols and water vapour. Ablated meteoroid mass is stored as atmospheric aerosol and gradually settles into a mineral-deposit stock. This is still not a complete elemental model: the exact chemical species produced by ablation, hydrated minerals, manufactured goods and biological stocks need to be linked into a unified ledger.
 
 ### Next implementation steps
 
-1. Add compensated reservoir updates and explicit numerical-error reporting for large planetary stocks.
-2. Resolve atmospheric ablation into chemical species and link gas mass/composition to atmospheric pressure.
-3. Make site-specific extraction, accessibility and production rates depend on geology and technology.
-4. Add elemental inventories and conservation across industrial processing, food, biomass, human metabolism and waste.
-5. Add geographic impact locations, crater formation and optional player-directed ice-rich asteroid missions.
+1. Make site-specific extraction, accessibility and production rates depend on geology and technology.
+2. Resolve atmospheric ablation into explicit chemical species and include oxygen/hydrogen chemistry beyond the water system.
+3. Add elemental inventories and conservation across industrial processing, food, biomass, human metabolism and waste.
+4. Add geographic impact locations, crater formation and optional player-directed ice-rich asteroid missions.
 
