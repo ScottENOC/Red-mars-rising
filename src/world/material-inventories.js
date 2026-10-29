@@ -393,7 +393,7 @@ export function checkMaterialConservation(w){
     const materialKeys=new Set([...Object.keys(now?.materialsKg??{}),...Object.keys(before?.materialsKg??{})]);
     for(const key of materialKeys){
       const current=now?.materialsKg?.[key]??0,initial=before?.materialsKg?.[key]??0;
-      trackedDeltaKg+=current-initial;
+      // Industrial stocks are part of colonyMatterBalance, not the water/food/gas chemistry subtotal.
       colonyMass+=current;
     }
   }
