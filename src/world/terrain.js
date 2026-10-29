@@ -73,9 +73,17 @@ export function createPolarCapMesh(north, worldState) {
   if (radiusDeg <= 0) return null;
   const vertices = [], indices = [], segments = 96, rings = 18;
   for (let j = 0; j <= rings; j++) {
-    const ang = THREE.MathUtils.degToRad(radiusDeg * j / rings);
     for (let i = 0; i <= segments; i++) {
       const lon = 2 * Math.PI * i / segments;
+      // Deterministic low-frequency boundary variation avoids the artificial perfect-circle
+      // look without adding per-frame randomness. This is a visual approximation, not a
+      // claim that the current extent values are a scientific ice-boundary dataset.
+      const edgeVariation =
+        0.055 * Math.sin(3 * lon + (north ? 0.4 : 1.1)) +
+        0.032 * Math.sin(5 * lon - (north ? 0.7 : 0.2)) +
+        0.018 * Math.cos(9 * lon + (north ? 0.1 : 1.7));
+      const edgeRadiusDeg = radiusDeg * (1 + edgeVariation);
+      const ang = THREE.MathUtils.degToRad(edgeRadiusDeg * j / rings);
       const lat = north ? Math.PI / 2 - ang : -Math.PI / 2 + ang;
       const r = 1.0015 + terrainRadiusOffset(lat * 180 / Math.PI, lon * 180 / Math.PI);
       vertices.push(-r * Math.cos(lat) * Math.sin(lon), r * Math.sin(lat), r * Math.cos(lat) * Math.cos(lon));
