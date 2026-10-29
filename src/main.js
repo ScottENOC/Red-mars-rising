@@ -272,7 +272,7 @@ gridGroup.visible=false;
 let targetRotation=new THREE.Quaternion().setFromEuler(new THREE.Euler(THREE.MathUtils.degToRad(-8),THREE.MathUtils.degToRad(18),0,'YXZ'));
 root.quaternion.copy(targetRotation);
 let zoom=4.2,minZoom=0.12,maxZoom=28,showLabels=true,showGrid=false;
-const cameraFocus=new THREE.Vector3();let focusedMoon=null;
+const cameraFocus=new THREE.Vector3();let focusedMoon=null,focusedSurface=null;
 let targetViewRotation=new THREE.Quaternion();
 const moonSpecs={phobos:{name:'Phobos',orbit:2.76,periodHours:7.65,radius:0.00327,phase:.2,color:0x8b8178},deimos:{name:'Deimos',orbit:6.92,periodHours:30.3,radius:0.00183,phase:2.2,color:0xaaa097}};
 const moonObjects={};
@@ -312,7 +312,7 @@ function updateMoonOrbits(){
  }
 }
 function focusMoon(id){
- const m=moonObjects[id];if(!m)return;focusedMoon=id;targetViewRotation.identity();loadMoonAssets(id);
+ const m=moonObjects[id];if(!m)return;focusedSurface=null;focusedMoon=id;targetViewRotation.identity();loadMoonAssets(id);
  for(const [otherId,o] of Object.entries(moonObjects)){o.focusedScale=otherId===id;o.body.scale.setScalar(otherId===id?.03:moonSpecs[otherId].radius);o.marker.visible=otherId!==id&&zoom>1.8;o.halo.visible=otherId!==id&&zoom>6.5;}
  cameraFocus.copy(m.group.position);setZoom(.18);
  document.querySelectorAll('[data-moon]').forEach(el=>el.classList.toggle('active',el.dataset.moon===id));
@@ -320,11 +320,28 @@ function focusMoon(id){
 }
 let pointer=null,lastTrackball=null,pointers=new Map(),pinchStart=0,pinchZoom=zoom,dragged=false;
 const raycaster=new THREE.Raycaster(),pointerNdc=new THREE.Vector2();
-function setZoom(v){zoom=THREE.MathUtils.clamp(v,minZoom,maxZoom);updateLod();}
+function setZoom(v){
+ let next=THREE.MathUtils.clamp(v,minZoom,maxZoom);
+ // Once the camera approaches the surface, switch from centre-distance zoom
+ // to altitude-above-surface zoom so the camera never enters the solid planet.
+ if(focusedSurface&&next>1.5){
+  focusedSurface=null;cameraFocus.set(0,0,0);
+  next=THREE.MathUtils.clamp(next+1,minZoom,maxZoom);
+ }else if(!focusedSurface&&!focusedMoon&&next<1.12){
+  const localNormal=new THREE.Vector3(0,0,1).applyQuaternion(root.quaternion.clone().invert()).normalize();
+  const lat=Math.asin(THREE.MathUtils.clamp(localNormal.y,-1,1))*180/Math.PI;
+  const lon=Math.atan2(-localNormal.x,localNormal.z)*180/Math.PI;
+  const radius=1+terrainRadiusOffset(lat,lon)+0.002;
+  focusedSurface=localNormal.multiplyScalar(radius);
+  cameraFocus.copy(focusedSurface).applyQuaternion(root.quaternion);
+  next=Math.max(minZoom,next-radius);
+ }
+ zoom=next;updateLod();
+}
 function notify(message){const t=document.querySelector('#toast');t.textContent=message;t.classList.add('show');clearTimeout(notify.timer);notify.timer=setTimeout(()=>t.classList.remove('show'),1800);}
 function setActivePlace(id){document.querySelectorAll('.place').forEach(el=>el.classList.toggle('active',el.dataset.place===id));}
-function resetView(announce=true){focusedMoon=null;cameraFocus.set(0,0,0);for(const [id,m] of Object.entries(moonObjects)){m.focusedScale=false;m.body.scale.setScalar(moonSpecs[id].radius);}document.querySelectorAll('[data-moon]').forEach(el=>el.classList.remove('active'));targetRotation.setFromEuler(new THREE.Euler(THREE.MathUtils.degToRad(-8),THREE.MathUtils.degToRad(18),0,'YXZ'));setZoom(4.2);setActivePlace('global');if(announce)notify('Mars global view restored');}
-function focusPlace(id){if(id==='global'){resetView();return;}const p=locations[id];if(!p)return;focusedMoon=null;cameraFocus.set(0,0,0);for(const [mid,m] of Object.entries(moonObjects)){m.focusedScale=false;m.body.scale.setScalar(moonSpecs[mid].radius);}document.querySelectorAll('[data-moon]').forEach(el=>el.classList.remove('active'));const v=xyz(p.lat,p.lon,1);const yaw=Math.atan2(-v.x,v.z);const pitch=Math.asin(v.y);targetRotation.setFromEuler(new THREE.Euler(pitch,yaw,0,'YXZ'));setZoom(Math.min(zoom,p.zoom+0.45));setActivePlace(id);notify(p.name+' · '+p.description);}
+function resetView(announce=true){focusedMoon=null;focusedSurface=null;cameraFocus.set(0,0,0);for(const [id,m] of Object.entries(moonObjects)){m.focusedScale=false;m.body.scale.setScalar(moonSpecs[id].radius);}document.querySelectorAll('[data-moon]').forEach(el=>el.classList.remove('active'));targetRotation.setFromEuler(new THREE.Euler(THREE.MathUtils.degToRad(-8),THREE.MathUtils.degToRad(18),0,'YXZ'));setZoom(4.2);setActivePlace('global');if(announce)notify('Mars global view restored');}
+function focusPlace(id){if(id==='global'){resetView();return;}const p=locations[id];if(!p)return;focusedMoon=null;focusedSurface=id==='colony'?xyz(p.lat,p.lon,1+terrainRadiusOffset(p.lat,p.lon)+0.002):null;cameraFocus.set(0,0,0);for(const [mid,m] of Object.entries(moonObjects)){m.focusedScale=false;m.body.scale.setScalar(moonSpecs[mid].radius);}document.querySelectorAll('[data-moon]').forEach(el=>el.classList.remove('active'));const v=xyz(p.lat,p.lon,1);const yaw=Math.atan2(-v.x,v.z);const pitch=Math.asin(v.y);targetRotation.setFromEuler(new THREE.Euler(pitch,yaw,0,'YXZ'));setZoom(id==='colony'?0.12:Math.min(zoom,p.zoom+0.45));setActivePlace(id);notify(p.name+' · '+p.description);}
 document.querySelectorAll('[data-place]').forEach(el=>el.addEventListener('click',()=>{focusPlace(el.dataset.place);landmarksMenu.hidden=true;labelsBtn.setAttribute('aria-expanded','false');}));
 document.querySelectorAll('[data-moon]').forEach(el=>el.addEventListener('click',()=>{focusMoon(el.dataset.moon);landmarksMenu.hidden=true;labelsBtn.setAttribute('aria-expanded','false');}));
 const landmarksMenu=document.querySelector('#landmarksMenu'),labelsBtn=document.querySelector('#labelsBtn');
@@ -381,6 +398,7 @@ function animate(now=performance.now()){
  const dt=Math.min(Math.max((now-previousFrameTime)/1000,0),0.25);previousFrameTime=now;
  updateMissionClock(dt);
  if(!focusedMoon)root.quaternion.slerp(targetRotation,.09);
+ if(focusedSurface&&!focusedMoon)cameraFocus.copy(focusedSurface).applyQuaternion(root.quaternion);
  updateMoonOrbits();
  if(colonyLogistics)colonyLogistics.update(zoom,elapsedGameSeconds);
  const scaleLabel=document.querySelector('#mapScaleLabel');
