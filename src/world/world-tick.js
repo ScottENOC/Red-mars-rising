@@ -1,3 +1,4 @@
+import { ensureMaterialInventories, processNaturalMeteoroidFlux, transferWater, checkWaterConservation } from './material-inventories.js';
 import { SHORTLISTED_SITES } from './campaign-options.js';
 
 const MARS_RADIUS_M = 3_389_500;
@@ -40,7 +41,20 @@ export function processWorldTick(w) {
   const powerShortfall = w.economy.powerCapacity < w.economy.powerDemand;
   w.colonists.morale = Math.max(0, Math.min(100, w.colonists.morale + (powerShortfall ? -.15 : .015)));
   w.colonists.health = Math.max(0, Math.min(100, w.colonists.health + (powerShortfall ? -.04 : .006)));
-  w.economy.water = Math.max(0, w.economy.water - .12 * (1 - site.waterAccess));
+  const waterUseUnits = Math.min(w.economy.water, .12 * (1 - site.waterAccess));
+  const homeColony = w.settlements.find(s => s.kind === 'primary-colony');
+  if (homeColony && waterUseUnits > 0) {
+    const stores = w.materials.colonies[homeColony.id].waterKg;
+    const useKg = waterUseUnits * 1000;
+    if (stores.tanks >= useKg) {
+      transferWater(w, {from:'colony:' + homeColony.id + ':tanks',to:'colony:' + homeColony.id + ':wastewater',massKg:useKg,sol,process:'daily-use',note:'Used water enters wastewater pending treatment or disposal.'});
+    } else {
+      // Keep the legacy economy stock and material inventory in sync if a save is short.
+      const availableKg = stores.tanks;
+      if (availableKg > 0) transferWater(w, {from:'colony:' + homeColony.id + ':tanks',to:'colony:' + homeColony.id + ':wastewater',massKg:availableKg,sol,process:'daily-use',note:'Available tank water enters wastewater.'});
+    }
+  }
+  w.economy.water = Math.max(0, w.economy.water - waterUseUnits);
   w.colonists.cumulativeWork += w.colonists.population * (w.colonists.morale / 100) * (powerShortfall ? .45 : 1);
   w.colonists.science += w.settlements.some(s => s.infrastructure?.includes('laboratory')) ? .08 : .02;
 
@@ -54,7 +68,17 @@ export function processWorldTick(w) {
     project.status = 'complete';
     const home = w.settlements.find(s => s.kind === 'primary-colony');
     if (project.id === 'solar-expansion') { w.economy.powerCapacity += 35; w.economy.powerDemand += 4; }
-    if (project.id === 'water-extractor') { if (home && !home.infrastructure.includes('water-extractor')) home.infrastructure.push('water-extractor'); w.economy.water += 35; }
+    if (project.id === 'water-extractor') {
+      if (home && !home.infrastructure.includes('water-extractor')) home.infrastructure.push('water-extractor');
+      const stores = home && w.materials.colonies[home.id]?.waterKg;
+      const extractedKg = 35_000;
+      if (home && stores && w.materials.planetary.waterKg.subsurfaceIce.mass >= extractedKg) {
+        transferWater(w, {from:'planet:subsurfaceIce',to:'colony:' + home.id + ':tanks',massKg:extractedKg,sol,process:'ice-extraction',note:'Pilot extractor transfers subsurface ice to colony tanks.'});
+        w.economy.water += extractedKg / 1000;
+      } else {
+        events.push({type:'project-output-shortfall',sol,description:'The water extractor was completed, but its assumed source reservoir could not supply the planned output.'});
+      }
+    }
     if (project.id === 'buried-habitat' && home) { home.infrastructure.push('regolith-shielded-habitat'); w.colonists.morale = Math.min(100, w.colonists.morale + 2); }
     if (project.id === 'ice-survey') climate.water.accessibleIceIndex = Math.min(100, climate.water.accessibleIceIndex + Math.round(site.waterAccess * 20));
     events.push({type:'project-complete',sol,description:project.name+' completed.'});
@@ -114,7 +138,7 @@ export function processWorldTick(w) {
       events.push({type:'cargo-drop-landed',sol,description:drop.sponsorName+' cargo landed at '+drop.siteName+'; no crewed colony has been established.'});
     }
   }
-  w.time.lastProcessedSol = sol;
+  checkWaterConservation(w);\n  w.time.lastProcessedSol = sol;
   w.time.solOfYear = ((sol - 1) % 669) + 1;
   for (const event of events) w.events.push({...event,sol});
   return events;
