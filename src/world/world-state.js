@@ -44,6 +44,10 @@ export function createInitialWorldState() {
         infrastructure: ['habitats', 'landing-pad', 'greenhouse', 'power-array', 'laboratory', 'workshop', 'rovers']
       }
     ],
+    infrastructure: {
+      // Routes are explicit world state and can be added when projects connect settlements.
+      routes: []
+    },
     logistics: {
       // Illustrative transfer windows and payloads for the visual prototype.
       // Distances are compressed in the renderer and are not to scale.
