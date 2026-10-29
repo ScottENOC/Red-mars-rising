@@ -21,6 +21,16 @@ export const SHORTLISTED_SITES = [
  {id:'tyrrhena',name:'Tyrrhena Terra',lat:-20.0,lon:105.0,terrain:'Ancient volcanic highlands',water:'Uncertain',rationale:'Science-led alternative with rougher construction conditions.'},
  {id:'pavonis',name:'Pavonis Foothills',lat:0.0,lon:247.0,terrain:'Volcanic flank',water:'Uncertain',rationale:'Long-term equatorial infrastructure candidate; not a near-term space elevator.'}
 ];
+export const HABITAT_CONSTRUCTION_RECIPES = [
+ {id:'prefabricated-frame',name:'Imported metal frame + local shielding',description:'Use a factory-qualified imported frame and critical hardware, with local aggregate for shielding. Faster and lower fabrication uncertainty, but imports more finished components.',economyCost:{funds:65,materials:22,machinery:8},durationSols:35,localMaterialsKg:{aggregate:12000,polymers:40,spareParts:10},importedMaterialsKg:{constructionComponents:1200},risk:'Lower fabrication uncertainty; higher import dependence.'},
+ {id:'regolith-shell',name:'Locally formed regolith shell + imported pressure liner',description:'Use local aggregate for a non-pressure-bearing structural shell, with a smaller imported pressure liner and critical fittings. Slower and dependent on local processing quality.',economyCost:{funds:50,materials:12,machinery:6},durationSols:45,localMaterialsKg:{aggregate:18000,polymers:80,spareParts:30},importedMaterialsKg:{constructionComponents:150},risk:'Lower imported component mass; greater schedule and local quality-assurance risk.'}
+];
+export function ensureConstructionRecipeOptions(w) {
+ const project=(w.infrastructure?.projects??[]).find(p=>p.id==='buried-habitat');
+ if(!project)return;
+ if(!Array.isArray(project.recipeOptions))project.recipeOptions=HABITAT_CONSTRUCTION_RECIPES.map(r=>({...r,economyCost:{...r.economyCost},localMaterialsKg:{...r.localMaterialsKg},importedMaterialsKg:{...r.importedMaterialsKg}}));
+ if(!project.selectedRecipeId||!project.recipeOptions.some(r=>r.id===project.selectedRecipeId))project.selectedRecipeId=project.recipeOptions[0]?.id??null;
+}
 export const STRATEGIC_PROGRAMS = [
  {id:'local-components-study',name:'Investigate local component manufacturing',category:'industrial autonomy',cost:{funds:70,materials:16},durationSols:45,description:'Assess which imported fittings and non-critical components could be made from local feedstocks using polymer processing, metalworking and additive manufacturing.',outcome:'A preliminary feasibility assessment, not an automatic factory or a guarantee of substitution.'},
  {id:'cargo-pipeline',name:'Strengthen sponsor cargo pipeline',category:'supply resilience',cost:{funds:45,materials:10},durationSols:25,description:'Improve cargo handling, shipment scheduling and coordination with the sponsor; this favours dependable imports over immediate self-sufficiency.',outcome:'Better supply reliability and improved sponsor confidence, while the colony remains import-dependent.'}
@@ -56,10 +66,11 @@ export function startCampaign(w,locationId,sponsorId) {
  w.settlements=[{id:'first-colony',name:site.id==='jezero'?'Jezero Base':site.name+' Base',kind:'primary-colony',locationId:site.id,lat:site.lat,lon:site.lon,terrainType:site.terrain,population:w.colonists.population,status:'operational',sponsorId:sponsor.id,infrastructure:['habitats','landing-pad','greenhouse','power-array','laboratory','workshop','rovers'],siteModifiers:{heatDemand:site.heatDemand,waterAccess:site.waterAccess,buildEase:site.buildEase,vulnerability:site.vulnerability,elevationKm:site.elevationKm}}];
  w.infrastructure.projects=[
   {id:'ice-survey',name:'Subsurface ice survey',category:'science',cost:{funds:35,materials:8},durationSols:18,remainingSols:18,progress:0,status:'available',description:'Survey local ice deposits and reduce uncertainty.'},
-  {id:'buried-habitat',name:'Regolith-shielded habitat',category:'infrastructure',cost:{funds:65,materials:22,machinery:8},durationSols:35,remainingSols:35,progress:0,status:'available',description:'Add shielding and improve habitat resilience.'},
+  {id:'buried-habitat',name:'Regolith-shielded habitat',category:'infrastructure',cost:{funds:65,materials:22,machinery:8},durationSols:35,remainingSols:35,progress:0,status:'available',description:'Expand habitable space with a choice of imported or locally fabricated structural materials.'},
   {id:'solar-expansion',name:'Expand power array',category:'infrastructure',cost:{funds:45,materials:18,machinery:5},durationSols:24,remainingSols:24,progress:0,status:'available',description:'Increase available electrical capacity.'},
   {id:'water-extractor',name:'Pilot water extraction',category:'industry',cost:{funds:55,materials:20,machinery:10},durationSols:30,remainingSols:30,progress:0,status:'available',description:'Test local ice extraction and reduce imported water demand.'}
  ];
+ ensureConstructionRecipeOptions(w);
  w.economy.funds+=Math.round(sponsor.support*1.5);w.economy.materials+=Math.round(sponsor.support*.25);
  w.materials=createMaterialInventories();ensureMaterialInventories(w);checkMaterialConservation(w);
  w.events.push({type:'campaign-start',sol:w.time.sol,description:'Five-year expedition support begins at '+site.name+', backed by '+sponsor.name+'.'});
