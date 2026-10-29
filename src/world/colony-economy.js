@@ -63,7 +63,7 @@ function routeDistanceKm(a,b){
   const rad=Math.PI/180,lat1=a.lat*rad,lat2=b.lat*rad,dl=(b.lon-a.lon)*rad;
   const dlat=lat2-lat1, wrapped=((dl+Math.PI*3)%(Math.PI*2))-Math.PI;
   const h=Math.sin(dlat/2)**2+Math.cos(lat1)*Math.cos(lat2)*Math.sin(wrapped/2)**2;
-  return 3389500*2*Math.asin(Math.sqrt(Math.max(0,Math.min(1,h))));
+  return 3389.5*2*Math.asin(Math.sqrt(Math.max(0,Math.min(1,h))));
 }
 function transitSols(distanceKm){
   // Abstract rover convoy speed, with a substantial allowance for navigation, terrain and loading.
@@ -154,7 +154,7 @@ function dispatchIntercolonyTrade(w,sol){
       if(from.economy.inventory[good]<=(good==='food'?45:good==='components'?18:good==='machinery'?12:good==='electronics'?10:25))continue;
       if(w.colonyTrade.shipments.some(x=>x.status==='in-transit'&&x.fromId===from.id&&x.good===good))continue;
       const needThreshold={food:25,components:10,machinery:6,electronics:5,aggregate:12}[good];
-      const to=alive.filter(s=>s.id!==from.id&&relationship(from,s)>=50&&s.economy.inventory[good]<needThreshold&&!w.colonyTrade.shipments.some(x=>x.status==='in-transit'&&x.toId===s.id&&x.good===good))
+      const to=alive.filter(s=>s.id!==from.id&&relationship(from,s)>=50&&s.economy.inventory[good]<needThreshold&&!w.colonyTrade.shipments.some(x=>x.status==='in-transit'&&x.kind==='trade'&&x.toId===s.id&&x.good===good))
         .sort((a,b)=>a.economy.inventory[good]-b.economy.inventory[good])[0];
       if(!to)continue;
       const reserve={food:35,components:12,machinery:8,electronics:6,aggregate:18}[good];
