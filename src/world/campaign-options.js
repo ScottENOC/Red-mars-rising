@@ -52,7 +52,8 @@ export function startCampaign(w,locationId,sponsorId) {
   {id:'solar-expansion',name:'Expand power array',category:'infrastructure',cost:{funds:45,materials:18,machinery:5},durationSols:24,remainingSols:24,progress:0,status:'available',description:'Increase available electrical capacity.'},
   {id:'water-extractor',name:'Pilot water extraction',category:'industry',cost:{funds:55,materials:20,machinery:10},durationSols:30,remainingSols:30,progress:0,status:'available',description:'Test local ice extraction and reduce imported water demand.'}
  ];
- w.economy.funds+=Math.round(sponsor.support*1.5);w.economy.materials+=Math.round(sponsor.support*.25);\n w.materials=createMaterialInventories();ensureMaterialInventories(w);checkWaterConservation(w);
+ w.economy.funds+=Math.round(sponsor.support*1.5);w.economy.materials+=Math.round(sponsor.support*.25);
+ w.materials=createMaterialInventories();ensureMaterialInventories(w);checkWaterConservation(w);
  w.events.push({type:'campaign-start',sol:w.time.sol,description:'Five-year expedition support begins at '+site.name+', backed by '+sponsor.name+'.'});
  w.events.push({type:'sponsor-system-activated',sol:w.time.sol,description:'All sponsor blocs are active; rival colonies can emerge independently.'});
  return {site,sponsor};
