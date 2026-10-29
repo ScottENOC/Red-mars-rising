@@ -1,8 +1,8 @@
 // Scenario-owned initial conditions. These are today's starting assumptions, not permanent laws.
 export function createInitialWorldState() {
   return {
-    schemaVersion: 2,
-    scenarioId: 'present-day-mars-before-arrival',
+    schemaVersion: 1,
+    scenarioId: 'first-expedition-arrival',
     time: { sol: 0 },
     planet: { id: 'mars', meanDiameterKm: 6779, ageYears: 4_500_000_000 },
     terrain: {
@@ -29,11 +29,37 @@ export function createInitialWorldState() {
         }
       }
     },
+    // A modest, functioning settlement exists when play begins; people are not
+    // individually assigned to jobs. Projects are constrained by capability,
+    // equipment, materials, expertise, time and sponsor commitments instead.
+    settlements: [
+      {
+        id: 'jezero-base',
+        name: 'Jezero Base',
+        kind: 'primary-colony',
+        lat: 18.38,
+        lon: 77.58,
+        population: 100,
+        status: 'operational',
+        infrastructure: ['habitats', 'landing-pad', 'greenhouse', 'power-array', 'laboratory', 'workshop', 'rovers']
+      }
+    ],
+    logistics: {
+      // Illustrative transfer windows and payloads for the visual prototype.
+      // Distances are compressed in the renderer and are not to scale.
+      supplyShips: [
+        { id: 'supply-ship-1', cargo: 'Construction robots', phase: 0.22, cycleSols: 52 },
+        { id: 'supply-ship-2', cargo: 'Greenhouse modules', phase: 0.58, cycleSols: 67 },
+        { id: 'supply-ship-3', cargo: 'Life-support spares', phase: 0.82, cycleSols: 59 }
+      ]
+    },
     celestialBodies: [
       { id: 'phobos', kind: 'moon', status: 'orbiting' },
       { id: 'deimos', kind: 'moon', status: 'orbiting' }
     ],
-    events: []
+    events: [
+      { type: 'scenario-start', sol: 0, description: 'The first expedition establishes its initial settlement.' }
+    ]
   };
 }
 
