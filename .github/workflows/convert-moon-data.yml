@@ -1,0 +1,48 @@
+name: Convert NASA moon data to lightweight web assets
+
+on:
+  push:
+    branches: [development]
+    paths:
+      - 'scripts/convert-moon-data.py'
+      - 'data/moons/nasa-pds-thomas/**'
+      - '.github/workflows/convert-moon-data.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out development
+        uses: actions/checkout@v4
+        with:
+          ref: development
+          fetch-depth: 0
+
+      - name: Install conversion dependencies
+        run: python -m pip install --disable-pip-version-check numpy pillow astropy
+
+      - name: Convert shape models and image mosaics
+        run: python scripts/convert-moon-data.py
+
+      - name: Report generated sizes
+        run: |
+          echo 'Optimised moon assets:'
+          find data/moons/optimized -maxdepth 1 -type f -printf '%s bytes  %f\n' | sort -k2
+          echo "Total: $(du -sb data/moons/optimized | cut -f1) bytes"
+
+      - name: Commit optimised assets to development
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/moons/optimized/
+          if git diff --cached --quiet; then
+            echo 'Optimised assets are already up to date.'
+            exit 0
+          fi
+          git commit -m 'Add downscaled Phobos and Deimos web assets'
+          git push origin HEAD:development
