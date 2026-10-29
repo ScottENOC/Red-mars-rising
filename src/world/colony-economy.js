@@ -127,7 +127,6 @@ function aidReserve(good){return {food:35,components:12,machinery:8,electronics:
 function emergencyThreshold(good){return {food:12,components:1,machinery:0.5,electronics:0.25,aggregate:1}[good]??1;}
 function emergencyNeed(colony,good){return Number(colony?.economy?.inventory?.[good]??0)<emergencyThreshold(good);}
 function aidPolicy(w,recipient){return w.campaign.emergencyAidPolicy?.[recipient.id]??'automatic';}
-function aidPriority(w,colony){return priorityFor(w,colony)+(aidPolicy(w,colony)==='prioritise'?2:0);}
 function noteAid(w,entry){
   w.colonyTrade.aidHistory.push(entry);
   if(w.colonyTrade.aidHistory.length>100)w.colonyTrade.aidHistory.splice(0,w.colonyTrade.aidHistory.length-100);
@@ -162,13 +161,14 @@ function assessEmergencyAid(w,sol,events){
       if(request.status!=='open')continue;
       request.attempts++;
       const donors=alive.filter(d=>d.id!==recipient.id&&Number(d.economy.inventory[good]??0)>aidReserve(good));
-      const ranked=donors.map(d=>({donor:d,rel:relationship(d,recipient),distance:routeDistanceKm(d,recipient)})).sort((a,b)=>aidPriority(w,b.donor)-aidPriority(w,a.donor)||b.rel-a.rel||a.distance-b.distance);
+      const ranked=donors.map(d=>({donor:d,rel:relationship(d,recipient),distance:routeDistanceKm(d,recipient)})).sort((a,b)=>b.rel-a.rel||a.distance-b.distance);
       const primary=(w.settlements??[]).find(s=>s.kind==='primary-colony');
       const primaryPolicy=primary&&recipient.id!==primary.id?aidPolicy(w,recipient):'automatic';
       const primaryCandidate=ranked.find(x=>x.donor.id===primary?.id);
       const donor=ranked.find(x=>x.donor.id!==primary?.id||primaryPolicy!=='protect-reserves');
       if(donor){
-        const amount=Math.min(good==='food'?25:good==='components'?5:good==='machinery'?4:good==='electronics'?3:8,donor.donor.economy.inventory[good]-aidReserve(good));
+        const baseAid=good==='food'?25:good==='components'?5:good==='machinery'?4:good==='electronics'?3:8;
+        const amount=Math.min(baseAid*(donor.donor.id===primary?.id&&aidPolicy(w,recipient)==='prioritise'?1.5:1),donor.donor.economy.inventory[good]-aidReserve(good));
         const route=routeTravel(w,donor.donor,recipient,donor.distance);
         const foodRunway=good==='food'?Math.max(0,Math.floor((recipient.economy.inventory.food-2)/Math.max(0.1,recipient.population*0.018-(SPECIALISATIONS[recipient.economy.specialisation]?.produces.food??0)))):Infinity;
         const arrivesInTime=good!=='food'||route.travelSols<=Math.max(0,foodRunway);
@@ -260,7 +260,7 @@ function operateColonies(w,sol,events){
           s.population=Math.max(0,Math.round((s.population??0)-1));
           if(s.population===0){
             s.status='failed';
-            const refused=(w.colonyTrade.emergencyRequests??[]).some(r=>r.toId===s.id&&r.good==='food'&&r.feasibleAidRefused&&r.status==='open');
+            const refused=(w.colonyTrade.emergencyRequests??[]).some(r=>r.toId===s.id&&r.good==='food'&&r.feasibleAidRefused&&['open','unreachable','unavailable'].includes(r.status));
             if(refused)relationIncident(w,s,sol,8,'the player colony protected its reserves despite a feasible food shipment');
             events.push({type:'colony-failed',sol,description:s.name+' has been abandoned after prolonged food shortages.'});
           }
