@@ -5,7 +5,7 @@ export function createInitialWorldState() {
     scenarioId: 'first-expedition-arrival',
     time: { sol: 0, year: 2027, solOfYear: 1, lastProcessedSol: 0 },
     planet: { id: 'mars', meanDiameterKm: 6779, ageYears: 4_500_000_000 },
-    terrain: { source: 'procedural-prototype', geologicalModifications: [] },
+    terrain: { source: 'NASA MOLA MEGDR 4 pixels/degree', geologicalModifications: [], depositSites: [] },
     climate: {
       meanSurfaceTemperatureC: -63, referenceMeanTemperatureC: -63,
       atmosphere: { pressurePa: 610, composition: 'present-day-approximation', co2Fraction: 0.953, waterVapourPa: 0.03 },
