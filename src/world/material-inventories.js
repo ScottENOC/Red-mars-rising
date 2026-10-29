@@ -99,7 +99,7 @@ export function processNaturalMeteoroidFlux(w,sol){
       else if(component==='otherVolatiles')mineral.otherVolatiles+=mass;
       else if(component==='waterIce'){
         const vapour=mass*.8;
-        mineral.waterIceUnprocessed+=mass-vapour;
+        m.planetary.waterKg.surfaceIce.mass+=mass-vapour;
         m.planetary.waterKg.atmosphericVapour.mass+=vapour;
         m.planetary.externalWaterInputsKg+=vapour;m.externalFlows.importedWaterKg+=vapour;
         m.ledger.push({sol,substance:'H2O',massKg:vapour,from:'space:meteoroid-ice',to:'planet:atmosphericVapour',process:'natural-impact-vapour',note:'Scenario estimate of water ice retained as atmospheric vapour; unretained volatile mass is included in the aggregate ablation estimate.'});
@@ -127,7 +127,7 @@ export function processWaterClimate(w,sol){
     m.ledger.push({sol,substance:'H2O',massKg:evap,from:'planet:surfaceLiquid',to:'planet:atmosphericVapour',process:'evaporation',note:'Illustrative climate-dependent phase transfer.'});
     if(temp<0){const freeze=Math.min(p.surfaceLiquid.mass,p.surfaceLiquid.mass*freezeRate);p.surfaceLiquid.mass-=freeze;p.surfaceIce.mass+=freeze;m.ledger.push({sol,substance:'H2O',massKg:freeze,from:'planet:surfaceLiquid',to:'planet:surfaceIce',process:'freezing',note:'Cold surface conditions freeze liquid water.'});}
   }
-  const iceLoss=Math.min(p.surfaceIce.mass,p.surfaceIce.mass*sublimationRate*.1);
+  const iceLoss=Math.min(p.surfaceIce.mass,p.surfaceIce.mass*1e-7*sublimationRate);
   if(iceLoss>0){p.surfaceIce.mass-=iceLoss;p.atmosphericVapour.mass+=iceLoss;m.ledger.push({sol,substance:'H2O',massKg:iceLoss,from:'planet:surfaceIce',to:'planet:atmosphericVapour',process:'sublimation',note:'Illustrative surface-ice sublimation rate.'});}
   const condensationRate=temp<-20?.00015:temp<0?.00003:.000001;
   const condensed=Math.min(p.atmosphericVapour.mass,p.atmosphericVapour.mass*condensationRate);
