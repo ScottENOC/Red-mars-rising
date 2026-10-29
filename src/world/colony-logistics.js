@@ -220,6 +220,7 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
   }
 
   function update(zoom, elapsedGameSeconds) {
+    while (builtSettlements.length < settlements.length) buildSettlement(settlements[builtSettlements.length]);
     const detailVisible = zoom < 1.6;
     const markerVisible = zoom >= 1.6 && zoom < 8.5;
     for (const { group, markerGroup } of builtSettlements) {
