@@ -180,3 +180,10 @@ export function updatePolarCaps(THREEUnused, root, worldState, solarLongitudeDeg
     }
   }
 }
+
+// Returns sampled NASA MOLA elevation in metres, or null before topography has loaded.
+// Logistics can then use its conservative flat-terrain fallback without blocking simulation startup.
+export function terrainElevationMeters(lat, lon) {
+  if (!molaElevationAt) return null;
+  return molaElevationAt(lat, lon);
+}
