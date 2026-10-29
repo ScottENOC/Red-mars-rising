@@ -75,16 +75,26 @@ export function processWorldTick(w) {
     if (project.id === 'water-extractor') {
       if (home && !home.infrastructure.includes('water-extractor')) home.infrastructure.push('water-extractor');
       const stores = home && w.materials.colonies[home.id]?.waterKg;
-      const extractedKg = 35_000;
-      if (home && stores && w.materials.planetary.waterKg.subsurfaceIce.mass >= extractedKg) {
-        transferWater(w, {from:'planet:subsurfaceIce',to:'colony:' + home.id + ':tanks',massKg:extractedKg,sol,process:'ice-extraction',note:'Pilot extractor transfers subsurface ice to colony tanks.'});
+      const deposit = home && w.materials.siteDeposits[home.locationId];
+      const sourceId = deposit?.waterStockId;
+      const source = sourceId && w.materials.planetary.waterKg[sourceId];
+      const surveyMultiplier = deposit?.surveyed ? 1.5 : 1;
+      const extractedKg = deposit ? Math.min(source?.mass ?? 0, deposit.extractionRateKgPerSol * surveyMultiplier * project.durationSols) : 0;
+      if (home && stores && source && extractedKg > 0) {
+        transferWater(w, {from:'planet:' + sourceId,to:'colony:' + home.id + ':tanks',massKg:extractedKg,sol,process:'site-specific-ice-extraction',note:'Extraction rate depends on local prospectivity and whether a prior survey improved targeting.'});
         w.economy.water += extractedKg / 1000;
       } else {
-        events.push({type:'project-output-shortfall',sol,description:'The water extractor was completed, but its assumed source reservoir could not supply the planned output.'});
+        events.push({type:'project-output-shortfall',sol,description:'The water extractor was completed, but the local deposit or extraction technology could not supply water.'});
       }
     }
     if (project.id === 'buried-habitat' && home) { home.infrastructure.push('regolith-shielded-habitat'); w.colonists.morale = Math.min(100, w.colonists.morale + 2); }
-    if (project.id === 'ice-survey') climate.water.accessibleIceIndex = Math.min(100, climate.water.accessibleIceIndex + Math.round(site.waterAccess * 20));
+    if (project.id === 'ice-survey') {
+      climate.water.accessibleIceIndex = Math.min(100, climate.water.accessibleIceIndex + Math.round(site.waterAccess * 20));
+      if (home && w.materials.siteDeposits[home.locationId]) {
+        w.materials.siteDeposits[home.locationId].surveyed = true;
+        w.materials.siteDeposits[home.locationId].confidence = 'medium';
+      }
+    }
     events.push({type:'project-complete',sol,description:project.name+' completed.'});
   }
 
