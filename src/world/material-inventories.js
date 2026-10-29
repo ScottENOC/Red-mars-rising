@@ -23,7 +23,7 @@ export const METEOROID_TYPES = [
 
 export function createMaterialInventories() {
   const marsAtmosphereKg=610*(4*Math.PI*3_389_500**2)/3.71;
-  const types=Object.fromEntries(METEOROID_TYPES.map(t=>[t.id,{massKg:0,retainedKg:0,escapedOrAblatedKg:0}]));
+  const types=Object.fromEntries(METEOROID_TYPES.map(t=>[t.id,{massKg:0,retainedKg:0,ablatedIntoAtmosphereKg:0}]));
   return {
     units:{mass:'kg',energy:'kWh',time:'sol'},
     provenance:'Initial planetary reservoirs and meteoroid type fractions are transparent scenario estimates, not precision measurements.',
@@ -37,7 +37,7 @@ export function createMaterialInventories() {
         hydratedMinerals:{mass:1e15,confidence:'very-low',note:'Illustrative water-equivalent bound; requires mineral processing.'}
       },
       atmosphereKg:{carbonDioxide:marsAtmosphereKg*.953,nitrogen:marsAtmosphereKg*.027,argon:marsAtmosphereKg*.016,oxygen:marsAtmosphereKg*.0013,carbonMonoxide:marsAtmosphereKg*.0008,otherGases:marsAtmosphereKg*(1-.953-.027-.016-.0013-.0008)},
-      meteoroids:{incomingCumulativeKg:0,retainedCumulativeKg:0,escapedOrAblatedCumulativeKg:0,pendingIncomingKg:0,types,surfaceDepositsKg:0,atmosphericTransientKg:0,craterImpactsGreaterThan8mCumulative:0,impactFractionalAccumulator:0,lastImpactSol:0},
+      meteoroids:{incomingCumulativeKg:0,retainedCumulativeKg:0,escapedOrAblatedCumulativeKg:0,pendingIncomingKg:0,types,surfaceDepositsKg:0,atmosphericTransientKg:0,atmosphericAblatedCumulativeKg:0,craterImpactsGreaterThan8mCumulative:0,impactFractionalAccumulator:0,lastImpactSol:0},
       mineralDepositsKg:{silicates:0,ironNickel:0,sulfides:0,carbonOrganics:0,otherMinerals:0,waterIceUnprocessed:0,carbonDioxideIce:0,otherVolatiles:0},
       externalWaterInputsKg:0,externalWaterOutputsKg:0
     },
@@ -104,12 +104,12 @@ export function processNaturalMeteoroidFlux(w,sol){
   const incomingKg=METEOROID_MASS_FLUX_KG_PER_EARTH_YEAR*EARTH_DAYS_PER_MARS_SOL/365.25;
   const retainedFraction=.90; // scenario assumption; survival depends on particle size and composition
   const retainedKg=incomingKg*retainedFraction,ablatedKg=incomingKg-retainedKg;
-  r.incomingCumulativeKg+=incomingKg;r.retainedCumulativeKg+=retainedKg;r.escapedOrAblatedCumulativeKg+=ablatedKg;
+  r.incomingCumulativeKg+=incomingKg;r.retainedCumulativeKg+=retainedKg;r.escapedOrAblatedCumulativeKg+=ablatedKg;r.atmosphericAblatedCumulativeKg+=ablatedKg;
   r.pendingIncomingKg+=incomingKg;m.externalFlows.meteoroidMatterKg+=incomingKg;r.atmosphericTransientKg+=incomingKg;
   const mineral=m.planetary.mineralDepositsKg;
   for(const type of METEOROID_TYPES){
     const incoming=incomingKg*type.fraction,retained=incoming*retainedFraction,stock=r.types[type.id];
-    stock.massKg+=incoming;stock.retainedKg+=retained;stock.escapedOrAblatedKg+=incoming-retained;
+    stock.massKg+=incoming;stock.retainedKg+=retained;stock.ablatedIntoAtmosphereKg+=incoming-retained;
     for(const [component,fraction] of Object.entries(type.composition)){
       const mass=retained*fraction;
       if(component==='silicates')mineral.silicates+=mass;
@@ -120,11 +120,12 @@ export function processNaturalMeteoroidFlux(w,sol){
       else if(component==='carbonDioxideIce')mineral.carbonDioxideIce+=mass;
       else if(component==='otherVolatiles')mineral.otherVolatiles+=mass;
       else if(component==='waterIce'){
-        const vapour=mass*.8;
-        m.planetary.waterKg.surfaceIce.mass+=mass-vapour;
+        const deliveredWater=incoming*fraction;
+        const vapour=deliveredWater*.8;
+        m.planetary.waterKg.surfaceIce.mass+=deliveredWater-vapour;
         m.planetary.waterKg.atmosphericVapour.mass+=vapour;
-        m.planetary.externalWaterInputsKg+=vapour;m.externalFlows.importedWaterKg+=vapour;
-        m.ledger.push({sol,substance:'H2O',massKg:vapour,from:'space:meteoroid-ice',to:'planet:atmosphericVapour',process:'natural-impact-vapour',note:'Scenario estimate of water ice retained as atmospheric vapour; unretained volatile mass is included in the aggregate ablation estimate.'});
+        m.planetary.externalWaterInputsKg+=deliveredWater;m.externalFlows.importedWaterKg+=deliveredWater;
+        m.ledger.push({sol,substance:'H2O',massKg:deliveredWater,from:'space:meteoroid-ice',to:'planet:water-reservoirs',process:'natural-volatile-delivery',note:'Modelled water-bearing dust contributes vapour and surface ice; volatile fraction is an uncertain scenario assumption.'});
       }
     }
   }
@@ -143,8 +144,8 @@ export function processNaturalMeteoroidFlux(w,sol){
       const impactMassKg=(4/3)*Math.PI*(diameterM/2)**3*chosen.densityKgM3;
       const retainedImpactKg=impactMassKg*.85;
       const stock=r.types[chosen.id];
-      stock.massKg+=impactMassKg;stock.retainedKg+=retainedImpactKg;stock.escapedOrAblatedKg+=impactMassKg-retainedImpactKg;
-      r.incomingCumulativeKg+=impactMassKg;r.retainedCumulativeKg+=retainedImpactKg;r.escapedOrAblatedCumulativeKg+=impactMassKg-retainedImpactKg;
+      stock.massKg+=impactMassKg;stock.retainedKg+=retainedImpactKg;stock.ablatedIntoAtmosphereKg+=impactMassKg-retainedImpactKg;
+      r.incomingCumulativeKg+=impactMassKg;r.retainedCumulativeKg+=retainedImpactKg;r.escapedOrAblatedCumulativeKg+=impactMassKg-retainedImpactKg;r.atmosphericAblatedCumulativeKg+=impactMassKg-retainedImpactKg;
       r.pendingIncomingKg+=impactMassKg;r.surfaceDepositsKg+=retainedImpactKg;m.externalFlows.meteoroidMatterKg+=impactMassKg;
       addRetainedMeteoroidComposition(m,chosen,retainedImpactKg,sol);
       m.ledger.push({sol,substance:chosen.label,massKg:impactMassKg,from:'space',to:'planet:impact-site',process:'natural-crater-impact',note:'Modelled impactor diameter '+diameterM.toFixed(2)+' m; assumed density '+chosen.densityKgM3+' kg/m3; 15% entry/impact mass loss.'});
