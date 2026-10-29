@@ -229,6 +229,23 @@ function deliverShipments(w,sol,events){
       noteAid(w,{sol,kind:'aid-received',shipmentId:ship.id,requestId:ship.requestId,fromId:ship.fromId,toId:destination.id,good:ship.good,amount:ship.amount,description:(w.settlements.find(s=>s.id===ship.fromId)?.name??'A neighbouring colony')+' delivered emergency '+ship.good+' aid to '+destination.name+'.'});
     }
     if(ship.kind==='earth-import'){destination.economy.importDependence=clamp(destination.economy.importDependence+1);destination.economy.pendingImports=(destination.economy.pendingImports??[]).filter(good=>good!==ship.good);destination.economy.pendingImport=destination.economy.pendingImports.length>0;}
+    if(ship.kind==='project-support'&&destination.kind==='primary-colony'){
+      const commitment=(w.sponsorCommitments?.commitments??[]).find(item=>item.id===ship.commitmentId);
+      if(commitment&&ship.good==='machinery'){
+        destination.economy.capabilities??={};
+        destination.economy.capabilities[commitment.projectId]={
+          supportMode:commitment.supportMode,
+          productionCapability:['production-machinery','open-production-capability'].includes(commitment.supportMode),
+          repairAutonomy:!['licensed-machinery','restricted-machinery','licensed-widgets'].includes(commitment.supportMode),
+          deliveredSol:sol,
+          sponsorId:commitment.sponsorId
+        };
+        commitment.capabilityDeliveredSol=sol;
+        commitment.capabilityOperational=true;
+        commitment.supportHistory??=[];
+        commitment.supportHistory.push({sol,kind:'capability-delivered',description:'Sponsor equipment for '+commitment.name+' arrived; capability recorded in the colony economy.'});
+      }
+    }
     addTradeLog(w,{sol,kind:'delivered',shipmentId:ship.id,fromId:ship.fromId,toId:ship.toId,good:ship.good,amount:ship.amount,description:ship.amount+' units of '+ship.good+' arrived at '+destination.name+'.'});
     events.push({type:'colony-shipment-arrived',sol,description:ship.amount+' units of '+ship.good+' arrived at '+destination.name+(ship.kind==='earth-import'?' from its Earth sponsor':' from '+(w.settlements.find(s=>s.id===ship.fromId)?.name??'another colony'))+'.'});
     if(ship.kind==='trade'){
