@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-model href="https://pds.nasa.gov/pds4/pds/v1/PDS4_PDS_1F00.sch" schematypens="http://purl.oclc.org/dsdl/schematron"?>
+<Product_Observational xmlns="http://pds.nasa.gov/pds4/pds/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://pds.nasa.gov/pds4/pds/v1 https://pds.nasa.gov/pds4/pds/v1/PDS4_PDS_1F00.xsd">
+  <Identification_Area>
+    <logical_identifier>urn:nasa:pds:ast-sat.thomas.shape-models:data:m2deimosimg_tab</logical_identifier>
+    <version_id>1.0</version_id>
+    <title>M2 DEIMOS MOSAIC IMAGE CATALOG</title>
+    <information_model_version>1.15.0.0</information_model_version>
+    <product_class>Product_Observational</product_class>
+    <Citation_Information>
+      <author_list>Thomas, P.C.</author_list>
+      <publication_year>2021</publication_year>
+      <description>Table of images used to create the image mosaic of M2 Deimos.  All images used for
+the mosaic are Viking Orbiter images.  Their geometry is discussed in Benesh and
+Thorpe (1975).  Approximate pixel scale is 0.0000248.  Thus, at a range of 1000 km,
+the scale is 24.8 m/pixel. Longitudes are west.</description>
+    </Citation_Information>
+  </Identification_Area>
+  <Observation_Area>
+    <Time_Coordinates>
+      <start_date_time>1976-06-22Z</start_date_time>
+      <stop_date_time>1980-07-30Z</stop_date_time>
+    </Time_Coordinates>
+    <Primary_Result_Summary>
+      <purpose>Science</purpose>
+      <processing_level>Derived</processing_level>
+      <Science_Facets>
+        <discipline_name>Small Bodies</discipline_name>
+        <facet1>Shape Model</facet1>
+      </Science_Facets>
+    </Primary_Result_Summary>
+    <Investigation_Area>
+      <name>Viking</name>
+      <type>Mission</type>
+      <Internal_Reference>
+        <lid_reference>urn:nasa:pds:context:investigation:mission.viking</lid_reference>
+        <reference_type>data_to_investigation</reference_type>
+      </Internal_Reference>
+    </Investigation_Area>
+    <Observing_System>
+      <Observing_System_Component>
+        <name>Viking Orbiter 1</name>
+        <type>Host</type>
+        <Internal_Reference>
+          <lid_reference>urn:nasa:pds:context:instrument_host:spacecraft.vo1</lid_reference>
+          <reference_type>is_instrument_host</reference_type>
+        </Internal_Reference>
+      </Observing_System_Component>
+      <Observing_System_Component>
+        <name>VISUAL IMAGING SUBSYSTEM - CAMERA A for VO1</name>
+        <type>Instrument</type>
+        <Internal_Reference>
+          <lid_reference>urn:nasa:pds:context:instrument:visa.vo1</lid_reference>
+          <reference_type>is_instrument</reference_type>
+        </Internal_Reference>
+      </Observing_System_Component>
+    </Observing_System>
+    <Observing_System>
+      <Observing_System_Component>
+        <name>Viking Orbiter 1</name>
+        <type>Host</type>
+        <Internal_Reference>
+          <lid_reference>urn:nasa:pds:context:instrument_host:spacecraft.vo1</lid_reference>
+          <reference_type>is_instrument_host</reference_type>
+        </Internal_Reference>
+      </Observing_System_Component>
+      <Observing_System_Component>
+        <name>VISUAL IMAGING SUBSYSTEM - CAMERA B for VO1</name>
+        <type>Instrument</type>
+        <Internal_Reference>
+          <lid_reference>urn:nasa:pds:context:instrument:visb.vo1</lid_reference>
+          <reference_type>is_instrument</reference_type>
+        </Internal_Reference>
+      </Observing_System_Component>
+    </Observing_System>
+    <Observing_System>
+      <Observing_System_Component>
+        <name>Viking Orbiter 2</name>
+        <type>Host</type>
+        <Internal_Reference>
+          <lid_reference>urn:nasa:pds:context:instrument_host:spacecraft.vo2</lid_reference>
+          <reference_type>is_instrument_host</reference_type>
+        </Internal_Reference>
+      </Observing_System_Component>
+      <Observing_System_Component>
+        <name>Visual Imaging Subsystem - Camera A for VO2</name>
+        <type>Instrument</type>
+        <Internal_Reference>
+          <lid_reference>urn:nasa:pds:context:instrument:visa.vo2</lid_reference>
+          <reference_type>is_instrument</reference_type>
+        </Internal_Reference>
+      </Observing_System_Component>
+    </Observing_System>
+    <Observing_System>
+      <Observing_System_Component>
+        <name>Viking Orbiter 2</name>
+        <type>Host</type>
+        <Internal_Reference>
+          <lid_reference>urn:nasa:pds:context:instrument_host:spacecraft.vo2</lid_reference>
+          <reference_type>is_instrument_host</reference_type>
+        </Internal_Reference>
+      </Observing_System_Component>
+      <Observing_System_Component>
+        <name>Visual Imaging Subsystem - Camera B for VO2</name>
+        <type>Instrument</type>
+        <Internal_Reference>
+          <lid_reference>urn:nasa:pds:context:instrument:visb.vo2</lid_reference>
+          <reference_type>is_instrument</reference_type>
+        </Internal_Reference>
+      </Observing_System_Component>
+    </Observing_System>
+    <Target_Identification>
+      <name>Mars II (Deimos)</name>
+      <type>Satellite</type>
+    </Target_Identification>
+  </Observation_Area>
+  <Reference_List>
+    <External_Reference>
+      <doi>10.1006/icar.1993.1130</doi>
+      <reference_text>Thomas, P.C., Gravity, Tides, and Topography on Small Satellites and Asteroids:
+Application to Surface Features of the Martian Satellites, Icarus 105, 326-344, 1993.
+doi: 10.1006/icar.1993.1130</reference_text>
+    </External_Reference>
+  </Reference_List>
+  <File_Area_Observational>
+    <File>
+      <file_name>m2deimosimg.tab</file_name>
+      <local_identifier>file</local_identifier>
+      <creation_date_time>2021-10-06</creation_date_time>
+      <file_size unit="byte">768</file_size>
+      <records>12</records>
+    </File>
+    <Table_Character>
+      <local_identifier>table</local_identifier>
+      <offset unit="byte">0</offset>
+      <records>12</records>
+      <record_delimiter>Carriage-Return Line-Feed</record_delimiter>
+      <Record_Character>
+        <fields>8</fields>
+        <groups>0</groups>
+        <record_length unit="byte">64</record_length>
+        <Field_Character>
+          <name>IMAGE_NUMBER</name>
+          <field_number>1</field_number>
+          <field_location unit="byte">1</field_location>
+          <data_type>ASCII_String</data_type>
+          <field_length unit="byte">9</field_length>
+          <field_format>%-9s</field_format>
+          <description>Viking Orbiter image number</description>
+        </Field_Character>
+        <Field_Character>
+          <name>SUB_SC_LATITUDE</name>
+          <field_number>2</field_number>
+          <field_location unit="byte">11</field_location>
+          <data_type>ASCII_Real</data_type>
+          <field_length unit="byte">6</field_length>
+          <field_format>%6.2f</field_format>
+          <unit>DEGREE</unit>
+          <description>Latitude on the satellite of the point directly below the spacecraft</description>
+        </Field_Character>
+        <Field_Character>
+          <name>SUB_SC_LONGITUDE</name>
+          <field_number>3</field_number>
+          <field_location unit="byte">18</field_location>
+          <data_type>ASCII_Real</data_type>
+          <field_length unit="byte">6</field_length>
+          <field_format>%6.2f</field_format>
+          <unit>DEGREE</unit>
+          <description>Longitude on the satellite of the point directly below the spacecraft</description>
+        </Field_Character>
+        <Field_Character>
+          <name>SUB_SOLAR_LATITUDE</name>
+          <field_number>4</field_number>
+          <field_location unit="byte">25</field_location>
+          <data_type>ASCII_Real</data_type>
+          <field_length unit="byte">6</field_length>
+          <field_format>%6.2f</field_format>
+          <unit>DEGREE</unit>
+          <description>Latitude on the satellite of the point directly below the sun</description>
+        </Field_Character>
+        <Field_Character>
+          <name>SUB_SOLAR_LONGITUDE</name>
+          <field_number>5</field_number>
+          <field_location unit="byte">32</field_location>
+          <data_type>ASCII_Real</data_type>
+          <field_length unit="byte">6</field_length>
+          <field_format>%6.2f</field_format>
+          <unit>DEGREE</unit>
+          <description>Longitude on the satellite of the point directly below the sun</description>
+        </Field_Character>
+        <Field_Character>
+          <name>CENTER_RANGE</name>
+          <field_number>6</field_number>
+          <field_location unit="byte">39</field_location>
+          <data_type>ASCII_Real</data_type>
+          <field_length unit="byte">9</field_length>
+          <field_format>%9.0f</field_format>
+          <unit>KILOMETER</unit>
+          <description>The distance between the spacecraft and the center of figure of the satellite</description>
+        </Field_Character>
+        <Field_Character>
+          <name>NORTH_AZIMUTH</name>
+          <field_number>7</field_number>
+          <field_location unit="byte">49</field_location>
+          <data_type>ASCII_Real</data_type>
+          <field_length unit="byte">6</field_length>
+          <field_format>%6.2f</field_format>
+          <unit>DEGREE</unit>
+          <description>The angle in degrees clockwise from a line from image center to the top of the image,
+and the line from image center to the north pole of the satellite</description>
+        </Field_Character>
+        <Field_Character>
+          <name>SOLAR_PHASE_ANGLE</name>
+          <field_number>8</field_number>
+          <field_location unit="byte">56</field_location>
+          <data_type>ASCII_Real</data_type>
+          <field_length unit="byte">7</field_length>
+          <field_format>%7.2f</field_format>
+          <unit>DEGREE</unit>
+          <description>Solar phase angle in degrees</description>
+        </Field_Character>
+      </Record_Character>
+    </Table_Character>
+  </File_Area_Observational>
+</Product_Observational>
+
