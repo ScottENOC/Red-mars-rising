@@ -58,7 +58,7 @@ campaignStyle.textContent=`
 .cp-heading{display:flex;justify-content:space-between;gap:8px;color:#d9c2b3;font-size:10px;letter-spacing:.16em;text-transform:uppercase;margin-bottom:8px}
 .cp-metrics{font-size:11px;line-height:1.65;color:#aeb4b7;border-bottom:1px solid #ffffff18;padding-bottom:9px;margin-bottom:8px}
 .cp-metrics strong{color:#eee4dc;font-weight:500}
-.cp-project{border-top:1px solid #ffffff12;padding:9px 0}
+.cp-diplomacy{border-bottom:1px solid #ffffff18;padding:8px 0 10px;margin-bottom:8px;color:#b7a89f;font-size:10px}.cp-diplomacy summary{cursor:pointer;letter-spacing:.08em;text-transform:uppercase}.cp-sponsor{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid #ffffff0d}.cp-sponsor strong{font-weight:500;color:#e7e2dc}.cp-sponsor span{color:#899197;text-align:right;font-size:9px}.cp-project{border-top:1px solid #ffffff12;padding:9px 0}
 .cp-project strong{display:block;color:#e7e2dc;font-size:11px;font-weight:500}
 .cp-project small{display:block;color:#899197;font-size:9px;line-height:1.5;margin:4px 0 7px}
 .cp-project button{border:1px solid #ffffff24;background:#ffffff08;color:#d9c2b3;font-size:9px;letter-spacing:.08em;padding:7px 9px}
@@ -146,7 +146,10 @@ function updateMissionClock(deltaSeconds) {
   if (clockRunning) elapsedGameSeconds += deltaSeconds * clockSpeed;
   const completedSols=Math.floor(elapsedGameSeconds/MARS_SOL_SECONDS);
   if(worldState.campaign.started&&completedSols>lastProcessedClockSol){
-    while(lastProcessedClockSol<completedSols){processWorldTick(worldState);lastProcessedClockSol++;}
+    while(lastProcessedClockSol<completedSols){
+      const tickEvents=processWorldTick(worldState);lastProcessedClockSol++;
+      for(const event of tickEvents)if(['rival-colony-founded','project-complete','sponsor-pressure','support-anniversary'].includes(event.type))notify(event.description);
+    }
     renderCampaignPanel();
     const temp=worldState.climate.meanSurfaceTemperatureC;
     document.querySelector('#meanTemp').textContent=(temp<0?'−':'')+Math.abs(temp).toFixed(12)+'°C';
