@@ -275,7 +275,7 @@ function operateColonies(w,sol,events){
       e.inventory.machinery=Math.max(0,Math.min(150,e.inventory.machinery));
       e.inventory.electronics=Math.max(0,Math.min(120,e.inventory.electronics));
     }
-    if(sol%30===0&&(e.importDependence>35||s.kind==='primary-colony'||s.kind==='rival-colony')&&!(s.kind==='primary-colony'&&(w.campaign?.earthConflictDeclared||w.campaign?.warWithEarth||w.campaign?.survivalGuaranteeSuspended))){
+    if(sol%30===0&&(e.importDependence>35||s.kind==='primary-colony'||s.kind==='rival-colony')&&!(s.kind==='primary-colony'&&(w.campaign?.earthConflictDeclared||w.campaign?.warWithEarth||w.campaign?.survivalGuaranteeSuspended||w.campaign?.sponsorCommitmentsSuspended))){
       const thresholds={food:40,components:8,machinery:5,electronics:4,aggregate:8};
       const amounts={food:55,components:18,machinery:12,electronics:10,aggregate:30};
       for(const good of GOODS){
