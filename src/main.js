@@ -205,7 +205,7 @@ let targetRotation=new THREE.Quaternion().setFromEuler(new THREE.Euler(THREE.Mat
 root.quaternion.copy(targetRotation);
 let zoom=4.2,minZoom=0.12,maxZoom=28,showLabels=true,showGrid=false;
 const cameraFocus=new THREE.Vector3();let focusedMoon=null;
-let targetMoonRotation=new THREE.Quaternion();
+let targetViewRotation=new THREE.Quaternion();
 const moonSpecs={phobos:{name:'Phobos',orbit:2.76,periodHours:7.65,radius:0.00327,phase:.2,color:0x8b8178},deimos:{name:'Deimos',orbit:6.92,periodHours:30.3,radius:0.00183,phase:2.2,color:0xaaa097}};
 const moonObjects={};
 const moonAssetPromises={};
@@ -244,7 +244,7 @@ function updateMoonOrbits(){
  }
 }
 function focusMoon(id){
- const m=moonObjects[id];if(!m)return;focusedMoon=id;targetMoonRotation.copy(m.group.quaternion);loadMoonAssets(id);
+ const m=moonObjects[id];if(!m)return;focusedMoon=id;targetViewRotation.identity();loadMoonAssets(id);
  for(const [otherId,o] of Object.entries(moonObjects)){o.focusedScale=otherId===id;o.body.scale.setScalar(otherId===id?.03:moonSpecs[otherId].radius);o.marker.visible=otherId!==id&&zoom>1.8;o.halo.visible=otherId!==id&&zoom>6.5;}
  cameraFocus.copy(m.group.position);setZoom(.18);
  document.querySelectorAll('[data-moon]').forEach(el=>el.classList.toggle('active',el.dataset.moon===id));
@@ -276,7 +276,7 @@ function trackballPoint(clientX,clientY){
  const scale=1/Math.sqrt(length);return new THREE.Vector3(x*scale,y*scale,0);
 }
 space.addEventListener('pointerdown',e=>{space.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});dragged=false;if(pointers.size===1){pointer=e.pointerId;lastTrackball=trackballPoint(e.clientX,e.clientY);}else if(pointers.size===2){const a=[...pointers.values()];pinchStart=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);pinchZoom=zoom;lastTrackball=null;}space.classList.add('dragging');});
-space.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2){const a=[...pointers.values()];const dist=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);if(pinchStart>0)setZoom(pinchZoom*pinchStart/dist);dragged=true;return;}if(pointer===e.pointerId){const next=trackballPoint(e.clientX,e.clientY);if(lastTrackball){const delta=new THREE.Quaternion().setFromUnitVectors(lastTrackball,next);if(focusedMoon&&moonObjects[focusedMoon])targetMoonRotation.premultiply(delta).normalize();else targetRotation.premultiply(delta).normalize();}lastTrackball=next;if(pointers.size===1)dragged=true;}});
+space.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2){const a=[...pointers.values()];const dist=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);if(pinchStart>0)setZoom(pinchZoom*pinchStart/dist);dragged=true;return;}if(pointer===e.pointerId){const next=trackballPoint(e.clientX,e.clientY);if(lastTrackball){const delta=new THREE.Quaternion().setFromUnitVectors(lastTrackball,next);if(focusedMoon&&moonObjects[focusedMoon])targetViewRotation.premultiply(delta).normalize();else targetRotation.premultiply(delta).normalize();}lastTrackball=next;if(pointers.size===1)dragged=true;}});
 function endPointer(e){pointers.delete(e.pointerId);if(pointer===e.pointerId){pointer=null;lastTrackball=null;}if(pointers.size<2)pinchStart=0;if(!pointers.size)space.classList.remove('dragging');}
 space.addEventListener('pointerup',endPointer);space.addEventListener('pointercancel',endPointer);
 space.addEventListener('click',e=>{if(dragged)return;const rect=renderer.domElement.getBoundingClientRect();pointerNdc.x=((e.clientX-rect.left)/rect.width)*2-1;pointerNdc.y=-((e.clientY-rect.top)/rect.height)*2+1;raycaster.setFromCamera(pointerNdc,camera);const hits=raycaster.intersectObjects([...markerGroup.children,...Object.values(moonObjects).map(m=>m.marker)],false);if(hits.length){const hit=hits[0].object;if(hit.userData.id)focusPlace(hit.userData.id);else for(const [id,m] of Object.entries(moonObjects))if(hit===m.marker){focusMoon(id);break;}}});
@@ -291,12 +291,12 @@ function updateSolarLighting() {
  const subsolarLongitude=(12-localSolarHours)*360/MARS_SOL_SECONDS*3600;
  const latitude=declination,longitude=THREE.MathUtils.degToRad(subsolarLongitude);
  const sunLocal=new THREE.Vector3(-Math.cos(latitude)*Math.sin(longitude),Math.sin(latitude),Math.cos(latitude)*Math.cos(longitude)).normalize();
- const sunWorld=sunLocal.applyQuaternion(root.quaternion).multiplyScalar(4);
+ const sunDirection=sunLocal.clone().normalize();
+ const sunWorld=sunDirection.clone().applyQuaternion(root.quaternion).multiplyScalar(4);
  key.position.copy(sunWorld);
  if(focusedMoon&&moonObjects[focusedMoon]){
   const focused=moonObjects[focusedMoon];
-  const direction=sunWorld.clone().normalize();
-  moonKey.position.copy(focused.group.position).addScaledVector(direction,0.22);
+  moonKey.position.copy(focused.group.position).addScaledVector(sunDirection,0.22);
   moonKeyTarget.position.copy(focused.group.position);
   moonKey.visible=true;
   moonKey.shadow.camera.left=-0.065;moonKey.shadow.camera.right=0.065;moonKey.shadow.camera.top=0.065;moonKey.shadow.camera.bottom=-0.065;
@@ -306,9 +306,11 @@ function animate(now=performance.now()){
  requestAnimationFrame(animate);
  const dt=Math.min(Math.max((now-previousFrameTime)/1000,0),0.25);previousFrameTime=now;
  updateMissionClock(dt);
- if(focusedMoon&&moonObjects[focusedMoon])moonObjects[focusedMoon].group.quaternion.slerp(targetMoonRotation,.09);else root.quaternion.slerp(targetRotation,.09);
+ if(!focusedMoon)root.quaternion.slerp(targetRotation,.09);
  updateMoonOrbits();
- camera.position.x+=(cameraFocus.x-camera.position.x)*.12;camera.position.y+=(cameraFocus.y-camera.position.y)*.12;camera.position.z+=(cameraFocus.z+zoom-camera.position.z)*.12;camera.lookAt(cameraFocus);
+ const cameraOffset=new THREE.Vector3(0,0,zoom).applyQuaternion(focusedMoon?targetViewRotation:new THREE.Quaternion());
+  const desiredCameraPosition=cameraFocus.clone().add(cameraOffset);
+  camera.position.lerp(desiredCameraPosition,.12);camera.lookAt(cameraFocus);
  stars.rotation.y+=.00004;markerGroup.visible=showLabels&&zoom<8.5;gridGroup.visible=showGrid&&zoom<8.5;updateSolarLighting();
  renderer.render(scene,camera);
 }
