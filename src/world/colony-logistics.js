@@ -17,6 +17,28 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
   const colonyGroups = [];
   const colonyMarkers = [];
   const settlementPickTargets = [];
+  const shortlistMarkers = [];
+  const orbitPoiMarkers = [];
+  const earthPoiMarkers = [];
+  function pointOnMars(lat, lon, extra = 0.012) {
+    const a = THREE.MathUtils.degToRad(lat), b = THREE.MathUtils.degToRad(lon);
+    const r = 1 + terrainRadiusOffset(lat, lon) + extra;
+    return new THREE.Vector3(-r * Math.cos(a) * Math.sin(b), r * Math.sin(a), r * Math.cos(a) * Math.cos(b));
+  }
+  function addPoiMarker(parent, poi, position, color = 0x9fc2d8, radius = 0.009) {
+    const marker = new THREE.Mesh(new THREE.SphereGeometry(radius, 10, 8), new THREE.MeshBasicMaterial({color}));
+    marker.position.copy(position);
+    marker.userData = {kind:'point-of-interest', id:poi.id, poiKind:poi.kind, name:poi.name, status:poi.status, description:poi.description ?? poi.rationale ?? ''};
+    parent.add(marker);
+    return marker;
+  }
+  for (const site of (worldState.shortlistedSites ?? [])) {
+    shortlistMarkers.push(addPoiMarker(root,{...site,kind:'shortlisted-landing-site',status:'shortlisted'},pointOnMars(site.lat,site.lon,0.012),0xd5a16f,0.006));
+  }
+  for (const poi of (worldState.pointsOfInterest ?? [])) {
+    if (!poi.kind.startsWith('mars-orbit')) continue;
+    orbitPoiMarkers.push({poi,marker:addPoiMarker(root,poi,new THREE.Vector3(),poi.kind==='mars-orbit-comms'?0x71c9e8:0xc4c6a5,0.012)});
+  }
 
   function addRoad(group, points, material) {
     const curvePoints = points.map(([x, z]) => new THREE.Vector3(x, 0.003, z));
@@ -189,6 +211,14 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
   const atmosphere = new THREE.Mesh(new THREE.SphereGeometry(0.455, 32, 20), new THREE.MeshBasicMaterial({ color: 0x6fa9d9, transparent: true, opacity: 0.12, side: THREE.BackSide }));
   earthGroup.add(atmosphere);
   orbitalGroup.add(earthGroup);
+  const earthSystemPois = (worldState.pointsOfInterest ?? []).filter(p => ['earth-comms','earth-orbit-station','lunar-relay','moon-asset'].includes(p.kind));
+  for (const poi of earthSystemPois) {
+    const pos = poi.kind === 'earth-comms' ? new THREE.Vector3(0.02,-0.03,0.426)
+      : poi.kind === 'earth-orbit-station' ? new THREE.Vector3(0.52,0.12,0.08)
+      : poi.kind === 'lunar-relay' ? new THREE.Vector3(0.88,0.2,0.02)
+      : new THREE.Vector3(0.62,-0.3,-0.08);
+    earthPoiMarkers.push({poi,marker:addPoiMarker(earthGroup,poi,pos,poi.kind==='earth-orbit-station'?0xf0c17a:0x91c8df,0.025)});
+  }
 
   const arrival = new THREE.Vector3(1.12, 0.18, 0.02);
   const curve = new THREE.CatmullRomCurve3([
@@ -228,8 +258,15 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
       markerGroup.visible = markerVisible;
     }
     for (const road of routeMeshes) road.visible = zoom < 8.5;
-    const logisticsVisible = zoom > 11.5;
+    const logisticsVisible = zoom > 8.5;
     orbitalGroup.visible = logisticsVisible;
+    for (const marker of shortlistMarkers) marker.visible = zoom >= 1.6 && zoom < 8.5;
+    for (const {poi,marker} of orbitPoiMarkers) {
+      const phase = (poi.orbitPhase ?? 0) * Math.PI * 2 + elapsedGameSeconds / 9000;
+      marker.position.set(Math.cos(phase)*1.18,Math.sin(phase*0.73)*0.22,Math.sin(phase)*1.18);
+      marker.visible = logisticsVisible;
+    }
+    for (const {marker} of earthPoiMarkers) marker.visible = logisticsVisible;
     if (logisticsVisible) {
       for (const { spec, ship } of shipMeshes) {
         const progress = (spec.phase + elapsedGameSeconds / (spec.cycleSols * 88775.244)) % 1;
@@ -247,6 +284,10 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
     settlements: builtSettlements,
     shipPickTargets,
     settlementPickTargets,
+    shortlistMarkers,
+    orbitPoiMarkers,
+    earthPoiMarkers,
+    poiPickTargets: [...shortlistMarkers,...orbitPoiMarkers.map(x=>x.marker),...earthPoiMarkers.map(x=>x.marker)],
     routeMeshes,
     rebuildSettlementRoutes,
     update,
