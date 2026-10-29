@@ -153,8 +153,9 @@ function addMeteoroidComposition(m,type,incomingKg,retainedKg,sol,sourceLabel){
       const vapour=ablatedWater+retainedWater*.8,ice=retainedWater*.2;
       waterStock(m,'planet:atmosphericVapour').adjust(vapour);
       waterStock(m,'planet:surfaceIce').adjust(ice);
-      m.planetary.externalWaterInputsKg+=incomingComponent;addExternalWaterFlow(m,'importedWaterKg',incomingComponent);
-      m.ledger.push({sol,substance:'H2O',massKg:incomingComponent,from:'space:'+sourceLabel,to:'planet:water-reservoirs',process:'meteoroid-volatile-delivery',note:'All incoming water-ice mass is accounted for: ablated ice becomes vapour; retained ice is split between vapour and surface ice.'});
+      const accountedWaterKg=vapour+ice;
+      m.planetary.externalWaterInputsKg+=accountedWaterKg;addExternalWaterFlow(m,'importedWaterKg',accountedWaterKg);
+      m.ledger.push({sol,substance:'H2O',massKg:accountedWaterKg,from:'space:'+sourceLabel,to:'planet:water-reservoirs',process:'meteoroid-volatile-delivery',note:'Recorded mass equals the sum actually added to atmospheric vapour and surface ice; ablated ice becomes vapour and retained ice is split between vapour and surface ice.'});
     }
   }
 }
