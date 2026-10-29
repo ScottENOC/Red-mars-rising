@@ -19,6 +19,7 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
   const settlementPickTargets = [];
   const shortlistMarkers = [];
   const surfacePoiMarkers = [];
+  const cargoDropMarkers = [];
   const orbitPoiMarkers = [];
   const earthPoiMarkers = [];
   function pointOnMars(lat, lon, extra = 0.012) {
@@ -35,6 +36,12 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
   }
   for (const site of (worldState.shortlistedSites ?? [])) {
     shortlistMarkers.push(addPoiMarker(root,{...site,kind:'shortlisted-landing-site',status:'shortlisted'},pointOnMars(site.lat,site.lon,0.012),0xd5a16f,0.006));
+  }
+  for (const drop of (worldState.logistics?.plannedCargoDrops ?? [])) {
+    const site = (worldState.shortlistedSites ?? []).find(x => x.id === drop.siteId);
+    if (!site) continue;
+    const marker = addPoiMarker(root,{id:drop.id,name:'Cargo drop · '+drop.siteName,kind:'cargo-drop',status:drop.status,description:drop.cargo+' · sponsor: '+drop.sponsorName},pointOnMars(site.lat,site.lon,0.018),drop.status==='landed'?0x8ecb93:0x75bce0,0.01);
+    cargoDropMarkers.push({drop,marker});
   }
   for (const poi of (worldState.pointsOfInterest ?? [])) {
     if (poi.kind === 'mars-surface-robotic') {
@@ -267,6 +274,11 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
     orbitalGroup.visible = logisticsVisible;
     for (const marker of shortlistMarkers) marker.visible = zoom >= 1.6 && zoom < 8.5;
     for (const marker of surfacePoiMarkers) marker.visible = zoom >= 1.6 && zoom < 8.5;
+    for (const {drop,marker} of cargoDropMarkers) {
+      marker.visible = zoom >= 1.6 && zoom < 8.5;
+      marker.userData.status = drop.status;
+      marker.material.color.set(drop.status==='landed'?0x8ecb93:0x75bce0);
+    }
     for (const {poi,marker} of orbitPoiMarkers) {
       const phase = (poi.orbitPhase ?? 0) * Math.PI * 2 + elapsedGameSeconds / 9000;
       marker.position.set(Math.cos(phase)*1.18,Math.sin(phase*0.73)*0.22,Math.sin(phase)*1.18);
@@ -293,7 +305,7 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
     shortlistMarkers,
     orbitPoiMarkers,
     earthPoiMarkers,
-    poiPickTargets: [...shortlistMarkers,...surfacePoiMarkers,...orbitPoiMarkers.map(x=>x.marker),...earthPoiMarkers.map(x=>x.marker)],
+    poiPickTargets: [...shortlistMarkers,...surfacePoiMarkers,...cargoDropMarkers.map(x=>x.marker),...orbitPoiMarkers.map(x=>x.marker),...earthPoiMarkers.map(x=>x.marker)],
     routeMeshes,
     rebuildSettlementRoutes,
     update,
