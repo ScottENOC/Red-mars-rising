@@ -1,4 +1,4 @@
-import { ensureMaterialInventories, processNaturalMeteoroidFlux, processWaterClimate, recycleColonyWater, transferWater, checkMaterialConservation } from './material-inventories.js';
+import { ensureMaterialInventories, processNaturalMeteoroidFlux, processWaterClimate, settleAtmosphericMeteoroidDust, syncAtmosphereFromInventories, recycleColonyWater, transferWater, checkMaterialConservation } from './material-inventories.js';
 import { SHORTLISTED_SITES } from './campaign-options.js';
 
 const MARS_RADIUS_M = 3_389_500;
@@ -18,6 +18,8 @@ export function processWorldTick(w) {
   checkMaterialConservation(w); // Establish the baseline before any external inputs or transfers this sol.
   processNaturalMeteoroidFlux(w, sol);
   processWaterClimate(w, sol);
+  settleAtmosphericMeteoroidDust(w, sol);
+  syncAtmosphereFromInventories(w);
   const site = w.settlements.find(s => s.kind === 'primary-colony')?.siteModifiers ?? {waterAccess:.5,heatDemand:1};
   const climate = w.climate;
   climate.energyBalance ??= {};
