@@ -65,7 +65,7 @@ Rival sponsors observe the first colony for at least 60 sols, assess whether the
 - Each impact record carries location, sol, crater dimensions, impactor class/mass, a provisional ejecta/deposit composition, and a simple crater cross-section. Local deposits are recorded in kilograms by component and are a subset of the already-counted retained impactor mass, not extra mass.
 - The global NASA MOLA grid remains the immutable baseline. Sparse impact deformation is applied to elevation queries, while local crater meshes provide detail between the coarse global globe vertices. The current physically scaled craters are too small to resolve at planetary zoom; a dedicated close-up surface terrain LOD is still needed for clear inspection.
 - Campaign state, simulation time, inventories and geological modifications autosave to browser local storage once per completed sol, at campaign start, and when the page is backgrounded. A manual “Save now” control is also provided. This is a single local browser save slot; clearing site data or using another browser/device will not carry it across.
-- Local storage quota, mobile-browser behaviour and long-campaign performance still need browser testing. Geological history is intentionally not capped, unlike the transient UI marker cache.
+- Saves retain the full material stocks and geological history, but cap the detailed process ledger at its latest 1,500 entries and record how many older entries were omitted. Local storage quota, mobile-browser behaviour and long-campaign performance still need browser testing. Geological history is intentionally not capped, unlike the transient UI marker cache.
 
 ## Conserved material accounting — in progress
 
