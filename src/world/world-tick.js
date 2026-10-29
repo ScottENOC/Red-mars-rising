@@ -1,9 +1,14 @@
-import { ensureMaterialInventories, processNaturalMeteoroidFlux, processWaterClimate, settleAtmosphericMeteoroidDust, syncAtmosphereFromInventories, recycleColonyWater, transferWater, checkMaterialConservation } from './material-inventories.js';
+import { ensureMaterialInventories, processNaturalMeteoroidFlux, processWaterClimate, settleAtmosphericMeteoroidDust, syncAtmosphereFromInventories, recycleColonyWater, transferWater, checkMaterialConservation, consumeColonyWaterForReaction, addColonyWaterFromReaction } from './material-inventories.js';
 import { SHORTLISTED_SITES } from './campaign-options.js';
 
 const MARS_RADIUS_M = 3_389_500;
 const MARS_SURFACE_AREA_M2 = 4 * Math.PI * MARS_RADIUS_M ** 2;
 const MARS_SOL_SECONDS = 88775.244;
+const EARTH_DAYS_PER_MARS_SOL = MARS_SOL_SECONDS / 86400;
+const GLUCOSE_MOLAR_G = 6*12.011 + 12*1.00794 + 6*15.9994;
+const CO2_PER_GLUCOSE = 6*(12.011+2*15.9994)/GLUCOSE_MOLAR_G;
+const WATER_PER_GLUCOSE = 6*(2*1.00794+15.9994)/GLUCOSE_MOLAR_G;
+const O2_PER_GLUCOSE = 6*(2*15.9994)/GLUCOSE_MOLAR_G;
 const STEFAN_BOLTZMANN = 5.670374419e-8;
 const EFFECTIVE_EMISSIVITY = 0.75;
 const CLIMATE_HEAT_CAPACITY_J_M2_K = 1e7;
@@ -26,23 +31,6 @@ export function processWorldTick(w) {
   climate.energyBalance.accumulatedWasteHeatJPerM2 ??= 0;
   climate.energyBalance.temperatureAnomalyC ??= 0;
 
-  // Every colonist contributes sensible heat. Keep the tiny energy input in the
-  // model at full floating-point precision; never threshold or round it away.
-  const population = w.settlements.reduce((sum, s) => sum + Math.max(0, s.population ?? 0), 0);
-  const humanWasteHeatW = population * 100;
-  const wasteHeatWm2 = humanWasteHeatW / MARS_SURFACE_AREA_M2;
-  const anomaly = climate.energyBalance.temperatureAnomalyC;
-  const radiativeLossWm2 = RADIATIVE_FEEDBACK_W_M2_K * anomaly;
-  const netEnergyJm2 = (wasteHeatWm2 - radiativeLossWm2) * MARS_SOL_SECONDS;
-  climate.energyBalance.humanWasteHeatWm2 = wasteHeatWm2;
-  climate.energyBalance.humanWasteHeatW = humanWasteHeatW;
-  climate.energyBalance.radiativeLossWm2 = radiativeLossWm2;
-  climate.energyBalance.netEnergyJm2 = wasteHeatWm2 - radiativeLossWm2;
-  climate.energyBalance.accumulatedWasteHeatJPerM2 += wasteHeatWm2 * MARS_SOL_SECONDS;
-  climate.energyBalance.temperatureAnomalyC += netEnergyJm2 / CLIMATE_HEAT_CAPACITY_J_M2_K;
-  climate.meanSurfaceTemperatureC = climate.referenceMeanTemperatureC + climate.energyBalance.temperatureAnomalyC;
-  climate.energyBalance.effectiveHeatCapacityJm2K = CLIMATE_HEAT_CAPACITY_J_M2_K;
-  climate.energyBalance.modelNote = 'Illustrative global energy-budget response; small heat inputs are accumulated without thresholds. Local heat distribution is not yet spatially resolved.';
 
   const powerShortfall = w.economy.powerCapacity < w.economy.powerDemand;
   w.colonists.morale = Math.max(0, Math.min(100, w.colonists.morale + (powerShortfall ? -.15 : .015)));
@@ -59,6 +47,79 @@ export function processWorldTick(w) {
     if (humidityKg > 0) transferWater(w, {from:'colony:' + homeColony.id + ':tanks',to:'colony:' + homeColony.id + ':habitatHumidity',massKg:humidityKg,sol,process:'evaporation-in-habitat',note:'A fraction of used water enters habitat air as humidity.'});
   }
   w.economy.water = Math.max(0, w.economy.water - waterUseUnits);
+
+  // Physical food/atmosphere cycle. Food is a dry glucose-equivalent proxy, not a nutritionally complete diet.
+  // Stoichiometry uses glucose + O2 <-> CO2 + H2O; 10% of food mass becomes solid waste.
+  const colony = homeColony && w.materials.colonies[homeColony.id];
+  const siteDeposit = homeColony && w.materials.siteDeposits[homeColony.locationId];
+  let processElectricityKWh = 0;
+  let metabolicHeatW = 0;
+  if (colony) {
+    const people = Math.max(0, Number(homeColony.population ?? w.colonists.population) || 0);
+    const dailyFoodKg = people * 0.62 * EARTH_DAYS_PER_MARS_SOL;
+    const wasteFraction = 0.10;
+    const requestedFoodKg = Math.min(Math.max(0,colony.foodKg),dailyFoodKg);
+    const oxygenLimitedFoodKg = Math.max(0,(colony.gasesKg.oxygen??0)/(O2_PER_GLUCOSE*(1-wasteFraction)));
+    const foodEatenKg = Math.min(requestedFoodKg,oxygenLimitedFoodKg);
+    const metabolisedFoodKg = foodEatenKg*(1-wasteFraction);
+    const oxygenUsedKg = metabolisedFoodKg*O2_PER_GLUCOSE;
+    const co2ProducedKg = metabolisedFoodKg*CO2_PER_GLUCOSE;
+    const metabolicWaterKg = metabolisedFoodKg*WATER_PER_GLUCOSE;
+    if(foodEatenKg>0){
+      colony.foodKg-=foodEatenKg;
+      colony.solidWasteKg+=foodEatenKg*wasteFraction;
+      colony.gasesKg.oxygen-=oxygenUsedKg;
+      colony.gasesKg.carbonDioxide+=co2ProducedKg;
+      addColonyWaterFromReaction(w,{colonyId:homeColony.id,massKg:metabolicWaterKg,sol,process:'human-metabolism',note:'Glucose-equivalent food oxidation yields CO₂ and metabolic water; 10% of consumed food mass becomes solid waste.'});
+      w.materials.ledger.push({sol,process:'human-metabolism',substance:'food',massKg:foodEatenKg,from:'colony:'+homeColony.id+':food',to:'colony:'+homeColony.id+':biomass-and-products',note:'Food is partitioned into solid waste, CO₂ and metabolic water using a simplified glucose oxidation model.'});
+    }
+    metabolicHeatW=people*100;
+
+    // Greenhouse photosynthesis is limited by actual CO₂ and tank water, and is paused by power shortfall.
+    if(!powerShortfall && homeColony.infrastructure?.includes('greenhouse')){
+      const maxDryBiomassKg=people*0.25;
+      const producibleByCO2=Math.max(0,colony.gasesKg.carbonDioxide??0)/CO2_PER_GLUCOSE;
+      const producibleByWater=Math.max(0,colony.waterKg.tanks)/WATER_PER_GLUCOSE;
+      const producedKg=Math.min(maxDryBiomassKg,producibleByCO2,producibleByWater);
+      if(producedKg>0){
+        const co2UsedKg=producedKg*CO2_PER_GLUCOSE;
+        const waterUsedKg=producedKg*WATER_PER_GLUCOSE;
+        consumeColonyWaterForReaction(w,{colonyId:homeColony.id,massKg:waterUsedKg,sol,process:'greenhouse-photosynthesis',note:'Water is a chemical reactant in the glucose-equivalent photosynthesis model.'});
+        colony.gasesKg.carbonDioxide-=co2UsedKg;
+        colony.foodKg+=producedKg*0.70;
+        colony.biomassKg+=producedKg*0.30;
+        const oxygenProducedKg=producedKg*O2_PER_GLUCOSE;
+        colony.gasesKg.oxygen+=oxygenProducedKg;
+        processElectricityKWh+=producedKg*20;
+        w.materials.ledger.push({sol,process:'greenhouse-photosynthesis',substance:'dry glucose-equivalent biomass',massKg:producedKg,co2ConsumedKg:co2UsedKg,waterConsumedKg:waterUsedKg,oxygenProducedKg,edibleFoodKg:producedKg*0.70,inedibleBiomassKg:producedKg*0.30,note:'Simplified photosynthesis stoichiometry; crop diversity, nutrient chemistry and food quality are not yet represented.'});
+      }
+    }
+
+    // Regolith mining and beneficiation retain all feed mass as aggregate, concentrate and tailings.
+    // Rates and yields are explicit scenario assumptions, not a claim about a selected industrial process.
+    if(!powerShortfall && homeColony.infrastructure?.includes('workshop') && siteDeposit){
+      const minedKg=Math.min(1000,Math.max(0,siteDeposit.regolithAvailableKg??0));
+      if(minedKg>0){
+        siteDeposit.regolithAvailableKg-=minedKg;
+        colony.materialsKg.regolith+=minedKg;
+        w.materials.externalFlows.colonyMatterImportsKg+=minedKg;
+        w.materials.ledger.push({sol,process:'regolith-mining',substance:'regolith',massKg:minedKg,from:'local-surface-deposit',to:'colony:'+homeColony.id+':materials.regolith',note:'Illustrative accessible regolith reserve; mining imports mass into the colony boundary.'});
+      }
+      const processedKg=Math.min(1000,Math.max(0,colony.materialsKg.regolith??0));
+      if(processedKg>0){
+        colony.materialsKg.regolith-=processedKg;
+        colony.materialsKg.aggregate+=processedKg*0.70;
+        colony.materialsKg.metalConcentrate+=processedKg*0.10;
+        colony.materialsKg.tailings+=processedKg*0.20;
+        processElectricityKWh+=(processedKg/1000)*50;
+        w.materials.ledger.push({sol,process:'regolith-beneficiation',substance:'regolith feed',massKg:processedKg,aggregateKg:processedKg*0.70,metalConcentrateKg:processedKg*0.10,tailingsKg:processedKg*0.20,note:'Mass-conserving illustrative yield: 70% aggregate, 10% metal-bearing concentrate, 20% tailings. No refined metal is assumed.'});
+      }
+    }
+    if(processElectricityKWh>0){
+      w.materials.energy.electricityConsumedKWh+=processElectricityKWh;
+      w.materials.energy.heatReleasedKWh+=(processElectricityKWh*0.80);
+    }
+  }
   w.colonists.cumulativeWork += w.colonists.population * (w.colonists.morale / 100) * (powerShortfall ? .45 : 1);
   w.colonists.science += w.settlements.some(s => s.infrastructure?.includes('laboratory')) ? .08 : .02;
 
@@ -153,6 +214,46 @@ export function processWorldTick(w) {
     }
   }
   recycleColonyWater(w, sol);
+
+  // Heat is an energy stock in joules relative to the colony's 20 °C reference state.
+  // Metabolic and equipment waste heat charge the store; leakage removes energy from it.
+  const heatColony=homeColony && w.materials.colonies[homeColony.id];
+  let colonyHeatLossW=0;
+  if(heatColony?.thermal){
+    const thermal=heatColony.thermal;
+    const equipmentHeatW=(processElectricityKWh*0.80*3.6e6)/MARS_SOL_SECONDS;
+    const heatInputW=metabolicHeatW+equipmentHeatW;
+    const heatInputJ=heatInputW*MARS_SOL_SECONDS;
+    const heatLossW=Math.max(0,thermal.storedEnergyJ)/(2*MARS_SOL_SECONDS);
+    const heatLossJ=heatLossW*MARS_SOL_SECONDS;
+    thermal.storedEnergyJ+=heatInputJ-heatLossJ;
+    thermal.temperatureC=thermal.referenceTemperatureC+thermal.storedEnergyJ/thermal.capacityJPerK;
+    thermal.heatInputCumulativeJ+=heatInputJ;
+    thermal.heatLossCumulativeJ+=heatLossJ;
+    colonyHeatLossW=heatLossW;
+    w.materials.energy.thermalHeatInputJ+=heatInputJ;
+    w.materials.energy.thermalHeatLostJ+=heatLossJ;
+  }
+
+  // Global thermal stock receives heat leaked from the colony and loses energy radiatively.
+  const climate=w.climate;
+  climate.energyBalance??={};
+  climate.energyBalance.storedThermalEnergyJ??=(climate.energyBalance.temperatureAnomalyC??0)*CLIMATE_HEAT_CAPACITY_J_M2_K*MARS_SURFACE_AREA_M2;
+  climate.energyBalance.temperatureAnomalyC??=0;
+  const anomaly=climate.energyBalance.temperatureAnomalyC;
+  const radiativeLossWm2=RADIATIVE_FEEDBACK_W_M2_K*anomaly;
+  const planetHeatInputJ=colonyHeatLossW*MARS_SOL_SECONDS;
+  const planetRadiativeLossJ=radiativeLossWm2*MARS_SURFACE_AREA_M2*MARS_SOL_SECONDS;
+  climate.energyBalance.storedThermalEnergyJ+=planetHeatInputJ-planetRadiativeLossJ;
+  climate.energyBalance.humanWasteHeatW=population*100;
+  climate.energyBalance.colonyHeatTransferW=colonyHeatLossW;
+  climate.energyBalance.radiativeLossWm2=radiativeLossWm2;
+  climate.energyBalance.netEnergyJm2=(colonyHeatLossW-MARS_SURFACE_AREA_M2*radiativeLossWm2)/MARS_SURFACE_AREA_M2;
+  climate.energyBalance.accumulatedWasteHeatJPerM2+=(colonyHeatLossW/MARS_SURFACE_AREA_M2)*MARS_SOL_SECONDS;
+  climate.energyBalance.temperatureAnomalyC=climate.energyBalance.storedThermalEnergyJ/(CLIMATE_HEAT_CAPACITY_J_M2_K*MARS_SURFACE_AREA_M2);
+  climate.meanSurfaceTemperatureC=climate.referenceMeanTemperatureC+climate.energyBalance.temperatureAnomalyC;
+  climate.energyBalance.effectiveHeatCapacityJm2K=CLIMATE_HEAT_CAPACITY_J_M2_K;
+  climate.energyBalance.modelNote='Illustrative global energy-stock model. The colony thermal store tracks metabolic/equipment heat and heat leakage; the planetary anomaly tracks leaked colony heat minus radiative loss. Natural solar/seasonal forcing and local spatial heat transport remain unmodelled.';
   checkMaterialConservation(w);
   w.time.lastProcessedSol = sol;
   w.time.solOfYear = ((sol - 1) % 669) + 1;
