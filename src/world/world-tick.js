@@ -1,3 +1,4 @@
+import { ensureAsteroidOperations, processAsteroidOperations } from './asteroid-operations.js';
 import { ensureMaterialInventories, processNaturalMeteoroidFlux, processWaterClimate, settleAtmosphericMeteoroidDust, syncAtmosphereFromInventories, recycleColonyWater, transferWater, checkMaterialConservation, consumeColonyWaterForReaction, addColonyWaterFromReaction } from './material-inventories.js';
 import { SHORTLISTED_SITES, ensureConstructionRecipeOptions } from './campaign-options.js';
 import { ensureColonyPoliticalState, processColonyPolitics } from './colony-politics.js';
@@ -24,6 +25,7 @@ export function processWorldTick(w) {
   ensureMaterialInventories(w);
   ensureColonyPoliticalState(w);
   ensureColonyEconomies(w);
+  ensureAsteroidOperations(w);
   checkMaterialConservation(w); // Establish the baseline before any external inputs or transfers this sol.
   processNaturalMeteoroidFlux(w, sol);
   processWaterClimate(w, sol);
@@ -257,6 +259,7 @@ export function processWorldTick(w) {
     }
   }
   processColonyEconomies(w, sol, events);
+  processAsteroidOperations(w, sol, events);
   processColonyPolitics(w, sol, events);
   recycleColonyWater(w, sol);
 
