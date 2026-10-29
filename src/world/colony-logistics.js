@@ -18,6 +18,7 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
   const colonyMarkers = [];
   const settlementPickTargets = [];
   const shortlistMarkers = [];
+  const surfacePoiMarkers = [];
   const orbitPoiMarkers = [];
   const earthPoiMarkers = [];
   function pointOnMars(lat, lon, extra = 0.012) {
@@ -36,6 +37,10 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
     shortlistMarkers.push(addPoiMarker(root,{...site,kind:'shortlisted-landing-site',status:'shortlisted'},pointOnMars(site.lat,site.lon,0.012),0xd5a16f,0.006));
   }
   for (const poi of (worldState.pointsOfInterest ?? [])) {
+    if (poi.kind === 'mars-surface-robotic') {
+      surfacePoiMarkers.push(addPoiMarker(root,poi,pointOnMars(poi.lat,poi.lon,0.014),poi.status==='inactive'?0x858585:0x87c58d,0.008));
+      continue;
+    }
     if (!poi.kind.startsWith('mars-orbit')) continue;
     orbitPoiMarkers.push({poi,marker:addPoiMarker(root,poi,new THREE.Vector3(),poi.kind==='mars-orbit-comms'?0x71c9e8:0xc4c6a5,0.012)});
   }
@@ -261,6 +266,7 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
     const logisticsVisible = zoom > 8.5;
     orbitalGroup.visible = logisticsVisible;
     for (const marker of shortlistMarkers) marker.visible = zoom >= 1.6 && zoom < 8.5;
+    for (const marker of surfacePoiMarkers) marker.visible = zoom >= 1.6 && zoom < 8.5;
     for (const {poi,marker} of orbitPoiMarkers) {
       const phase = (poi.orbitPhase ?? 0) * Math.PI * 2 + elapsedGameSeconds / 9000;
       marker.position.set(Math.cos(phase)*1.18,Math.sin(phase*0.73)*0.22,Math.sin(phase)*1.18);
@@ -287,7 +293,7 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
     shortlistMarkers,
     orbitPoiMarkers,
     earthPoiMarkers,
-    poiPickTargets: [...shortlistMarkers,...orbitPoiMarkers.map(x=>x.marker),...earthPoiMarkers.map(x=>x.marker)],
+    poiPickTargets: [...shortlistMarkers,...surfacePoiMarkers,...orbitPoiMarkers.map(x=>x.marker),...earthPoiMarkers.map(x=>x.marker)],
     routeMeshes,
     rebuildSettlementRoutes,
     update,
