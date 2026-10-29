@@ -51,6 +51,7 @@ export function ensureMaterialInventories(w) {
   w.materials??=createMaterialInventories();
   const m=w.materials;
   m.colonies??={};m.ledger??=[];m.energy??={electricityConsumedKWh:0,heatReleasedKWh:0};
+  for(const stock of Object.values(m.planetary.waterKg??{}))stock.compensation??=0;
   m.externalFlows??={importedWaterKg:0,exportedWaterKg:0,meteoroidMatterKg:0};
   m.diagnostics??={waterBalanceErrorKg:0,lastWaterBalanceCheckSol:0,hydrogenBalanceErrorKg:0,oxygenBalanceErrorKg:0};
   const home=w.settlements?.find(s=>s.kind==='primary-colony');
@@ -63,8 +64,14 @@ export function ensureMaterialInventories(w) {
 
 function waterStock(m,endpoint){
   const [scope,owner,compartment]=String(endpoint).split(':');
-  if(scope==='planet'&&m.planetary.waterKg[owner])return {get mass(){return m.planetary.waterKg[owner].mass;},set mass(v){m.planetary.waterKg[owner].mass=v;}};
-  if(scope==='colony'&&m.colonies[owner]?.waterKg?.[compartment]!==undefined)return {get mass(){return m.colonies[owner].waterKg[compartment];},set mass(v){m.colonies[owner].waterKg[compartment]=v;}};
+  if(scope==='planet'&&m.planetary.waterKg[owner]){
+    const stock=m.planetary.waterKg[owner];
+    return {get mass(){return stock.mass;},set mass(v){stock.mass=v;},adjust(delta){const y=delta-(stock.compensation??0);const t=stock.mass+y;stock.compensation=(t-stock.mass)-y;stock.mass=t;}};
+  }
+  if(scope==='colony'&&m.colonies[owner]?.waterKg?.[compartment]!==undefined){
+    const colony=m.colonies[owner];colony.waterCompensation??={};colony.waterCompensation[compartment]??=0;
+    return {get mass(){return colony.waterKg[compartment];},set mass(v){colony.waterKg[compartment]=v;},adjust(delta){const y=delta-colony.waterCompensation[compartment];const t=colony.waterKg[compartment]+y;colony.waterCompensation[compartment]=(t-colony.waterKg[compartment])-y;colony.waterKg[compartment]=t;}};
+  }
   return null;
 }
 export function transferWater(w,{from,to,massKg,sol=0,process='transfer',note=''}){
@@ -73,7 +80,7 @@ export function transferWater(w,{from,to,massKg,sol=0,process='transfer',note=''
   const a=waterStock(m,from),b=waterStock(m,to);
   if(!a||!b)throw new Error('Unknown water inventory endpoint.');
   if(a.mass+1e-9<massKg)throw new Error('Insufficient water in source inventory.');
-  a.mass-=massKg;b.mass+=massKg;m.ledger.push({sol,substance:'H2O',massKg,from,to,process,note});
+  a.adjust(-massKg);b.adjust(massKg);m.ledger.push({sol,substance:'H2O',massKg,from,to,process,note});
   return {ok:true,massKg,from,to};
 }
 
@@ -90,8 +97,8 @@ function addRetainedMeteoroidComposition(m,type,massKg,sol){
     else if(component==='otherVolatiles')mineral.otherVolatiles+=mass;
     else if(component==='waterIce'){
       const vapour=mass*.8;
-      m.planetary.waterKg.atmosphericVapour.mass+=vapour;
-      m.planetary.waterKg.surfaceIce.mass+=mass-vapour;
+      waterStock(m,'planet:atmosphericVapour').adjust(vapour);
+      waterStock(m,'planet:surfaceIce').adjust(mass-vapour);
       m.planetary.externalWaterInputsKg+=mass;
       m.externalFlows.importedWaterKg+=mass;
       m.ledger.push({sol,substance:'H2O',massKg:mass,from:'space:impact-body',to:'planet:water-reservoirs',process:'impact-volatile-delivery',note:'Impact-delivered ice split between atmospheric vapour and surface ice by a scenario assumption.'});
@@ -122,7 +129,7 @@ export function processNaturalMeteoroidFlux(w,sol){
       else if(component==='waterIce'){
         const deliveredWater=incoming*fraction;
         const vapour=deliveredWater*.8;
-        m.planetary.waterKg.surfaceIce.mass+=deliveredWater-vapour;
+        waterStock(m,'planet:surfaceIce').adjust(deliveredWater-vapour);
         m.planetary.waterKg.atmosphericVapour.mass+=vapour;
         m.planetary.externalWaterInputsKg+=deliveredWater;m.externalFlows.importedWaterKg+=deliveredWater;
         m.ledger.push({sol,substance:'H2O',massKg:deliveredWater,from:'space:meteoroid-ice',to:'planet:water-reservoirs',process:'natural-volatile-delivery',note:'Modelled water-bearing dust contributes vapour and surface ice; volatile fraction is an uncertain scenario assumption.'});
@@ -164,17 +171,17 @@ export function processWaterClimate(w,sol){
   const freezeRate=temp<0?Math.min(.02,.0005*(-temp)/63):0;
   const liquid=p.surfaceLiquid.mass;
   if(liquid>0){
-    const evap=Math.min(liquid,liquid*sublimationRate);p.surfaceLiquid.mass-=evap;p.atmosphericVapour.mass+=evap;
+    const evap=Math.min(liquid,liquid*sublimationRate);waterStock(m,'planet:surfaceLiquid').adjust(-evap);waterStock(m,'planet:atmosphericVapour').adjust(evap);
     m.ledger.push({sol,substance:'H2O',massKg:evap,from:'planet:surfaceLiquid',to:'planet:atmosphericVapour',process:'evaporation',note:'Illustrative climate-dependent phase transfer.'});
-    if(temp<0){const freeze=Math.min(p.surfaceLiquid.mass,p.surfaceLiquid.mass*freezeRate);p.surfaceLiquid.mass-=freeze;p.surfaceIce.mass+=freeze;m.ledger.push({sol,substance:'H2O',massKg:freeze,from:'planet:surfaceLiquid',to:'planet:surfaceIce',process:'freezing',note:'Cold surface conditions freeze liquid water.'});}
+    if(temp<0){const freeze=Math.min(p.surfaceLiquid.mass,p.surfaceLiquid.mass*freezeRate);waterStock(m,'planet:surfaceLiquid').adjust(-freeze);waterStock(m,'planet:surfaceIce').adjust(freeze);m.ledger.push({sol,substance:'H2O',massKg:freeze,from:'planet:surfaceLiquid',to:'planet:surfaceIce',process:'freezing',note:'Cold surface conditions freeze liquid water.'});}
   }
   const iceLoss=Math.min(p.surfaceIce.mass,p.surfaceIce.mass*1e-7*sublimationRate);
-  if(iceLoss>0){p.surfaceIce.mass-=iceLoss;p.atmosphericVapour.mass+=iceLoss;m.ledger.push({sol,substance:'H2O',massKg:iceLoss,from:'planet:surfaceIce',to:'planet:atmosphericVapour',process:'sublimation',note:'Illustrative surface-ice sublimation rate.'});}
+  if(iceLoss>0){waterStock(m,'planet:surfaceIce').adjust(-iceLoss);waterStock(m,'planet:atmosphericVapour').adjust(iceLoss);m.ledger.push({sol,substance:'H2O',massKg:iceLoss,from:'planet:surfaceIce',to:'planet:atmosphericVapour',process:'sublimation',note:'Illustrative surface-ice sublimation rate.'});}
   const condensationRate=temp<-20?.00015:temp<0?.00003:.000001;
   const condensed=Math.min(p.atmosphericVapour.mass,p.atmosphericVapour.mass*condensationRate);
-  if(condensed>0){p.atmosphericVapour.mass-=condensed;p.surfaceIce.mass+=condensed;m.ledger.push({sol,substance:'H2O',massKg:condensed,from:'planet:atmosphericVapour',to:'planet:surfaceIce',process:'condensation/deposition',note:'Illustrative cold-trap deposition; no spatial resolution yet.'});}
+  if(condensed>0){waterStock(m,'planet:atmosphericVapour').adjust(-condensed);waterStock(m,'planet:surfaceIce').adjust(condensed);m.ledger.push({sol,substance:'H2O',massKg:condensed,from:'planet:atmosphericVapour',to:'planet:surfaceIce',process:'condensation/deposition',note:'Illustrative cold-trap deposition; no spatial resolution yet.'});}
   const escape=Math.min(p.atmosphericVapour.mass,p.atmosphericVapour.mass*1e-8);
-  if(escape>0){p.atmosphericVapour.mass-=escape;m.planetary.externalWaterOutputsKg+=escape;m.externalFlows.exportedWaterKg+=escape;m.ledger.push({sol,substance:'H2O',massKg:escape,from:'planet:atmosphericVapour',to:'space',process:'atmospheric-escape',note:'Effective escape placeholder; hydrogen escape and oxygen residue are not yet resolved.'});}
+  if(escape>0){waterStock(m,'planet:atmosphericVapour').adjust(-escape);m.planetary.externalWaterOutputsKg+=escape;m.externalFlows.exportedWaterKg+=escape;m.ledger.push({sol,substance:'H2O',massKg:escape,from:'planet:atmosphericVapour',to:'space',process:'atmospheric-escape',note:'Effective escape placeholder; hydrogen escape and oxygen residue are not yet resolved.'});}
 }
 
 export function recycleColonyWater(w,sol){
@@ -215,7 +222,7 @@ export function importWater(w,{massKg,to='planet:atmosphericVapour',sol=0,source
   const m=ensureMaterialInventories(w);
   if(!Number.isFinite(massKg)||massKg<=0)throw new Error('Imported water mass must be positive.');
   const target=waterStock(m,to);if(!target)throw new Error('Unknown water destination.');
-  target.mass+=massKg;m.planetary.externalWaterInputsKg+=massKg;m.externalFlows.importedWaterKg+=massKg;
+  target.adjust(massKg);m.planetary.externalWaterInputsKg+=massKg;m.externalFlows.importedWaterKg+=massKg;
   m.ledger.push({sol,substance:'H2O',massKg,from:source,to,process:'external-water-import',note:'External mass input with a physical source.'});
   return {ok:true,massKg,to};
 }
