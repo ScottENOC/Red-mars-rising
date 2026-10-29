@@ -43,18 +43,12 @@ export function processWorldTick(w) {
   const powerShortfall = w.economy.powerCapacity < w.economy.powerDemand;
   w.colonists.morale = Math.max(0, Math.min(100, w.colonists.morale + (powerShortfall ? -.15 : .015)));
   w.colonists.health = Math.max(0, Math.min(100, w.colonists.health + (powerShortfall ? -.04 : .006)));
-  const waterUseUnits = Math.min(w.economy.water, .12 * (1 - site.waterAccess));
   const homeColony = w.settlements.find(s => s.kind === 'primary-colony');
+  const stores = homeColony ? w.materials.colonies[homeColony.id].waterKg : null;
+  const requestedWaterUseUnits = Math.min(w.economy.water, .12 * (1 - site.waterAccess));
+  const waterUseUnits = stores ? Math.min(requestedWaterUseUnits, stores.tanks / 1000) : requestedWaterUseUnits;
   if (homeColony && waterUseUnits > 0) {
-    const stores = w.materials.colonies[homeColony.id].waterKg;
-    const useKg = waterUseUnits * 1000;
-    if (stores.tanks >= useKg) {
-      transferWater(w, {from:'colony:' + homeColony.id + ':tanks',to:'colony:' + homeColony.id + ':wastewater',massKg:useKg,sol,process:'daily-use',note:'Used water enters wastewater pending treatment or disposal.'});
-    } else {
-      // Keep the legacy economy stock and material inventory in sync if a save is short.
-      const availableKg = stores.tanks;
-      if (availableKg > 0) transferWater(w, {from:'colony:' + homeColony.id + ':tanks',to:'colony:' + homeColony.id + ':wastewater',massKg:availableKg,sol,process:'daily-use',note:'Available tank water enters wastewater.'});
-    }
+    transferWater(w, {from:'colony:' + homeColony.id + ':tanks',to:'colony:' + homeColony.id + ':wastewater',massKg:waterUseUnits * 1000,sol,process:'daily-use',note:'Used water enters wastewater pending treatment or disposal.'});
   }
   w.economy.water = Math.max(0, w.economy.water - waterUseUnits);
   w.colonists.cumulativeWork += w.colonists.population * (w.colonists.morale / 100) * (powerShortfall ? .45 : 1);
