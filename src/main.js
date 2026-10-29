@@ -6,6 +6,7 @@ import { STARTING_LOCATIONS, SPONSORS, STRATEGIC_PROGRAMS, HABITAT_COMPONENT_CAT
 import { processWorldTick, commissionProject, commissionStrategicProgram } from './world/world-tick.js';
 import { METEOROID_TYPES } from './world/material-inventories.js';
 import { ensureColonyPoliticalState, influenceColony, getColonyPoliticalSummary } from './world/colony-politics.js';
+import { ensureColonyEconomies, getColonyEconomySummary } from './world/colony-economy.js';
 
 const TEXTURE_URL=new URL('../data/mars/8k_mars.jpg', import.meta.url).href;
 const worldState = createInitialWorldState();
@@ -160,6 +161,20 @@ function buildColonyPoliticsReport(){
  }).join('');
  return '<details style="margin:8px 0;padding:9px;background:#111923;border:1px solid #ffffff22;border-radius:8px"><summary style="cursor:pointer;font-weight:700">Martian colonies & diplomacy · '+rivals.length+' established</summary><div style="margin-top:8px;font-size:12px;line-height:1.55"><div>Each colony has its own political state. Sponsor relationships shape initial conditions but do not dictate colony-to-colony relations. Identity, autonomy and cooperation can evolve independently; unity is not guaranteed.</div>'+(rivals.length?rows:'<div style="padding:8px 0">No rival crewed colony has arrived yet. '+pending+' sponsor expedition plan(s) remain active; this section will become actionable when another colony is established.</div>')+'<div style="opacity:.72;margin-top:6px">These 0–100 values are prototype political indices, not measured probabilities. Joint research and autonomy initiatives are early influence actions; trade, treaties, factions, sanctions and war are not implemented yet.</div></div></details>';
 }
+function buildColonyEconomyReport(){
+ ensureColonyEconomies(worldState);
+ const colonies=worldState.settlements.filter(s=>!['failed','abandoned'].includes(s.status));
+ const goods=[['food','Food'],['components','Components'],['machinery','Machinery'],['electronics','Electronics'],['aggregate','Aggregate']];
+ const rows=colonies.map(colony=>{
+  const e=getColonyEconomySummary(worldState,colony);
+  const shortages=goods.filter(([key])=>e.shortages[key]).map(([,label])=>label);
+  const inventory=goods.map(([key,label])=>label+' '+Number(e.inventory[key]??0).toFixed(1)).join(' · ');
+  const freight=worldState.colonyTrade.shipments.filter(s=>s.status==='in-transit'&&(s.fromId===colony.id||s.toId===colony.id)).map(s=>(s.toId===colony.id?'Inbound':'Outbound')+' '+s.amount+' '+s.good+' · '+Math.max(0,s.arrivalSol-worldState.time.sol)+' sols'+(s.fromId.startsWith('earth:')?' · Earth cargo':'' )).join('<br>')||'No freight currently in transit';
+  return '<div style="padding:9px 0;border-top:1px solid #ffffff18"><strong>'+colony.name+'</strong><div>'+e.specialisation+' · population '+Math.round(colony.population??0)+' · local stability '+e.stability+' · Earth dependence index '+e.importDependence+'</div><div>'+inventory+'</div><div>'+(shortages.length?'Low stocks: '+shortages.join(', '):'No stock currently below its warning threshold')+'</div><div>'+freight+'</div></div>';
+ }).join('');
+ const recent=worldState.colonyTrade.tradeLog.slice(-5).reverse().map(item=>'<div>Sol '+item.sol+' · '+item.description+'</div>').join('');
+ return '<details style="margin:8px 0;padding:9px;background:#111923;border:1px solid #ffffff22;border-radius:8px"><summary style="cursor:pointer;font-weight:700">Colony economies & freight · '+colonies.length+' operating</summary><div style="margin-top:8px;font-size:12px;line-height:1.55"><div>Colonies now hold separate inventories and production specialisations. Goods move only when a shipment departs and arrives; source stocks are deducted at departure. Current freight uses an abstract surface-haul model with travel time based on map distance.</div>'+rows+'<strong>Recent freight ledger</strong>'+(recent||'<div>No shipments recorded yet.</div>')+'<div style="opacity:.72;margin-top:6px">Stock units are abstract gameplay units, not tonnes or validated industrial throughput. Earth food/parts imports take 240 sols in this prototype. Trade requires a bilateral relationship index of at least 50 and a sender with surplus; it is not a guaranteed market-clearing system. Physical rover fleets, road quality, route blockages, cargo capacity by vehicle, contracts and prices are not modelled yet.</div></div></details>';
+}
 function renderCampaignPanel(){
  if(!worldState.campaign.started)return;
  const sponsor=worldState.sponsors.find(x=>x.id===worldState.campaign.startingSponsorId);
@@ -192,6 +207,7 @@ function renderCampaignPanel(){
  '<div class="cp-metrics"><strong>'+home.name+'</strong><br>'+sponsor.name+' · '+worldState.settlements.length+' settlement(s)<br>Earth link: '+(worldState.pointsOfInterest.filter(p=>p.kind==='mars-orbit-comms'&&p.status==='operational').length)+' Mars relays · ~12.5 min one-way light time<br>Transfer vehicle: '+(worldState.pointsOfInterest.find(p=>p.id==='mars-crewship')?.status??'unknown')+' in Mars orbit<br>Funds '+worldState.economy.funds+' · Materials '+worldState.economy.materials+' · Water '+worldState.economy.water.toFixed(1)+'<br>Morale '+worldState.colonists.morale.toFixed(1)+' · Sponsor patience '+worldState.campaign.sponsorPatience.toFixed(1)+'<br>Global heat contribution: '+tempAnomaly.toExponential(3)+' °C anomaly</div>'+
  materialPanel+
  buildColonyPoliticsReport()+
+ buildColonyEconomyReport()+
  buildHabitatComponentReport()+
  '<div class="cp-heading"><span>Strategic priorities</span><span>Colony-level decisions</span></div>'+
  '<div class="cp-metrics"><strong>Import dependence</strong><br>Current policy: '+({ 'accept-for-now':'Accept dependence for now', 'investigate-local-production':'Investigate local production', 'strengthen-supply-chain':'Strengthen supply chain' }[worldState.campaign.dependencyPolicy]??'Accept dependence for now')+'<br>Imported specialist components remain a potential bottleneck. Local regolith processing currently produces aggregate and metal-bearing concentrate, not qualified metal parts or finished components. The player sets priorities; the colony handles day-to-day execution.</div>'+
