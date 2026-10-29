@@ -84,7 +84,7 @@ export function processWorldTick(w) {
       plan.assessment = healthy ? 'cautiously-encouraged' : 'high-risk';
       plan.assessedAtSol = sol;
       plan.status = healthy ? 'awaiting-launch-window' : 'reviewing-failure-risk';
-      plan.launchSol = Math.max(780, Math.ceil((sol + (healthy ? 0 : 180)) / 780) * 780);
+      plan.launchSol = Math.max(780, Math.ceil((sol + (healthy ? 0 : 180)) / 780) * 780) + Math.max(0, w.sponsors.findIndex(x => x.id === sponsor.id)) * 4;
       plan.arrivalSol = plan.launchSol + 240;
       const reserved = new Set(w.sponsors.map(other => other.rivalPlan?.siteId).filter(Boolean));
       const site = (w.shortlistedSites ?? SHORTLISTED_SITES).find(p => !reserved.has(p.id) && !w.settlements.some(s => Math.abs(s.lat-p.lat)<4 && Math.abs(((s.lon-p.lon+540)%360)-180)<4));
