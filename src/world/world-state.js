@@ -17,8 +17,25 @@ export function createInitialWorldState() {
       seasonalFrost: { north: { maxExtentDeg: 30, material: 'co2-frost' }, south: { maxExtentDeg: 40, material: 'co2-frost' } }
     } },
     campaign: { started: false, startingLocationId: null, startingSponsorId: null, sponsorRelations: {}, sponsorPatience: 0, sponsorPressure: 0, reputation: 0, autonomy: 0, diplomaticIncidents: [], flags: [], supportYearsRemaining: 5 },
-    sponsors: [], settlements: [], infrastructure: { routes: [], assets: [], projects: [] },
-    logistics: { supplyShips: [
+    sponsors: [], settlements: [],
+    shortlistedSites: [],
+    pointsOfInterest: [
+      {id:'mars-relay-1',name:'Mars Relay A',kind:'mars-orbit-comms',status:'operational',orbitPhase:0.08,description:'Communications and navigation relay; future target for hacking or destruction.'},
+      {id:'mars-relay-2',name:'Mars Relay B',kind:'mars-orbit-comms',status:'operational',orbitPhase:0.37,description:'Second communications relay for partial coverage redundancy.'},
+      {id:'mars-relay-3',name:'Mars Relay C',kind:'mars-orbit-comms',status:'operational',orbitPhase:0.68,description:'Third relay; the network is not assumed to provide perfect global coverage.'},
+      {id:'mars-weather',name:'Mars Weather Orbiter',kind:'mars-orbit-science',status:'operational',orbitPhase:0.84,description:'Dust-storm and atmospheric observations.'},
+      {id:'mars-crewship',name:'Ares Transfer Vehicle',kind:'mars-orbit-vehicle',status:'orbiting',orbitPhase:0.53,description:'Crew transfer vehicle remains in Mars orbit as a return vehicle and emergency refuge.'},
+      {id:'phobos-station',name:'Phobos Survey Package',kind:'mars-orbit-science',status:'operational',orbitPhase:0.21,description:'Robotic survey package associated with Phobos; no crewed moon base.'},
+      {id:'earth-mars-comms',name:'Earth–Mars Deep Space Network',kind:'earth-comms',status:'operational',description:'Ground antennas and relay links on Earth; light-time delays still apply.'},
+      {id:'iss-expanded',name:'ISS Logistics Extension',kind:'earth-orbit-station',status:'operational',description:'Expanded orbital assembly and life-support test facility in this mild alternate history, not a direct launch slingshot.'},
+      {id:'lunar-relay',name:'Lunar Communications Relay',kind:'lunar-relay',status:'operational',description:'Relay in lunar orbit supporting Earth-side deep-space communications and navigation.'}
+    ],
+    infrastructure: { routes: [], assets: [], projects: [] },
+    logistics: { plannedCargoDrops: [
+      {id:'cargo-drop-esa',sponsorId:'esa',sponsorName:'ESA',siteId:'utopia',siteName:'Utopia Planitia',arrivalSol:45,status:'scheduled',cargo:'Power and life-support cargo'},
+      {id:'cargo-drop-cnsa',sponsorId:'cnsa',sponsorName:'CNSA',siteId:'deuteronilus',siteName:'Deuteronilus Mensae',arrivalSol:95,status:'scheduled',cargo:'Autonomous habitat and survey cargo'},
+      {id:'cargo-drop-helios',sponsorId:'helios',sponsorName:'Helios Industrial',siteId:'amazonis',siteName:'Amazonis Planitia',arrivalSol:155,status:'scheduled',cargo:'Industrial equipment'}
+    ], supplyShips: [
       { id: 'supply-ship-1', cargo: 'Construction robots', phase: 0.22, cycleSols: 52 },
       { id: 'supply-ship-2', cargo: 'Greenhouse modules', phase: 0.58, cycleSols: 67 },
       { id: 'supply-ship-3', cargo: 'Life-support spares', phase: 0.82, cycleSols: 59 }
