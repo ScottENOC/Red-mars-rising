@@ -37,7 +37,7 @@ export function createMaterialInventories() {
         hydratedMinerals:{mass:1e15,confidence:'very-low',note:'Illustrative water-equivalent bound; requires mineral processing.'}
       },
       atmosphereKg:{carbonDioxide:marsAtmosphereKg*.953,nitrogen:marsAtmosphereKg*.027,argon:marsAtmosphereKg*.016,oxygen:marsAtmosphereKg*.0013,carbonMonoxide:marsAtmosphereKg*.0008,otherGases:marsAtmosphereKg*(1-.953-.027-.016-.0013-.0008),meteoroidAerosols:0},
-      meteoroids:{incomingCumulativeKg:0,retainedCumulativeKg:0,atmosphericAblatedCumulativeKg:0,pendingIncomingKg:0,types,surfaceDepositsKg:0,atmosphericTransientKg:0,atmosphericAblatedCumulativeKg:0,craterImpactsGreaterThan8mCumulative:0,impactFractionalAccumulator:0,lastImpactSol:0},
+      meteoroids:{incomingCumulativeKg:0,retainedCumulativeKg:0,atmosphericAblatedCumulativeKg:0,pendingIncomingKg:0,types,surfaceDepositsKg:0,atmosphericTransientKg:0,atmosphericAblatedCumulativeKg:0,pendingAtmosphericDustSettledKg:0,craterImpactsGreaterThan8mCumulative:0,impactFractionalAccumulator:0,lastImpactSol:0},
       mineralDepositsKg:{silicates:0,ironNickel:0,sulfides:0,carbonOrganics:0,otherMinerals:0,waterIceUnprocessed:0,carbonDioxideIce:0,otherVolatiles:0},
       externalWaterInputsKg:0,externalWaterOutputsKg:0
     },
@@ -174,7 +174,8 @@ export function settleAtmosphericMeteoroidDust(w,sol){
     atmosphere.meteoroidAerosols-=settled;
     m.planetary.mineralDepositsKg.otherMinerals+=settled;
     m.planetary.meteoroids.surfaceDepositsKg+=settled;
-    if(sol%30===0)m.ledger.push({sol,substance:'mixed meteoroid dust',massKg:settled*30,from:'planet:atmosphere',to:'planet:mineralDeposits',process:'aerosol-settling',note:'Approximate atmospheric dust deposition accumulated over the previous 30 sols.'});
+    m.planetary.meteoroids.pendingAtmosphericDustSettledKg+=settled;
+    if(sol%30===0){m.ledger.push({sol,substance:'mixed meteoroid dust',massKg:m.planetary.meteoroids.pendingAtmosphericDustSettledKg,from:'planet:atmosphere',to:'planet:mineralDeposits',process:'aerosol-settling',note:'Atmospheric dust deposition accumulated over the last 30 sols.'});m.planetary.meteoroids.pendingAtmosphericDustSettledKg=0;}
   }
 }
 
