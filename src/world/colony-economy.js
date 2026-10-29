@@ -165,18 +165,17 @@ function assessEmergencyAid(w,sol,events){
       const primary=(w.settlements??[]).find(s=>s.kind==='primary-colony');
       const primaryPolicy=primary&&recipient.id!==primary.id?aidPolicy(w,recipient):'automatic';
       const primaryCandidate=ranked.find(x=>x.donor.id===primary?.id);
+      const foodRunway=good==='food'?Math.max(0,Math.floor((recipient.economy.inventory.food-2)/Math.max(0.1,recipient.population*0.018-(SPECIALISATIONS[recipient.economy.specialisation]?.produces.food??0)))):Infinity;
+      if(primary&&primaryCandidate&&primaryPolicy==='protect-reserves'){
+        const primaryRoute=routeTravel(w,primary,recipient,primaryCandidate.distance);
+        if(good!=='food'||primaryRoute.travelSols<=foodRunway){request.feasibleAidRefused=true;request.refusedByPrimary=true;}
+      }
       const donor=ranked.find(x=>x.donor.id!==primary?.id||primaryPolicy!=='protect-reserves');
       if(donor){
         const baseAid=good==='food'?25:good==='components'?5:good==='machinery'?4:good==='electronics'?3:8;
         const amount=Math.min(baseAid*(donor.donor.id===primary?.id&&aidPolicy(w,recipient)==='prioritise'?1.5:1),donor.donor.economy.inventory[good]-aidReserve(good));
         const route=routeTravel(w,donor.donor,recipient,donor.distance);
-        const foodRunway=good==='food'?Math.max(0,Math.floor((recipient.economy.inventory.food-2)/Math.max(0.1,recipient.population*0.018-(SPECIALISATIONS[recipient.economy.specialisation]?.produces.food??0)))):Infinity;
         const arrivesInTime=good!=='food'||route.travelSols<=Math.max(0,foodRunway);
-        if(primary&&primaryCandidate&&primaryPolicy==='protect-reserves'){
-          const primaryRoute=routeTravel(w,primary,recipient,routeDistanceKm(primary,recipient));
-          const primaryRunway=good==='food'?Math.max(0,Math.floor((recipient.economy.inventory.food-2)/Math.max(0.1,recipient.population*0.018-(SPECIALISATIONS[recipient.economy.specialisation]?.produces.food??0)))):Infinity;
-          if(good!=='food'||primaryRoute.travelSols<=primaryRunway){request.feasibleAidRefused=true;request.refusedByPrimary=true;}
-        }
         if(arrivesInTime){
           const shipment=createShipment(w,donor.donor,recipient,good,amount,sol,'emergency-aid');
           shipment.requestId=request.id;
