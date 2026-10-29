@@ -62,7 +62,7 @@ export function ensureMaterialInventories(w) {
   if(home){
     const colony=m.colonies[home.id];
     if(!colony.physicalStocksVersion){
-      colony.foodKg=1000;
+      colony.foodKg=Math.max(1000,Math.max(0,Number(home.population??10))*0.62*(88775.244/86400)*90);
       colony.biomassKg=0;
       colony.solidWasteKg=0;
       colony.materialsKg={regolith:0,aggregate:0,metalConcentrate:0,tailings:0,constructionComponents:0,slag:0,nutrients:500,spareParts:250,polymers:100};
@@ -95,6 +95,12 @@ export function ensureMaterialInventories(w) {
     const stockId='site_'+home.locationId+'_subsurfaceIce';
     m.planetary.waterKg[stockId]={mass:allocatedKg,compensation:0,confidence:'very-low',note:'Allocated local subsurface-ice deposit; estimated from site prospectivity, not a direct measurement.'};
     m.siteDeposits[home.locationId]={siteId:home.locationId,waterStockId:stockId,estimatedReserveKg:allocatedKg,waterAccess:access,surveyed:false,confidence:'very-low',extractionRateKgPerSol:500+access*1000,regolithAvailableKg:1e9,regolithConfidence:'low',regolithNote:'Illustrative accessible surface/regolith reserve for local processing; not a mapped mineable reserve.'};
+  }
+  if(home?.locationId&&m.siteDeposits[home.locationId]){
+    const deposit=m.siteDeposits[home.locationId];
+    deposit.regolithAvailableKg??=1e9;
+    deposit.regolithConfidence??='low';
+    deposit.regolithNote??='Illustrative accessible surface/regolith reserve for local processing; not a mapped mineable reserve.';
   }
   return m;
 }
