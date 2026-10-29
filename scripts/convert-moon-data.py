@@ -36,23 +36,25 @@ def make_mesh(body, table_path):
     vertices = []
     uvs = []
     mean_radius = float(np.mean(sampled))
+    source_cols = len(lons)
+    # Duplicate the first vertex at the end of each row so texture U wraps cleanly.
     for i, lat in enumerate(lats):
         lr = np.deg2rad(lat)
-        for j, lon in enumerate(lons):
+        for j in range(source_cols + 1):
+            lon = 360.0 if j == source_cols else float(lons[j])
+            radius = float(sampled[i, 0 if j == source_cols else j]) / mean_radius
             lo = np.deg2rad(lon)
-            radius = float(sampled[i, j]) / mean_radius
-            uvs.append([float(lons[j] / 360.0), float((lat + 90.0) / 180.0)])
+            uvs.append([lon / 360.0, float((lat + 90.0) / 180.0)])
             # Three.js convention: longitude zero faces +Z, east longitude turns toward -X.
             vertices.append([round(-radius*np.cos(lr)*np.sin(lo), 6),
                              round(radius*np.sin(lr), 6),
                              round(radius*np.cos(lr)*np.cos(lo), 6)])
     faces = []
-    rows, cols = len(lats), len(lons)
+    rows, cols = len(lats), source_cols + 1
     for i in range(rows-1):
-        for j in range(cols):
-            j2 = (j+1) % cols
-            a, b = i*cols+j, i*cols+j2
-            c, d = (i+1)*cols+j, (i+1)*cols+j2
+        for j in range(cols-1):
+            a, b = i*cols+j, i*cols+j+1
+            c, d = (i+1)*cols+j, (i+1)*cols+j+1
             faces.extend([[a, c, b], [b, c, d]])
     payload = {"units": "mean-radius", "vertices": vertices, "uvs": uvs, "indices": [v for face in faces for v in face]}
     path = OUT / f"{body}-mesh.json"
