@@ -64,7 +64,7 @@ export function requestSponsorProject(w,projectId){
  state.requests.push(request);
  record(w,{sol:w.time?.sol??0,kind:approved?'project-approved':'project-declined',requestId:id,projectId,description:sponsor.name+(approved?' approved ':' declined ')+project.name+'. '+request.reason});
  if(!approved)return {ok:true,approved:false,reason:sponsor.name+' declined the proposal. You can revisit it after circumstances change.'};
- const commitment={id:'commitment-'+id,requestId:id,projectId,name:project.name,category:project.category,status:'active',approvedSol:w.time?.sol??0,sponsorId:sponsor.id,sponsorName:sponsor.name,supportMode:mode,goods:{...project.goods},nextSupportSol:(w.time?.sol??0)+30,lastSupportSol:null,suspendedReason:null,operationalSupport:true,maintenanceSupport:true,repairSupport:true,autonomyCost:project.autonomyCost,terms:typeTerms(sponsor,mode),supportHistory:[]};
+ const commitment={id:'commitment-'+id,requestId:id,projectId,name:project.name,category:project.category,status:'active',approvedSol:w.time?.sol??0,sponsorId:sponsor.id,sponsorName:sponsor.name,supportMode:mode,goods:{...project.goods},nextSupportSol:(w.time?.sol??0),lastSupportSol:null,suspendedReason:null,operationalSupport:true,maintenanceSupport:true,repairSupport:true,autonomyCost:project.autonomyCost,terms:typeTerms(sponsor,mode),supportHistory:[]};
  state.commitments.push(commitment);
  request.commitmentId=commitment.id;
  const home=primaryColony(w);
@@ -80,11 +80,11 @@ function logCommitment(w,c,sol,kind,description){
  c.supportHistory??=[];c.supportHistory.push({sol,kind,description});if(c.supportHistory.length>30)c.supportHistory.shift();
  record(w,{sol,kind,commitmentId:c.id,projectId:c.projectId,description});
 }
-function createSponsorShipment(w,home,good,amount,sol,kind,sourceId,description){
+function createSponsorShipment(w,home,good,amount,sol,kind,sourceId,description,commitmentId=null){
  w.colonyTrade??={shipments:[],nextShipmentId:1,tradeLog:[]};
  w.colonyTrade.shipments??=[];w.colonyTrade.tradeLog??=[];w.colonyTrade.nextShipmentId??=1;
- if(w.colonyTrade.shipments.some(x=>x.status==='in-transit'&&x.toId===home.id&&x.good===good&&x.kind===kind))return null;
- const ship={id:'colony-haul-'+w.colonyTrade.nextShipmentId++,kind,fromId:sourceId,toId:home.id,good,amount,departSol:sol,arrivalSol:sol+240,travelSols:240,distanceKm:null,status:'in-transit',sponsorCommitment:true};
+ if(kind!=='project-support'&&w.colonyTrade.shipments.some(x=>x.status==='in-transit'&&x.toId===home.id&&x.good===good&&x.kind===kind))return null;
+ const ship={id:'colony-haul-'+w.colonyTrade.nextShipmentId++,kind,fromId:sourceId,toId:home.id,good,amount,departSol:sol,arrivalSol:sol+240,travelSols:240,distanceKm:null,status:'in-transit',sponsorCommitment:true,commitmentId};
  w.colonyTrade.shipments.push(ship);
  const entry={sol,kind:'sponsor-commitment-shipment',shipmentId:ship.id,toId:home.id,good,amount,description};
  w.colonyTrade.tradeLog.push(entry);if(w.colonyTrade.tradeLog.length>100)w.colonyTrade.tradeLog.shift();
@@ -115,7 +115,7 @@ export function processSponsorCommitments(w,sol,events=[]){
   const goods=Object.entries(c.goods??{});
   let dispatched=0;
   for(const [good,amount] of goods){
-   const ship=createSponsorShipment(w,home,good,amount,sol,'project-support','earth:'+c.sponsorId,sponsor.name+' supplied '+amount+' units of '+good+' under its ongoing '+c.name+' commitment.');
+   const ship=createSponsorShipment(w,home,good,amount,sol,'project-support','earth:'+c.sponsorId,sponsor.name+' supplied '+amount+' units of '+good+' under its ongoing '+c.name+' commitment.',c.id);
    if(ship)dispatched++;
   }
   c.lastSupportSol=sol;c.nextSupportSol=sol+30;
