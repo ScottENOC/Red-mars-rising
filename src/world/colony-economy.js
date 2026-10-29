@@ -165,16 +165,19 @@ function assessEmergencyAid(w,sol,events){
       const ranked=donors.map(d=>({donor:d,rel:relationship(d,recipient),distance:routeDistanceKm(d,recipient)})).sort((a,b)=>aidPriority(w,b.donor)-aidPriority(w,a.donor)||b.rel-a.rel||a.distance-b.distance);
       const primary=(w.settlements??[]).find(s=>s.kind==='primary-colony');
       const primaryPolicy=primary&&recipient.id!==primary.id?aidPolicy(w,recipient):'automatic';
+      const primaryCandidate=ranked.find(x=>x.donor.id===primary?.id);
       const donor=ranked.find(x=>x.donor.id!==primary?.id||primaryPolicy!=='protect-reserves');
       if(donor){
         const amount=Math.min(good==='food'?25:good==='components'?5:good==='machinery'?4:good==='electronics'?3:8,donor.donor.economy.inventory[good]-aidReserve(good));
         const route=routeTravel(w,donor.donor,recipient,donor.distance);
         const foodRunway=good==='food'?Math.max(0,Math.floor((recipient.economy.inventory.food-2)/Math.max(0.1,recipient.population*0.018-(SPECIALISATIONS[recipient.economy.specialisation]?.produces.food??0)))):Infinity;
         const arrivesInTime=good!=='food'||route.travelSols<=Math.max(0,foodRunway);
-        if(primary&&donor.donor.id===primary.id&&primaryPolicy==='protect-reserves'&&arrivesInTime){
-          request.feasibleAidRefused=true;
-          request.refusedByPrimary=true;
-        }else if(arrivesInTime){
+        if(primary&&primaryCandidate&&primaryPolicy==='protect-reserves'){
+          const primaryRoute=routeTravel(w,primary,recipient,routeDistanceKm(primary,recipient));
+          const primaryRunway=good==='food'?Math.max(0,Math.floor((recipient.economy.inventory.food-2)/Math.max(0.1,recipient.population*0.018-(SPECIALISATIONS[recipient.economy.specialisation]?.produces.food??0)))):Infinity;
+          if(good!=='food'||primaryRoute.travelSols<=primaryRunway){request.feasibleAidRefused=true;request.refusedByPrimary=true;}
+        }
+        if(arrivesInTime){
           const shipment=createShipment(w,donor.donor,recipient,good,amount,sol,'emergency-aid');
           shipment.requestId=request.id;
           request.status='in-transit';request.shipmentId=shipment.id;request.donorId=donor.donor.id;request.amount=amount;request.arrivalSol=shipment.arrivalSol;
@@ -226,7 +229,7 @@ function deliverShipments(w,sol,events){
     }
     if(ship.kind==='earth-import'){destination.economy.importDependence=clamp(destination.economy.importDependence+1);destination.economy.pendingImports=(destination.economy.pendingImports??[]).filter(good=>good!==ship.good);destination.economy.pendingImport=destination.economy.pendingImports.length>0;}
     addTradeLog(w,{sol,kind:'delivered',shipmentId:ship.id,fromId:ship.fromId,toId:ship.toId,good:ship.good,amount:ship.amount,description:ship.amount+' units of '+ship.good+' arrived at '+destination.name+'.'});
-    events.push({type:'colony-shipment-arrived',sol,description:ship.amount+' units of '+ship.good+' arrived at '+destination.name+(ship.kind==='trade'?' from '+(w.settlements.find(s=>s.id===ship.fromId)?.name??'another colony'):' from its Earth sponsor')+'.'});
+    events.push({type:'colony-shipment-arrived',sol,description:ship.amount+' units of '+ship.good+' arrived at '+destination.name+(ship.kind==='earth-import'?' from its Earth sponsor':' from '+(w.settlements.find(s=>s.id===ship.fromId)?.name??'another colony'))+'.'});
     if(ship.kind==='trade'){
       const from=w.settlements.find(s=>s.id===ship.fromId);
       if(from&&from.economy)from.economy.importDependence=clamp(from.economy.importDependence-0.5);
