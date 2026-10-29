@@ -129,6 +129,30 @@ export function processWorldTick(w) {
   w.colonists.cumulativeWork += w.colonists.population * (w.colonists.morale / 100) * (powerShortfall ? .45 : 1);
   w.colonists.science += w.settlements.some(s => s.infrastructure?.includes('laboratory')) ? .08 : .02;
 
+  // Strategic programmes represent colony-level priorities; no individual worker assignments are exposed.
+  for (const program of (w.campaign.strategicPrograms ?? [])) {
+    if (program.status !== 'active') continue;
+    if (powerShortfall) { program.pausedReason = 'Power shortfall'; continue; }
+    program.remainingSols = Math.max(0, program.remainingSols - 1);
+    program.progress = 1 - program.remainingSols / program.durationSols;
+    delete program.pausedReason;
+    if (program.remainingSols !== 0) continue;
+    program.status = 'complete';
+    if (program.id === 'local-components-study') {
+      w.campaign.localManufacturingAssessment = {status:'preliminary',sol,confidence:'low',potentialSubstitutionRange:[60,80],category:'selected non-critical imported components',note:'Scenario estimate only. This is a research finding, not current production capacity; feedstock processing, quality assurance and component-specific qualification would still be required.'};
+      w.campaign.dependencyPolicy = 'investigate-local-production';
+      events.push({type:'strategic-program-complete',sol,description:'Local component study completed: selected non-critical component categories may offer a 60–80% substitution opportunity, but confidence is low and no production capability has been built yet.'});
+    }
+    if (program.id === 'cargo-pipeline') {
+      w.campaign.logisticsReliability = Math.max(w.campaign.logisticsReliability ?? 0.5, 0.8);
+      w.campaign.sponsorPatience = Math.min(100, w.campaign.sponsorPatience + 8);
+      w.campaign.sponsorPressure = Math.max(0, w.campaign.sponsorPressure - 10);
+      w.campaign.dependencyPolicy = 'strengthen-supply-chain';
+      events.push({type:'strategic-program-complete',sol,description:'Sponsor cargo pipeline strengthened: shipment coordination is more reliable and sponsor confidence has improved, but material dependence remains.'});
+    }
+    events.push({type:'project-complete',sol,description:program.name+' completed.'});
+  }
+
   for (const project of w.infrastructure.projects) {
     if (project.status !== 'active') continue;
     if (powerShortfall) { project.pausedReason = 'Power shortfall'; continue; }
@@ -266,6 +290,19 @@ export function processWorldTick(w) {
   w.time.solOfYear = ((sol - 1) % 669) + 1;
   for (const event of events) w.events.push({...event,sol});
   return events;
+}
+
+export function commissionStrategicProgram(w, programId) {
+  const program = (w.campaign.strategicPrograms ?? []).find(p => p.id === programId);
+  if (!program || program.status !== 'available') return {ok:false,reason:'Strategic programme is not available.'};
+  for (const [resource, amount] of Object.entries(program.cost)) {
+    if ((w.economy[resource] ?? 0) < amount) return {ok:false,reason:'Insufficient '+resource+'.'};
+  }
+  for (const [resource, amount] of Object.entries(program.cost)) w.economy[resource] -= amount;
+  program.status = 'active'; program.remainingSols = program.durationSols; program.progress = 0;
+  w.campaign.dependencyPolicy = program.id === 'local-components-study' ? 'investigate-local-production' : 'strengthen-supply-chain';
+  w.events.push({type:'strategic-program-start',sol:w.time.sol,description:program.name+' commissioned.'});
+  return {ok:true,program};
 }
 
 export function commissionProject(w, projectId) {
