@@ -65,25 +65,26 @@ for(const [a,b,r,depth] of [[-42.4,70.5,.19,.085],[-50,316,.12,.055],[12,88,.105
 h+=(lat<0?1:.45)*(.006*Math.sin(lon*1.7+lat*.8)*Math.sin(lat*2.1-lon*.4)+.004*Math.sin(lon*4.2+lat*3.7));h-=.022*Math.exp(-1 * ((lat-42)/22)**2);if(Math.abs(lat)>80)h+=.012*Math.min(1,(Math.abs(lat)-80)/8);return h;}
 
 
-// Polar ice is generated from scenario state, never baked into the terrain geometry.
-export function createPolarCapMesh(north, worldState) {
-  const hemisphere = north ? 'north' : 'south';
-  const capState = worldState.surface.ice.polarCaps[hemisphere];
-  const radiusDeg = THREE.MathUtils.clamp(capState.extentDeg, 0, 45);
-  if (radiusDeg <= 0) return null;
+// Polar ice is generated from separate persistent-deposit and seasonal-frost state.
+function polarBoundaryVariation(lon, north) {
+  return 0.055 * Math.sin(3 * lon + (north ? 0.4 : 1.1)) +
+    0.032 * Math.sin(5 * lon - (north ? 0.7 : 0.2)) +
+    0.018 * Math.cos(9 * lon + (north ? 0.1 : 1.7));
+}
+
+function createPolarCapMesh(north, capState, innerExtentDeg = 0, color = 0xdedbd0) {
+  const outerExtentDeg = THREE.MathUtils.clamp(capState.extentDeg, 0, 45);
+  const innerDeg = THREE.MathUtils.clamp(innerExtentDeg, 0, outerExtentDeg);
+  if (outerExtentDeg <= 0 || outerExtentDeg <= innerDeg + 0.01) return null;
   const vertices = [], indices = [], segments = 96, rings = 18;
   for (let j = 0; j <= rings; j++) {
     for (let i = 0; i <= segments; i++) {
       const lon = 2 * Math.PI * i / segments;
-      // Deterministic low-frequency boundary variation avoids the artificial perfect-circle
-      // look without adding per-frame randomness. This is a visual approximation, not a
-      // claim that the current extent values are a scientific ice-boundary dataset.
-      const edgeVariation =
-        0.055 * Math.sin(3 * lon + (north ? 0.4 : 1.1)) +
-        0.032 * Math.sin(5 * lon - (north ? 0.7 : 0.2)) +
-        0.018 * Math.cos(9 * lon + (north ? 0.1 : 1.7));
-      const edgeRadiusDeg = radiusDeg * (1 + edgeVariation);
-      const ang = THREE.MathUtils.degToRad(edgeRadiusDeg * j / rings);
+      // Matching deterministic boundaries lets seasonal frost meet the residual cap
+      // without a visible gap. The outline remains a provisional visual approximation.
+      const variation = polarBoundaryVariation(lon, north);
+      const radiusDeg = innerDeg + (outerExtentDeg - innerDeg) * j / rings;
+      const ang = THREE.MathUtils.degToRad(radiusDeg * (1 + variation));
       const lat = north ? Math.PI / 2 - ang : -Math.PI / 2 + ang;
       const r = 1.0015 + terrainRadiusOffset(lat * 180 / Math.PI, lon * 180 / Math.PI);
       vertices.push(-r * Math.cos(lat) * Math.sin(lon), r * Math.sin(lat), r * Math.cos(lat) * Math.cos(lon));
@@ -97,19 +98,38 @@ export function createPolarCapMesh(north, worldState) {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
   geometry.setIndex(indices); geometry.computeVertexNormals();
-  const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({color: 0xdedbd0, roughness: 1, side: THREE.DoubleSide}));
-  mesh.userData.polarCapHemisphere = hemisphere;
+  const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
+    color, roughness: 1, side: THREE.DoubleSide
+  }));
+  mesh.userData.polarCapHemisphere = north ? 'north' : 'south';
+  mesh.userData.polarIceLayer = innerDeg > 0 ? 'seasonal-frost' : 'residual-cap';
   return mesh;
 }
 
-export function updatePolarCaps(THREEUnused, root, worldState) {
+export function updatePolarCaps(THREEUnused, root, worldState, solarLongitudeDeg = 156) {
   for (const child of [...root.children]) {
     if (child.userData?.polarCapHemisphere) {
       root.remove(child); child.geometry.dispose(); child.material.dispose();
     }
   }
+  const ice = worldState.surface.ice;
+  const ls = ((solarLongitudeDeg % 360) + 360) % 360;
   for (const north of [true, false]) {
-    const mesh = createPolarCapMesh(north, worldState);
-    if (mesh) root.add(mesh);
+    const hemisphere = north ? 'north' : 'south';
+    const residual = ice.residualCaps[hemisphere];
+    const residualExtent = THREE.MathUtils.clamp(residual.extentDeg, 0, 45);
+    const persistentMesh = createPolarCapMesh(north, residual, 0, north ? 0xe0ded7 : 0xd7d4ca);
+    if (persistentMesh) root.add(persistentMesh);
+
+    // First-pass seasonal cycle: frost expands in that hemisphere's winter and retreats
+    // toward the equinox. This is a transparent approximation, not a fitted climate model.
+    const winterPeakLs = north ? 270 : 90;
+    const seasonal = ice.seasonalFrost[hemisphere];
+    const seasonalFactor = Math.max(0, Math.cos(THREE.MathUtils.degToRad(ls - winterPeakLs)));
+    const seasonalExtent = Math.min(45, seasonal.maxExtentDeg * seasonalFactor);
+    if (seasonalExtent > residualExtent + 0.25) {
+      const frostMesh = createPolarCapMesh(north, { extentDeg: seasonalExtent }, residualExtent, north ? 0xe8e5dc : 0xe2dfd6);
+      if (frostMesh) root.add(frostMesh);
+    }
   }
 }
