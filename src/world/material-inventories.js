@@ -38,7 +38,7 @@ export function createMaterialInventories() {
       },
       atmosphereKg:{carbonDioxide:marsAtmosphereKg*.953,nitrogen:marsAtmosphereKg*.027,argon:marsAtmosphereKg*.016,oxygen:marsAtmosphereKg*.0013,carbonMonoxide:marsAtmosphereKg*.0008,otherGases:marsAtmosphereKg*(1-.953-.027-.016-.0013-.0008)},
       meteoroids:{incomingCumulativeKg:0,retainedCumulativeKg:0,escapedOrAblatedCumulativeKg:0,pendingIncomingKg:0,types,surfaceDepositsKg:0,atmosphericTransientKg:0,craterImpactsGreaterThan8mCumulative:0,impactFractionalAccumulator:0,lastImpactSol:0},
-      mineralDepositsKg:{silicates:0,ironNickel:0,sulfides:0,carbonOrganics:0,otherMinerals:0},
+      mineralDepositsKg:{silicates:0,ironNickel:0,sulfides:0,carbonOrganics:0,otherMinerals:0,waterIceUnprocessed:0,carbonDioxideIce:0,otherVolatiles:0},
       externalWaterInputsKg:0,externalWaterOutputsKg:0
     },
     colonies:{},ledger:[],energy:{electricityConsumedKWh:0,heatReleasedKWh:0},
@@ -95,8 +95,11 @@ export function processNaturalMeteoroidFlux(w,sol){
       else if(component==='sulfides')mineral.sulfides+=mass;
       else if(component==='carbonOrganics')mineral.carbonOrganics+=mass;
       else if(component==='otherMinerals')mineral.otherMinerals+=mass;
+      else if(component==='carbonDioxideIce')mineral.carbonDioxideIce+=mass;
+      else if(component==='otherVolatiles')mineral.otherVolatiles+=mass;
       else if(component==='waterIce'){
         const vapour=mass*.8;
+        mineral.waterIceUnprocessed+=mass-vapour;
         m.planetary.waterKg.atmosphericVapour.mass+=vapour;
         m.planetary.externalWaterInputsKg+=vapour;m.externalFlows.importedWaterKg+=vapour;
         m.ledger.push({sol,substance:'H2O',massKg:vapour,from:'space:meteoroid-ice',to:'planet:atmosphericVapour',process:'natural-impact-vapour',note:'Scenario estimate of water ice retained as atmospheric vapour; unretained volatile mass is included in the aggregate ablation estimate.'});
@@ -140,6 +143,7 @@ export function recycleColonyWater(w,sol){
     if(recovered>0){
       const electricity=recovered*.001;stock.wastewater-=recovered;stock.tanks+=recovered;
       m.energy.electricityConsumedKWh+=electricity;
+      if(w.economy)w.economy.water=(Number(w.economy.water)||0)+recovered/1000;
       m.ledger.push({sol,substance:'H2O',massKg:recovered,from:'colony:'+id+':wastewater',to:'colony:'+id+':tanks',process:'water-recycling',note:'85% recovered; 15% remains in brine/losses; electricity '+electricity.toFixed(3)+' kWh.'});
     }
   }
@@ -187,6 +191,7 @@ export function checkMaterialConservation(w){
   const waterO=total*WATER_O_MASS_FRACTION+Object.values(m.colonies).reduce((a,c)=>a+(c.gasesKg.oxygen??0),0);
   const initialH=m.diagnostics.initialHydrogenEquivalentKg??waterH;m.diagnostics.initialHydrogenEquivalentKg??=waterH;
   const initialO=m.diagnostics.initialOxygenEquivalentKg??waterO;m.diagnostics.initialOxygenEquivalentKg??=waterO;
-  m.diagnostics.hydrogenBalanceErrorKg=waterH-initialH;m.diagnostics.oxygenBalanceErrorKg=waterO-initialO;
+  m.diagnostics.hydrogenBalanceErrorKg=waterH-(initialH+(m.externalFlows.importedWaterKg-m.externalFlows.exportedWaterKg)*WATER_H_MASS_FRACTION);
+  m.diagnostics.oxygenBalanceErrorKg=waterO-(initialO+(m.externalFlows.importedWaterKg-m.externalFlows.exportedWaterKg)*WATER_O_MASS_FRACTION);
   return {totalWaterKg:total,waterBalanceErrorKg:m.diagnostics.waterBalanceErrorKg,hydrogenBalanceErrorKg:m.diagnostics.hydrogenBalanceErrorKg,oxygenBalanceErrorKg:m.diagnostics.oxygenBalanceErrorKg};
 }
