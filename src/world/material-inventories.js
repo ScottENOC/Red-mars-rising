@@ -339,9 +339,9 @@ export function addColonyWaterFromReaction(w,{colonyId,massKg,sol=0,process='che
 }
 export function checkMaterialConservation(w){
   const m=ensureMaterialInventories(w),p=m.planetary.waterKg;
-  const planetaryWater=Object.values(p).reduce((sum,x)=>sum+x.mass,0);
+  const planetaryWater=Object.values(p).reduce((sum,x)=>sum+x.mass-(x.compensation??0),0);
   const colonies=Object.values(m.colonies);
-  const colonyWater=colonies.reduce((sum,c)=>sum+Object.values(c.waterKg).reduce((a,x)=>a+x,0),0);
+  const colonyWater=colonies.reduce((sum,c)=>sum+Object.entries(c.waterKg).reduce((a,[key,x])=>a+x-(c.waterCompensation?.[key]??0),0),0);
   const hydrogenGas=colonies.reduce((sum,c)=>sum+(c.gasesKg.hydrogen??0),0);
   const oxygenGas=colonies.reduce((sum,c)=>sum+(c.gasesKg.oxygen??0),0);
   const colonyCO2=colonies.reduce((sum,c)=>sum+(c.gasesKg.carbonDioxide??0),0);
@@ -367,7 +367,7 @@ export function checkMaterialConservation(w){
   m.diagnostics.hydrogenBalanceErrorKg=waterH-(initialH+(m.externalFlows.importedWaterKg-m.externalFlows.exportedWaterKg)*WATER_H_MASS_FRACTION);
   m.diagnostics.oxygenBalanceErrorKg=waterO-(initialO+(m.externalFlows.importedWaterKg-m.externalFlows.exportedWaterKg)*WATER_O_MASS_FRACTION);
   const colonyMass=colonies.reduce((sum,c)=>sum+
-    Object.values(c.waterKg).reduce((a,x)=>a+x,0)+
+    Object.entries(c.waterKg).reduce((a,[key,x])=>a+x-(c.waterCompensation?.[key]??0),0)+
     Object.values(c.gasesKg).reduce((a,x)=>a+Math.max(0,Number(x)||0),0)+
     Math.max(0,c.foodKg??0)+Math.max(0,c.biomassKg??0)+Math.max(0,c.solidWasteKg??0)+
     Object.values(c.materialsKg??{}).reduce((a,x)=>a+Math.max(0,Number(x)||0),0),0);
