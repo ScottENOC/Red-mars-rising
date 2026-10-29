@@ -28,7 +28,6 @@ export function processWorldTick(w) {
   const site = w.settlements.find(s => s.kind === 'primary-colony')?.siteModifiers ?? {waterAccess:.5,heatDemand:1};
   const population = w.settlements.reduce((sum, s) => sum + Math.max(0, s.population ?? 0), 0);
   const climate = w.climate;
-  const climate = w.climate;
   climate.energyBalance ??= {};
   climate.energyBalance.accumulatedWasteHeatJPerM2 ??= 0;
   climate.energyBalance.temperatureAnomalyC ??= 0;
