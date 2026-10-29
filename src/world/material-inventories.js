@@ -75,6 +75,7 @@ export function ensureMaterialInventories(w) {
       m.diagnostics.initialOxygenEquivalentKg=undefined;
       m.diagnostics.initialColonyMatterMassKg=undefined;
       m.diagnostics.initialCarbonKg=undefined;
+      m.diagnostics.initialTrackedStocks=undefined;
     }
     colony.gasesKg.carbonDioxide??=0;
     colony.gasesKg.carbonMonoxide??=0;
@@ -338,47 +339,88 @@ export function addColonyWaterFromReaction(w,{colonyId,massKg,sol=0,process='che
   return massKg;
 }
 export function checkMaterialConservation(w){
-  const m=ensureMaterialInventories(w),p=m.planetary.waterKg;
-  const planetaryWater=Object.values(p).reduce((sum,x)=>sum+x.mass-(x.compensation??0),0);
-  const colonies=Object.values(m.colonies);
-  const colonyWater=colonies.reduce((sum,c)=>sum+Object.entries(c.waterKg).reduce((a,[key,x])=>a+x-(c.waterCompensation?.[key]??0),0),0);
-  const hydrogenGas=colonies.reduce((sum,c)=>sum+(c.gasesKg.hydrogen??0),0);
-  const oxygenGas=colonies.reduce((sum,c)=>sum+(c.gasesKg.oxygen??0),0);
-  const colonyCO2=colonies.reduce((sum,c)=>sum+(c.gasesKg.carbonDioxide??0),0);
-  const colonyCO=colonies.reduce((sum,c)=>sum+(c.gasesKg.carbonMonoxide??0),0);
-  const organicMass=colonies.reduce((sum,c)=>sum+Math.max(0,c.foodKg??0)+Math.max(0,c.biomassKg??0)+Math.max(0,c.solidWasteKg??0),0);
-  const waterMass=planetaryWater+colonyWater;
-  // This expanded diagnostic follows water and the simple carbohydrate/CO2/O2 cycle.
-  // It is no longer a water-only total: photosynthesis and metabolism move atoms between these stocks.
-  const totalWaterDerivedMassKg=waterMass+hydrogenGas+oxygenGas+colonyCO2+colonyCO+organicMass;
-  const initial=m.diagnostics.initialTotalWaterKg??totalWaterDerivedMassKg;
-  m.diagnostics.initialTotalWaterKg??=totalWaterDerivedMassKg;
-  const expected=initial+m.externalFlows.importedWaterKg-m.externalFlows.exportedWaterKg;
-  m.diagnostics.waterBalanceErrorKg=totalWaterDerivedMassKg-expected;
+  const m=ensureMaterialInventories(w),p=m.planetary.waterKg,colonies=Object.values(m.colonies);
+  const currentSnapshot={
+    planetaryWaterKg:Object.fromEntries(Object.entries(p).map(([key,x])=>[key,x.mass-(x.compensation??0)])),
+    colonies:Object.fromEntries(Object.entries(m.colonies).map(([id,c])=>[id,{
+      waterKg:Object.fromEntries(Object.entries(c.waterKg).map(([key,x])=>[key,x-(c.waterCompensation?.[key]??0)])),
+      gasesKg:{...c.gasesKg},
+      foodKg:c.foodKg??0,biomassKg:c.biomassKg??0,solidWasteKg:c.solidWasteKg??0,
+      materialsKg:{...(c.materialsKg??{})}
+    }]))
+  };
+  const snapshot=m.diagnostics.initialTrackedStocks??=JSON.parse(JSON.stringify(currentSnapshot));
+  // Compare compartment-by-compartment deltas, not two ~10^16 kg totals. This preserves
+  // small transfers that would be rounded away when subtracting planet-sized totals.
+  let trackedDeltaKg=0,waterDeltaKg=0,hydrogenDeltaKg=0,oxygenDeltaKg=0,carbonDeltaKg=0;
+  const pKeys=new Set([...Object.keys(snapshot.planetaryWaterKg),...Object.keys(currentSnapshot.planetaryWaterKg)]);
+  for(const key of pKeys){
+    const delta=(currentSnapshot.planetaryWaterKg[key]??0)-(snapshot.planetaryWaterKg[key]??0);
+    trackedDeltaKg+=delta;waterDeltaKg+=delta;
+    hydrogenDeltaKg+=delta*WATER_H_MASS_FRACTION;
+    oxygenDeltaKg+=delta*WATER_O_MASS_FRACTION;
+  }
+  const colonyIds=new Set([...Object.keys(snapshot.colonies),...Object.keys(currentSnapshot.colonies)]);
+  let colonyMass=0;
+  for(const id of colonyIds){
+    const now=currentSnapshot.colonies[id],before=snapshot.colonies[id];
+    const waterKeys=new Set([...Object.keys(now?.waterKg??{}),...Object.keys(before?.waterKg??{})]);
+    for(const key of waterKeys){
+      const delta=(now?.waterKg?.[key]??0)-(before?.waterKg?.[key]??0);
+      trackedDeltaKg+=delta;waterDeltaKg+=delta;
+      hydrogenDeltaKg+=delta*WATER_H_MASS_FRACTION;
+      oxygenDeltaKg+=delta*WATER_O_MASS_FRACTION;
+      colonyMass+=now?.waterKg?.[key]??0;
+    }
+    const gasKeys=new Set([...Object.keys(now?.gasesKg??{}),...Object.keys(before?.gasesKg??{})]);
+    for(const key of gasKeys){
+      const delta=(now?.gasesKg?.[key]??0)-(before?.gasesKg?.[key]??0);
+      trackedDeltaKg+=delta;
+      if(key==='hydrogen')hydrogenDeltaKg+=delta;
+      if(key==='oxygen')oxygenDeltaKg+=delta;
+      if(key==='carbonDioxide'){oxygenDeltaKg+=delta*CO2_O_FRACTION;carbonDeltaKg+=delta*CO2_C_FRACTION;}
+      if(key==='carbonMonoxide'){oxygenDeltaKg+=delta*CO_O_FRACTION;carbonDeltaKg+=delta*CO_C_FRACTION;}
+      colonyMass+=now?.gasesKg?.[key]??0;
+    }
+    for(const key of ['foodKg','biomassKg','solidWasteKg']){
+      const delta=(now?.[key]??0)-(before?.[key]??0);
+      trackedDeltaKg+=delta;
+      hydrogenDeltaKg+=delta*GLUCOSE_H_FRACTION;
+      oxygenDeltaKg+=delta*GLUCOSE_O_FRACTION;
+      carbonDeltaKg+=delta*GLUCOSE_C_FRACTION;
+      colonyMass+=now?.[key]??0;
+    }
+    const materialKeys=new Set([...Object.keys(now?.materialsKg??{}),...Object.keys(before?.materialsKg??{})]);
+    for(const key of materialKeys){
+      const current=now?.materialsKg?.[key]??0,initial=before?.materialsKg?.[key]??0;
+      trackedDeltaKg+=current-initial;
+      colonyMass+=current;
+    }
+  }
+  const waterNetExternal=m.externalFlows.importedWaterKg-m.externalFlows.exportedWaterKg;
+  m.diagnostics.waterBalanceErrorKg=trackedDeltaKg-waterNetExternal;
   m.diagnostics.lastWaterBalanceCheckSol=w.time?.sol??0;
-  const organicH=organicMass*GLUCOSE_H_FRACTION;
-  const organicO=organicMass*GLUCOSE_O_FRACTION;
-  const waterH=waterMass*WATER_H_MASS_FRACTION+hydrogenGas+organicH;
-  const waterO=waterMass*WATER_O_MASS_FRACTION+oxygenGas+organicO+colonyCO2*CO2_O_FRACTION+colonyCO*CO_O_FRACTION;
-  const initialH=m.diagnostics.initialHydrogenEquivalentKg??waterH;
-  const initialO=m.diagnostics.initialOxygenEquivalentKg??waterO;
-  m.diagnostics.initialHydrogenEquivalentKg??=waterH;
-  m.diagnostics.initialOxygenEquivalentKg??=waterO;
-  m.diagnostics.hydrogenBalanceErrorKg=waterH-(initialH+(m.externalFlows.importedWaterKg-m.externalFlows.exportedWaterKg)*WATER_H_MASS_FRACTION);
-  m.diagnostics.oxygenBalanceErrorKg=waterO-(initialO+(m.externalFlows.importedWaterKg-m.externalFlows.exportedWaterKg)*WATER_O_MASS_FRACTION);
-  const colonyMass=colonies.reduce((sum,c)=>sum+
-    Object.entries(c.waterKg).reduce((a,[key,x])=>a+x-(c.waterCompensation?.[key]??0),0)+
-    Object.values(c.gasesKg).reduce((a,x)=>a+Math.max(0,Number(x)||0),0)+
-    Math.max(0,c.foodKg??0)+Math.max(0,c.biomassKg??0)+Math.max(0,c.solidWasteKg??0)+
-    Object.values(c.materialsKg??{}).reduce((a,x)=>a+Math.max(0,Number(x)||0),0),0);
+  m.diagnostics.hydrogenBalanceErrorKg=hydrogenDeltaKg-waterNetExternal*WATER_H_MASS_FRACTION;
+  m.diagnostics.oxygenBalanceErrorKg=oxygenDeltaKg-waterNetExternal*WATER_O_MASS_FRACTION;
+  m.diagnostics.initialTrackedStocks??=snapshot;
   const initialColony=m.diagnostics.initialColonyMatterMassKg??colonyMass;
   m.diagnostics.initialColonyMatterMassKg??=colonyMass;
   m.diagnostics.colonyMatterBalanceErrorKg=colonyMass-(initialColony+m.externalFlows.colonyMatterImportsKg-m.externalFlows.colonyMatterExportsKg);
-  const carbonKg=colonies.reduce((sum,c)=>sum+
-    (c.foodKg+c.biomassKg+c.solidWasteKg)*GLUCOSE_C_FRACTION+
-    (c.gasesKg.carbonDioxide??0)*CO2_C_FRACTION+(c.gasesKg.carbonMonoxide??0)*CO_C_FRACTION,0);
-  const initialCarbon=m.diagnostics.initialCarbonKg??carbonKg;
-  m.diagnostics.initialCarbonKg??=carbonKg;
-  m.diagnostics.carbonBalanceErrorKg=carbonKg-initialCarbon;
+  m.diagnostics.carbonBalanceErrorKg=carbonDeltaKg;
+  const planetaryWater=Object.values(p).reduce((sum,x)=>sum+x.mass-(x.compensation??0),0);
+  const colonyWater=colonies.reduce((sum,c)=>sum+Object.entries(c.waterKg).reduce((a,[key,x])=>a+x-(c.waterCompensation?.[key]??0),0),0);
+  const hydrogenGas=colonies.reduce((sum,c)=>sum+(c.gasesKg.hydrogen??0),0);
+  const oxygenGas=colonies.reduce((sum,c)=>sum+(c.gasesKg.oxygen??0),0);
+  const organicMass=colonies.reduce((sum,c)=>sum+Math.max(0,c.foodKg??0)+Math.max(0,c.biomassKg??0)+Math.max(0,c.solidWasteKg??0),0);
+  const totalWaterDerivedMassKg=planetaryWater+colonyWater+hydrogenGas+oxygenGas+
+    colonies.reduce((sum,c)=>sum+(c.gasesKg.carbonDioxide??0)+(c.gasesKg.carbonMonoxide??0),0)+organicMass;
+  m.diagnostics.initialTotalWaterKg??=totalWaterDerivedMassKg;
+  const waterMass=planetaryWater+colonyWater;
+  const waterH=waterMass*WATER_H_MASS_FRACTION+hydrogenGas+organicMass*GLUCOSE_H_FRACTION;
+  const waterO=waterMass*WATER_O_MASS_FRACTION+oxygenGas+
+    organicMass*GLUCOSE_O_FRACTION+
+    colonies.reduce((sum,c)=>sum+(c.gasesKg.carbonDioxide??0)*CO2_O_FRACTION+(c.gasesKg.carbonMonoxide??0)*CO_O_FRACTION,0);
+  m.diagnostics.initialHydrogenEquivalentKg??=waterH;
+  m.diagnostics.initialOxygenEquivalentKg??=waterO;
   return {totalWaterDerivedMassKg,waterBalanceErrorKg:m.diagnostics.waterBalanceErrorKg,hydrogenBalanceErrorKg:m.diagnostics.hydrogenBalanceErrorKg,oxygenBalanceErrorKg:m.diagnostics.oxygenBalanceErrorKg,colonyMatterBalanceErrorKg:m.diagnostics.colonyMatterBalanceErrorKg,carbonBalanceErrorKg:m.diagnostics.carbonBalanceErrorKg};
 }
