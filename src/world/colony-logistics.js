@@ -265,6 +265,16 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
   const poiPickTargets = [...shortlistMarkers,...surfacePoiMarkers,...cargoDropMarkers.map(x=>x.marker),...orbitPoiMarkers.map(x=>x.marker),...earthPoiMarkers.map(x=>x.marker)];
   function syncImpactMarkers() {
     const impacts = worldState.materials?.planetary?.meteoroids?.recentImpacts ?? [];
+    const currentIds = new Set(impacts.map(impact=>impact.id));
+    for (const [id,marker] of impactMarkerById) {
+      if (currentIds.has(id)) continue;
+      root.remove(marker);
+      marker.geometry.dispose();
+      marker.material.dispose();
+      impactMarkerById.delete(id);
+      const index=poiPickTargets.indexOf(marker);
+      if(index>=0)poiPickTargets.splice(index,1);
+    }
     for (const impact of impacts) {
       if (impactMarkerById.has(impact.id)) continue;
       const poi = {
