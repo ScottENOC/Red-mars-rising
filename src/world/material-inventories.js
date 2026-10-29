@@ -36,7 +36,7 @@ export function createMaterialInventories() {
         surfaceLiquid:{mass:0,confidence:'high',note:'No stable open surface liquid-water stock assumed at present-day conditions.'},
         hydratedMinerals:{mass:1e15,confidence:'very-low',note:'Illustrative water-equivalent bound; requires mineral processing.'}
       },
-      atmosphereKg:{carbonDioxide:marsAtmosphereKg*.953,nitrogen:marsAtmosphereKg*.027,argon:marsAtmosphereKg*.016,oxygen:marsAtmosphereKg*.0013,carbonMonoxide:marsAtmosphereKg*.0008,otherGases:marsAtmosphereKg*(1-.953-.027-.016-.0013-.0008)},
+      atmosphereKg:{carbonDioxide:marsAtmosphereKg*.953,nitrogen:marsAtmosphereKg*.027,argon:marsAtmosphereKg*.016,oxygen:marsAtmosphereKg*.0013,carbonMonoxide:marsAtmosphereKg*.0008,otherGases:marsAtmosphereKg*(1-.953-.027-.016-.0013-.0008),meteoroidAerosols:0},
       meteoroids:{incomingCumulativeKg:0,retainedCumulativeKg:0,atmosphericAblatedCumulativeKg:0,pendingIncomingKg:0,types,surfaceDepositsKg:0,atmosphericTransientKg:0,atmosphericAblatedCumulativeKg:0,craterImpactsGreaterThan8mCumulative:0,impactFractionalAccumulator:0,lastImpactSol:0},
       mineralDepositsKg:{silicates:0,ironNickel:0,sulfides:0,carbonOrganics:0,otherMinerals:0,waterIceUnprocessed:0,carbonDioxideIce:0,otherVolatiles:0},
       externalWaterInputsKg:0,externalWaterOutputsKg:0
@@ -113,6 +113,7 @@ export function processNaturalMeteoroidFlux(w,sol){
   const retainedKg=incomingKg*retainedFraction,ablatedKg=incomingKg-retainedKg;
   r.incomingCumulativeKg+=incomingKg;r.retainedCumulativeKg+=retainedKg;r.atmosphericAblatedCumulativeKg+=ablatedKg;
   r.pendingIncomingKg+=incomingKg;m.externalFlows.meteoroidMatterKg+=incomingKg;r.atmosphericTransientKg+=incomingKg;
+  m.planetary.atmosphereKg.meteoroidAerosols+=ablatedKg;
   const mineral=m.planetary.mineralDepositsKg;
   for(const type of METEOROID_TYPES){
     const incoming=incomingKg*type.fraction,retained=incoming*retainedFraction,stock=r.types[type.id];
@@ -154,6 +155,7 @@ export function processNaturalMeteoroidFlux(w,sol){
       stock.massKg+=impactMassKg;stock.retainedKg+=retainedImpactKg;stock.ablatedIntoAtmosphereKg+=impactMassKg-retainedImpactKg;
       r.incomingCumulativeKg+=impactMassKg;r.retainedCumulativeKg+=retainedImpactKg;r.atmosphericAblatedCumulativeKg+=impactMassKg-retainedImpactKg;
       r.pendingIncomingKg+=impactMassKg;r.surfaceDepositsKg+=retainedImpactKg;m.externalFlows.meteoroidMatterKg+=impactMassKg;
+      m.planetary.atmosphereKg.meteoroidAerosols+=impactMassKg-retainedImpactKg;
       addRetainedMeteoroidComposition(m,chosen,retainedImpactKg,sol);
       m.ledger.push({sol,substance:chosen.label,massKg:impactMassKg,from:'space',to:'planet:impact-site',process:'natural-crater-impact',note:'Modelled impactor diameter '+diameterM.toFixed(2)+' m; assumed density '+chosen.densityKgM3+' kg/m3; 15% entry/impact mass loss.'});
     }
@@ -163,6 +165,36 @@ export function processNaturalMeteoroidFlux(w,sol){
     r.pendingIncomingKg=0;
     w.events.push({type:'natural-meteoroid-flux',sol,description:'Natural meteoroids deposited approximately '+Math.round(incomingKg*30*retainedFraction).toLocaleString('en-AU')+' kg of mixed mineral and volatile material over the last 30 sols. '+r.craterImpactsGreaterThan8mCumulative+' modelled impacts larger than 8 m have occurred globally.'});
   }
+}
+
+export function settleAtmosphericMeteoroidDust(w,sol){
+  const m=ensureMaterialInventories(w),atmosphere=m.planetary.atmosphereKg;
+  const settled=atmosphere.meteoroidAerosols*.001;
+  if(settled>0){
+    atmosphere.meteoroidAerosols-=settled;
+    m.planetary.mineralDepositsKg.otherMinerals+=settled;
+    m.planetary.meteoroids.surfaceDepositsKg+=settled;
+    if(sol%30===0)m.ledger.push({sol,substance:'mixed meteoroid dust',massKg:settled*30,from:'planet:atmosphere',to:'planet:mineralDeposits',process:'aerosol-settling',note:'Approximate atmospheric dust deposition accumulated over the previous 30 sols.'});
+  }
+}
+
+export function syncAtmosphereFromInventories(w){
+  const m=ensureMaterialInventories(w),g=m.planetary.atmosphereKg;
+  const waterVapour=m.planetary.waterKg.atmosphericVapour.mass;
+  const gasMass=g.carbonDioxide+g.nitrogen+g.argon+g.oxygen+g.carbonMonoxide+g.otherGases+waterVapour;
+  const totalAtmosphereMass=gasMass+g.meteoroidAerosols;
+  const area=4*Math.PI*3_389_500**2,gravity=3.71;
+  w.climate.atmosphere??={};
+  w.climate.atmosphere.pressurePa=totalAtmosphereMass*gravity/area;
+  w.climate.atmosphere.composition='inventory-derived';
+  w.climate.atmosphere.co2Fraction=g.carbonDioxide/gasMass;
+  w.climate.atmosphere.nitrogenFraction=g.nitrogen/gasMass;
+  w.climate.atmosphere.argonFraction=g.argon/gasMass;
+  w.climate.atmosphere.oxygenFraction=g.oxygen/gasMass;
+  w.climate.atmosphere.carbonMonoxideFraction=g.carbonMonoxide/gasMass;
+  w.climate.atmosphere.waterVapourFraction=waterVapour/gasMass;
+  w.climate.atmosphere.totalAtmosphericMassKg=totalAtmosphereMass;
+  return w.climate.atmosphere;
 }
 
 export function processWaterClimate(w,sol){
