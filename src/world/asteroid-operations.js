@@ -1,65 +1,45 @@
-const PROGRAMME = {
- id:'mars-orbital-operations',
- name:'Mars orbital operations system',
- description:'A reusable surface-to-orbit vehicle, propellant and servicing infrastructure, navigation, communications and capture robotics.',
- durationSols:180,
- cost:{funds:90,materials:35,machinery:24},
-};
-const MISSION = {
- id:'asteroid-capture-01',
- name:'Capture near-Mars asteroid',
- description:'Survey, rendezvous with and redirect a small near-Mars asteroid into a stable, accessible orbit.',
- durationSols:120,
- cost:{funds:55,materials:12,machinery:10},
-};
+const PROGRAMME={id:'mars-orbital-operations',name:'Mars orbital operations system',description:'Reusable surface-to-orbit vehicle, propellant, navigation, communications and servicing infrastructure.',durationSols:180,cost:{funds:90,materials:35,machinery:24}};
+const DEFENCE={id:'orbital-defence-suite',name:'Orbital surveillance and intervention suite',description:'Tracking sensors, high-energy laser, interceptor vehicle and command links. Built for debris and asteroid defence; inherently dual-use.',durationSols:100,cost:{funds:70,materials:18,machinery:20,electronics:12}};
+const CAPTURE={name:'Capture near-Mars asteroid',durationSols:120,cost:{funds:55,materials:12,machinery:10}};
+function solNow(w){return Number(w.time?.sol??0);}
+function charge(w,cost){if(!w.economy)return false;for(const [k,v] of Object.entries(cost))if(Number(w.economy[k]??0)<v)return false;for(const [k,v] of Object.entries(cost))w.economy[k]-=v;return true;}
 export function ensureAsteroidOperations(w){
  if(!w?.campaign?.started)return null;
- w.asteroidOperations??={programme:{...PROGRAMME,cost:{...PROGRAMME.cost},status:'available',progress:0,remainingSols:PROGRAMME.durationSols},missions:[],nextMissionId:1,orbitalAssets:[]};
- const s=w.asteroidOperations;
- s.missions??=[];s.orbitalAssets??=[];s.nextMissionId=Math.max(1,Number(s.nextMissionId)||1);
- s.programme??={...PROGRAMME,cost:{...PROGRAMME.cost},status:'available',progress:0,remainingSols:PROGRAMME.durationSols};
+ w.asteroidOperations??={programme:{...PROGRAMME,cost:{...PROGRAMME.cost},status:'available',progress:0,remainingSols:180},defence:{status:'available',progress:0,remainingSols:100,wear:0,nextAvailableSol:0,maintenanceArrears:0},missions:[],nextMissionId:1,orbitalAssets:[],operationsLog:[]};
+ const s=w.asteroidOperations;s.programme??={...PROGRAMME,cost:{...PROGRAMME.cost},status:'available',progress:0,remainingSols:180};s.defence??={status:'available',progress:0,remainingSols:100,wear:0,nextAvailableSol:0,maintenanceArrears:0};s.missions??=[];s.orbitalAssets??=[];s.operationsLog??=[];s.nextMissionId=Math.max(1,Number(s.nextMissionId)||1);
+ for(const rival of (w.settlements??[]).filter(x=>x.kind==='rival-colony'&&!['failed','abandoned'].includes(x.status))){if(!s.orbitalAssets.some(a=>a.id==='rival-relay-'+rival.id))s.orbitalAssets.push({id:'rival-relay-'+rival.id,name:rival.name+' communications relay',owner:rival.id,status:'operational',kind:'communications-satellite'});}
  return s;
 }
-function charge(w,cost){
- if(!w.economy||!w.campaign)return false;
- for(const [key,value] of Object.entries(cost))if(Number(w.economy[key]??0)<value)return false;
- for(const [key,value] of Object.entries(cost))w.economy[key]-=value;
- return true;
-}
-export function commissionOrbitalOperations(w){
- const s=ensureAsteroidOperations(w);if(!s)return {ok:false,reason:'No active campaign.'};
- if(s.programme.status!=='available')return {ok:false,reason:'The orbital operations programme has already been commissioned.'};
- if(!charge(w,s.programme.cost))return {ok:false,reason:'Insufficient funds, materials or machinery.'};
- s.programme.status='active';s.programme.remainingSols=s.programme.durationSols;s.programme.progress=0;
- return {ok:true,reason:'Mars orbital operations system commissioned. Construction and integration will take 180 sols.'};
-}
-export function launchAsteroidCapture(w){
- const s=ensureAsteroidOperations(w);if(!s)return {ok:false,reason:'No active campaign.'};
- if(s.programme.status!=='complete')return {ok:false,reason:'A functioning Mars orbital operations system is required before a capture mission can launch.'};
- if(s.missions.some(m=>m.status==='active'||m.status==='complete'))return {ok:false,reason:'The initial asteroid capture mission has already been launched or completed.'};
- if(!charge(w,MISSION.cost))return {ok:false,reason:'Insufficient funds, materials or machinery.'};
- const mission={id:'asteroid-mission-'+s.nextMissionId++,name:MISSION.name,description:MISSION.description,status:'active',launchedSol:w.time?.sol??0,durationSols:MISSION.durationSols,remainingSols:MISSION.durationSols,progress:0,target:{designation:'NMA-01',class:'small near-Mars asteroid',composition:'uncharacterised',orbit:'accessible capture candidate'},outcome:null};
- s.missions.push(mission);
- return {ok:true,reason:'Capture mission launched. The target remains uncharacterised until rendezvous and analysis.'};
+export function commissionOrbitalOperations(w){const s=ensureAsteroidOperations(w);if(!s)return {ok:false,reason:'No active campaign.'};if(s.programme.status!=='available')return {ok:false,reason:'The orbital operations programme has already been commissioned.'};if(!charge(w,PROGRAMME.cost))return {ok:false,reason:'Insufficient funds, materials or machinery.'};s.programme.status='active';s.programme.remainingSols=180;s.programme.progress=0;return {ok:true,reason:'Reusable Mars orbital operations system commissioned.'};}
+export function commissionOrbitalDefence(w){const s=ensureAsteroidOperations(w);if(!s)return {ok:false,reason:'No active campaign.'};if(s.programme.status!=='complete')return {ok:false,reason:'Complete the reusable orbital operations system first.'};if(s.defence.status!=='available')return {ok:false,reason:'The intervention suite is already commissioned.'};if(!charge(w,DEFENCE.cost))return {ok:false,reason:'Insufficient funds, materials, machinery or electronics.'};s.defence.status='active';s.defence.remainingSols=100;s.defence.progress=0;return {ok:true,reason:'Dual-use orbital surveillance and intervention suite commissioned.'};}
+function addMission(s,mission){mission.id='orbital-mission-'+s.nextMissionId++;s.missions.push(mission);s.operationsLog.push({sol:mission.launchedSol,description:mission.name+' launched.'});return {ok:true,reason:mission.name+' launched.'};}
+function vehicleReady(s,w){return !s.missions.some(m=>m.status==='active')&&solNow(w)>=(s.defence.nextAvailableSol??0);}
+export function launchAsteroidCapture(w){const s=ensureAsteroidOperations(w);if(!s||s.programme.status!=='complete')return {ok:false,reason:'A functioning orbital operations system is required.'};if(!vehicleReady(s,w))return {ok:false,reason:'The orbital vehicle is assigned or undergoing turnaround.'};if(!charge(w,CAPTURE.cost))return {ok:false,reason:'Insufficient mission resources.'};return addMission(s,{kind:'capture',name:CAPTURE.name,status:'active',launchedSol:solNow(w),durationSols:120,remainingSols:120,progress:0,target:{designation:'NMA-01',class:'small near-Mars asteroid',composition:'uncharacterised'},outcome:null});}
+export function launchOrbitalAttack(w,targetId,mode='disable-satellite'){
+ const s=ensureAsteroidOperations(w);if(!s||s.defence.status!=='complete')return {ok:false,reason:'A commissioned orbital intervention suite is required.'};if(!vehicleReady(s,w))return {ok:false,reason:'The orbital vehicle is assigned or undergoing turnaround.'};
+ const target=(w.settlements??[]).find(x=>x.id===targetId&&x.kind==='rival-colony'&&!['failed','abandoned'].includes(x.status));if(!target)return {ok:false,reason:'Invalid rival target.'};
+ if(mode==='disable-satellite'&&!s.orbitalAssets.some(a=>a.id==='rival-relay-'+target.id&&a.status==='operational'))return {ok:false,reason:'No operational rival communications relay is available to target.'};
+ if(!charge(w,{funds:35,materials:8,machinery:5,electronics:3}))return {ok:false,reason:'Insufficient mission resources.'};
+ const asteroid=mode==='asteroid-strike';const latitude=Math.abs(Number(target.lat??0));
+ const windowBand=latitude<25?'favourable low-inclination access':latitude>60?'high-inclination transfer required':'standard transfer';
+ return addMission(s,{kind:asteroid?'asteroid-strike':'anti-satellite',name:asteroid?'Directed asteroid deorbit':'Counter-space operation',status:'active',targetColonyId:target.id,targetName:target.name,mode,launchedSol:solNow(w),durationSols:asteroid?240:90,remainingSols:asteroid?240:90,progress:0,window:{type:'simplified orbital geometry',latitudeBand:windowBand},outcome:null});
 }
 export function processAsteroidOperations(w,sol,events=[]){
- const s=ensureAsteroidOperations(w);if(!s)return events;
- const p=s.programme;
- if(p.status==='active'){
-  const shortfall=w.economy.powerCapacity<w.economy.powerDemand;
-  if(!shortfall){p.remainingSols=Math.max(0,p.remainingSols-1);p.progress=1-p.remainingSols/p.durationSols;delete p.pausedReason;}
-  else p.pausedReason='Power shortfall';
-  if(p.remainingSols===0){p.status='complete';s.orbitalAssets.push({id:'mars-orbital-operations',name:'Mars orbital operations system',status:'operational',commissionedSol:sol,reusableVehicle:true,propellantInfrastructure:true,captureRobotics:true});events.push({type:'orbital-capability-complete',sol,description:'Mars orbital operations system is operational: reusable transport, servicing and capture capability is now available.'});}
- }
- for(const m of s.missions){
-  if(m.status!=='active')continue;
-  if(w.economy.powerCapacity>=w.economy.powerDemand){m.remainingSols=Math.max(0,m.remainingSols-1);m.progress=1-m.remainingSols/m.durationSols;}
-  else m.pausedReason='Power shortfall';
-  if(m.remainingSols===0){m.status='complete';m.outcome={designation:'NMA-01',status:'captured',orbit:'stable Mars orbit',composition:'awaiting detailed prospecting',capturedSol:sol};s.orbitalAssets.push({id:'captured-asteroid-NMA-01',name:'Captured asteroid NMA-01',status:'stable Mars orbit',capturedSol:sol,composition:'uncharacterised'});events.push({type:'asteroid-captured',sol,description:'Asteroid NMA-01 has been captured into a stable Mars orbit. Detailed prospecting and processing are now separate future projects.'});}
+ const s=ensureAsteroidOperations(w);if(!s)return events;const p=s.programme,d=s.defence;
+ if(p.status==='active'){if(w.economy.powerCapacity>=w.economy.powerDemand){p.remainingSols=Math.max(0,p.remainingSols-1);p.progress=1-p.remainingSols/180;delete p.pausedReason;}else p.pausedReason='Power shortfall';if(!p.remainingSols){p.status='complete';s.orbitalAssets.push({id:'mars-orbital-operations',name:'Mars orbital operations system',owner:'player',status:'operational',reusableVehicle:true,propellantInfrastructure:true});events.push({type:'orbital-capability-complete',sol,description:'Reusable Mars orbital operations system is operational.'});}}
+ if(d.status==='active'){if(w.economy.powerCapacity>=w.economy.powerDemand){d.remainingSols=Math.max(0,d.remainingSols-1);d.progress=1-d.remainingSols/100;}else d.pausedReason='Power shortfall';if(!d.remainingSols){d.status='complete';s.orbitalAssets.push({id:'mars-orbital-defence',name:'Orbital surveillance and intervention platform',owner:'player',status:'operational',capabilities:['tracking','laser-interception','kinetic-interceptor','debris-deflection']});events.push({type:'orbital-defence-complete',sol,description:'Dual-use orbital surveillance and intervention platform is operational.'});}}
+ if(d.status==='complete'&&sol>(d.lastMaintenanceSol??sol-1)){d.lastMaintenanceSol=sol;if(Number(w.economy.machinery??0)>=.04&&Number(w.economy.electronics??0)>=.02){w.economy.machinery-=.04;w.economy.electronics-=.02;d.wear=Math.max(0,(d.wear??0)-.002);d.maintenanceArrears=0;}else{d.wear=Math.min(1,(d.wear??0)+.003);d.maintenanceArrears=(d.maintenanceArrears??0)+1;}}
+ for(const m of s.missions){if(m.status!=='active')continue;if(w.economy.powerCapacity>=w.economy.powerDemand&&d.wear<.8){m.remainingSols=Math.max(0,m.remainingSols-1);m.progress=1-m.remainingSols/m.durationSols;}else m.pausedReason=d.wear>=.8?'Platform degraded':'Power shortfall';
+  if(m.remainingSols===0){m.status='complete';m.completedSol=sol;d.nextAvailableSol=sol+30;
+   if(m.kind==='capture'){m.outcome={status:'captured',orbit:'stable Mars orbit',composition:'awaiting prospecting',capturedSol:sol};s.orbitalAssets.push({id:'captured-asteroid-NMA-01',name:'Captured asteroid NMA-01',status:'stable Mars orbit',capturedSol:sol,composition:'uncharacterised'});events.push({type:'asteroid-captured',sol,description:'Asteroid NMA-01 captured into stable Mars orbit.'});}
+   if(m.kind==='anti-satellite'){const a=s.orbitalAssets.find(x=>x.id==='rival-relay-'+m.targetColonyId);if(a)a.status='disabled';m.outcome={status:'satellite disabled'};events.push({type:'orbital-attack',sol,description:'Counter-space operation disabled the communications relay serving '+m.targetName+'.'});}
+   if(m.kind==='asteroid-strike'){const t=w.settlements.find(x=>x.id===m.targetColonyId);if(t){t.infrastructure=(t.infrastructure??[]).filter(x=>x!=='habitats');t.status='severely-damaged';t.population=Math.max(0,Math.round((t.population??0)*.7));}m.outcome={status:'impact delivered'};events.push({type:'asteroid-attack',sol,description:'Redirected asteroid struck '+m.targetName+', catastrophically damaging the settlement.'});}
+   s.operationsLog.push({sol,description:m.name+' completed against '+(m.targetName??'NMA-01')+'.'});
+  }
  }
  return events;
 }
 export function getAsteroidOperationsSummary(w){
  const s=ensureAsteroidOperations(w);if(!s)return null;
- return {programme:{...s.programme,cost:{...s.programme.cost}},missions:s.missions.map(m=>({...m,target:{...m.target},outcome:m.outcome?{...m.outcome}:null})),orbitalAssets:s.orbitalAssets.map(a=>({...a})),missionAvailable:s.programme.status==='complete'&&!s.missions.some(m=>m.status==='active'||m.status==='complete')};
+ return {programme:{...s.programme,cost:{...PROGRAMME.cost}},defence:{...s.defence},missions:s.missions.map(m=>({...m,target:m.target?{...m.target}:undefined,outcome:m.outcome?{...m.outcome}:null,window:m.window?{...m.window}:undefined})),orbitalAssets:s.orbitalAssets.map(a=>({...a})),targets:(w.settlements??[]).filter(x=>x.kind==='rival-colony'&&!['failed','abandoned'].includes(x.status)).map(x=>({id:x.id,name:x.name,lat:x.lat,status:x.status,relayStatus:s.orbitalAssets.find(a=>a.id==='rival-relay-'+x.id)?.status??'operational'})),missionAvailable:s.programme.status==='complete'&&!s.missions.some(m=>m.status==='active')&&solNow(w)>=(s.defence.nextAvailableSol??0)};
 }
