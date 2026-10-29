@@ -10,10 +10,10 @@ const SPECIALISATIONS = {
 };
 const STARTING_STOCKS = {
   agriculture:{food:95,components:12,machinery:8,electronics:7,aggregate:15},
-  fabrication:{food:45,components:48,machinery:12,electronics:6,aggregate:80},
-  engineering:{food:45,components:24,machinery:35,electronics:7,aggregate:25},
-  electronics:{food:45,components:18,machinery:10,electronics:38,aggregate:20},
-  extraction:{food:45,components:14,machinery:9,electronics:5,aggregate:100}
+  fabrication:{food:100,components:48,machinery:12,electronics:6,aggregate:80},
+  engineering:{food:100,components:24,machinery:35,electronics:7,aggregate:25},
+  electronics:{food:100,components:18,machinery:10,electronics:38,aggregate:20},
+  extraction:{food:100,components:14,machinery:9,electronics:5,aggregate:100}
 };
 function selectSpecialisation(settlement,w){
   if(settlement.kind==='primary-colony') return 'agriculture';
@@ -158,7 +158,8 @@ function dispatchIntercolonyTrade(w,sol){
         .sort((a,b)=>a.economy.inventory[good]-b.economy.inventory[good])[0];
       if(!to)continue;
       const reserve={food:35,components:12,machinery:8,electronics:6,aggregate:18}[good];
-      const amount=Math.min(good==='food'?30:good==='components'?12:good==='machinery'?8:good==='electronics'?6:18,from.economy.inventory[good]-reserve,needThreshold-to.economy.inventory[good]);
+      const targetStock={food:55,components:18,machinery:12,electronics:10,aggregate:25}[good];
+      const amount=Math.min(good==='food'?30:good==='components'?12:good==='machinery'?8:good==='electronics'?6:18,from.economy.inventory[good]-reserve,targetStock-to.economy.inventory[good]);
       if(amount<=0)continue;
       createShipment(w,from,to,good,amount,sol,'trade');
     }
