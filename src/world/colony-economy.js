@@ -47,7 +47,8 @@ export function ensureColonyEconomies(w){
     e.importDependence ??=s.kind==='primary-colony'?72:85;
     e.shortages ??={};
     e.lastImportSol ??= -10000;
-    e.pendingImport ??=false;\n    e.pendingImports ??=[];
+    e.pendingImport ??=false;
+    e.pendingImports ??=[];
     e.lastTradeSol ??= -10000;
     e.stability ??=70;
     e.specialisationLabel ??=SPECIALISATIONS[e.specialisation]?.label??'General settlement';
@@ -106,7 +107,8 @@ function operateColonies(w,sol,events){
     const e=s.economy, spec=SPECIALISATIONS[e.specialisation]??SPECIALISATIONS.agriculture;
     const pop=Math.max(0,Number(s.population)||0);
     for(const good of GOODS){
-      const baselineFood=good==='food'?0.45*Math.max(0.25,pop/45):0;\n      const produced=((spec.produces[good]??0)*(Math.max(0.25,pop/45)))+baselineFood;
+      const baselineFood=good==='food'?0.45*Math.max(0.25,pop/45):0;
+      const produced=((spec.produces[good]??0)*(Math.max(0.25,pop/45)))+baselineFood;
       const consumed=good==='food'?pop*0.018:good==='components'?0.035:good==='machinery'?0.018:good==='electronics'?0.012:0.025;
       e.inventory[good]=round3(Math.max(0,e.inventory[good]+produced-consumed));
       e.shortages[good]=e.inventory[good]< (good==='food'?12:good==='components'?3:good==='machinery'?2:good==='electronics'?1.5:3);
