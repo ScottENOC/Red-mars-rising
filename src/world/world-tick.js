@@ -1,6 +1,7 @@
 import { ensureMaterialInventories, processNaturalMeteoroidFlux, processWaterClimate, settleAtmosphericMeteoroidDust, syncAtmosphereFromInventories, recycleColonyWater, transferWater, checkMaterialConservation, consumeColonyWaterForReaction, addColonyWaterFromReaction } from './material-inventories.js';
 import { SHORTLISTED_SITES, ensureConstructionRecipeOptions } from './campaign-options.js';
 import { ensureColonyPoliticalState, processColonyPolitics } from './colony-politics.js';
+import { ensureColonyEconomies, processColonyEconomies } from './colony-economy.js';
 
 const MARS_RADIUS_M = 3_389_500;
 const MARS_SURFACE_AREA_M2 = 4 * Math.PI * MARS_RADIUS_M ** 2;
@@ -22,6 +23,7 @@ export function processWorldTick(w) {
   const events = [];
   ensureMaterialInventories(w);
   ensureColonyPoliticalState(w);
+  ensureColonyEconomies(w);
   checkMaterialConservation(w); // Establish the baseline before any external inputs or transfers this sol.
   processNaturalMeteoroidFlux(w, sol);
   processWaterClimate(w, sol);
@@ -254,6 +256,7 @@ export function processWorldTick(w) {
       events.push({type:'cargo-drop-landed',sol,description:drop.sponsorName+' cargo landed at '+drop.siteName+'; no crewed colony has been established.'});
     }
   }
+  processColonyEconomies(w, sol, events);
   processColonyPolitics(w, sol, events);
   recycleColonyWater(w, sol);
 
