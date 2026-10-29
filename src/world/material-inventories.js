@@ -185,6 +185,7 @@ export function syncAtmosphereFromInventories(w){
   w.climate.atmosphere.oxygenFraction=g.oxygen/gasMass;
   w.climate.atmosphere.carbonMonoxideFraction=g.carbonMonoxide/gasMass;
   w.climate.atmosphere.waterVapourFraction=waterVapour/gasMass;
+  w.climate.atmosphere.waterVapourPa=w.climate.atmosphere.pressurePa*w.climate.atmosphere.waterVapourFraction;
   w.climate.atmosphere.totalAtmosphericMassKg=totalAtmosphereMass;
   return w.climate.atmosphere;
 }
