@@ -1,7 +1,7 @@
 // Scenario-owned initial conditions. These are today's starting assumptions, not permanent laws.
 export function createInitialWorldState() {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     scenarioId: 'present-day-mars-before-arrival',
     time: { sol: 0 },
     planet: { id: 'mars', meanDiameterKm: 6779, ageYears: 4_500_000_000 },
