@@ -37,7 +37,7 @@ export function createMaterialInventories() {
         hydratedMinerals:{mass:1e15,confidence:'very-low',note:'Illustrative water-equivalent bound; requires mineral processing.'}
       },
       atmosphereKg:{carbonDioxide:marsAtmosphereKg*.953,nitrogen:marsAtmosphereKg*.027,argon:marsAtmosphereKg*.016,oxygen:marsAtmosphereKg*.0013,carbonMonoxide:marsAtmosphereKg*.0008,otherGases:marsAtmosphereKg*(1-.953-.027-.016-.0013-.0008),meteoroidAerosols:0},
-      meteoroids:{incomingCumulativeKg:0,retainedCumulativeKg:0,atmosphericAblatedCumulativeKg:0,pendingIncomingKg:0,types,surfaceDepositsKg:0,atmosphericTransientKg:0,atmosphericAblatedCumulativeKg:0,pendingAtmosphericDustSettledKg:0,craterImpactsGreaterThan8mCumulative:0,impactFractionalAccumulator:0,lastImpactSol:0},
+      meteoroids:{incomingCumulativeKg:0,retainedCumulativeKg:0,atmosphericAblatedCumulativeKg:0,pendingIncomingKg:0,types,surfaceDepositsKg:0,atmosphericTransientKg:0,atmosphericAblatedCumulativeKg:0,pendingAtmosphericDustSettledKg:0,craterImpactsGreaterThan8mCumulative:0,impactFractionalAccumulator:0,lastImpactSol:0,recentImpacts:[]},
       mineralDepositsKg:{silicates:0,ironNickel:0,sulfides:0,carbonOrganics:0,otherMinerals:0,waterIceUnprocessed:0,carbonDioxideIce:0,otherVolatiles:0},
       externalWaterInputsKg:0,externalWaterOutputsKg:0
     },
@@ -117,6 +117,8 @@ function addMeteoroidComposition(m,type,incomingKg,retainedKg,sol,sourceLabel){
   }
 }
 
+function pseudoRandom01(seed){const value=Math.sin(seed*12.9898)*43758.5453;return value-Math.floor(value);}
+
 export function processNaturalMeteoroidFlux(w,sol){
   const m=ensureMaterialInventories(w),r=m.planetary.meteoroids;
   const incomingKg=METEOROID_MASS_FLUX_KG_PER_EARTH_YEAR*EARTH_DAYS_PER_MARS_SOL/365.25;
@@ -136,11 +138,11 @@ export function processNaturalMeteoroidFlux(w,sol){
     r.craterImpactsGreaterThan8mCumulative+=impacts;r.lastImpactSol=sol;
     for(let i=0;i<impacts;i++){
       // Deterministic quasi-random size/type variation makes tests reproducible without flattening the population.
-      const selector=Math.abs(Math.sin((sol+i*17.17)*12.9898)*43758.5453)%1;
+      const selector=pseudoRandom01(sol*31+i*17.17);
       let cumulative=0,chosen=METEOROID_TYPES[0];
       for(const type of METEOROID_TYPES){cumulative+=type.fraction;if(selector<cumulative){chosen=type;break;}}
-      const sizeSelector=(Math.sin((sol*17+i*31)*.123)+1)/2;
-      const diameterM=.35+sizeSelector*1.1;
+      const sizeSelector=pseudoRandom01(sol*17+i*31);
+      const diameterM=.5+sizeSelector*1.0;
       const impactMassKg=(4/3)*Math.PI*(diameterM/2)**3*chosen.densityKgM3;
       const retainedImpactKg=impactMassKg*.85;
       const stock=r.types[chosen.id];
@@ -148,7 +150,12 @@ export function processNaturalMeteoroidFlux(w,sol){
       r.incomingCumulativeKg+=impactMassKg;r.retainedCumulativeKg+=retainedImpactKg;r.atmosphericAblatedCumulativeKg+=impactMassKg-retainedImpactKg;
       r.pendingIncomingKg+=impactMassKg;r.surfaceDepositsKg+=retainedImpactKg;m.externalFlows.meteoroidMatterKg+=impactMassKg;
       addMeteoroidComposition(m,chosen,impactMassKg,retainedImpactKg,sol,'impact-body');
-      m.ledger.push({sol,substance:chosen.label,massKg:impactMassKg,from:'space',to:'planet:impact-site',process:'natural-crater-impact',note:'Modelled impactor diameter '+diameterM.toFixed(2)+' m; assumed density '+chosen.densityKgM3+' kg/m3; 15% entry/impact mass loss.'});
+      const lat=Math.asin(2*pseudoRandom01(sol*91+i*7.1)-1)*180/Math.PI;
+      const lon=pseudoRandom01(sol*113+i*13.7)*360-180;
+      const craterDiameterM=8+sizeSelector*12;
+      const impact={id:'impact-'+sol+'-'+i,sol,lat,lon,impactorDiameterM:diameterM,craterDiameterM,typeId:chosen.id,typeLabel:chosen.label,massKg:impactMassKg};
+      r.recentImpacts.push(impact);if(r.recentImpacts.length>200)r.recentImpacts.shift();
+      m.ledger.push({sol,substance:chosen.label,massKg:impactMassKg,from:'space',to:'planet:impact-site',process:'natural-crater-impact',note:'Modelled '+craterDiameterM.toFixed(1)+' m crater from '+diameterM.toFixed(2)+' m impactor; assumed density '+chosen.densityKgM3+' kg/m3 and 15% entry/impact mass loss.',impactId:impact.id,lat,lon});
     }
   }
   if(sol%30===0){
