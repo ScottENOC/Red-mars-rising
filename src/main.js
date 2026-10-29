@@ -161,13 +161,15 @@ document.querySelector('#copyTerrainError').addEventListener('click',async()=>{
 function removeEmbeddedPolarIce(sourceTexture){
  const image=sourceTexture.image;
  if(!image||!image.width||!image.height)return sourceTexture;
+ // A 4K-wide derived texture keeps the one-off canvas operation manageable on phones.
  const canvas=document.createElement('canvas');
- canvas.width=image.width;canvas.height=image.height;
+ canvas.width=Math.min(image.width,4096);
+ canvas.height=Math.min(image.height,2048);
  const context=canvas.getContext('2d',{willReadFrequently:true});
  if(!context)return sourceTexture;
- context.drawImage(image,0,0);
+ context.drawImage(image,0,0,canvas.width,canvas.height);
  const imageData=context.getImageData(0,0,canvas.width,canvas.height);
- const pixels=imageData.data,original=new Uint8ClampedArray(pixels);
+ const pixels=imageData.data;
  const width=canvas.width,height=canvas.height;
  const donorRows={
   north:Math.round((90-60)/180*height),
@@ -179,7 +181,7 @@ function removeEmbeddedPolarIce(sourceTexture){
   const donorBase=latitude>0?donorRows.north:donorRows.south;
   for(let x=0;x<width;x++){
    const i=(y*width+x)*4;
-   const red=original[i],green=original[i+1],blue=original[i+2];
+   const red=pixels[i],green=pixels[i+1],blue=pixels[i+2];
    const brightest=Math.max(red,green,blue),darkest=Math.min(red,green,blue);
    const chroma=brightest-darkest;
    // Target only bright, low-chroma pixels characteristic of the baked-in pale caps.
@@ -192,7 +194,7 @@ function removeEmbeddedPolarIce(sourceTexture){
    for(let offset=-3;offset<=3;offset++){
     const donorY=Math.max(0,Math.min(height-1,donorBase+offset));
     const di=(donorY*width+x)*4;
-    r+=original[di];g+=original[di+1];b+=original[di+2];count++;
+    r+=pixels[di];g+=pixels[di+1];b+=pixels[di+2];count++;
    }
    pixels[i]=red+(r/count-red)*blend;
    pixels[i+1]=green+(g/count-green)*blend;
