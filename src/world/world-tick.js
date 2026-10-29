@@ -26,6 +26,7 @@ export function processWorldTick(w) {
   settleAtmosphericMeteoroidDust(w, sol);
   syncAtmosphereFromInventories(w);
   const site = w.settlements.find(s => s.kind === 'primary-colony')?.siteModifiers ?? {waterAccess:.5,heatDemand:1};
+  const population = w.settlements.reduce((sum, s) => sum + Math.max(0, s.population ?? 0), 0);
   const climate = w.climate;
   climate.energyBalance ??= {};
   climate.energyBalance.accumulatedWasteHeatJPerM2 ??= 0;
@@ -143,6 +144,7 @@ export function processWorldTick(w) {
       const extractedKg = deposit ? Math.min(source?.mass ?? 0, deposit.extractionRateKgPerSol * surveyMultiplier * project.durationSols) : 0;
       if (home && stores && source && extractedKg > 0) {
         transferWater(w, {from:'planet:' + sourceId,to:'colony:' + home.id + ':tanks',massKg:extractedKg,sol,process:'site-specific-ice-extraction',note:'Extraction rate depends on local prospectivity and whether a prior survey improved targeting.'});
+        w.materials.externalFlows.colonyMatterImportsKg += extractedKg;
         w.economy.water += extractedKg / 1000;
       } else {
         events.push({type:'project-output-shortfall',sol,description:'The water extractor was completed, but the local deposit or extraction technology could not supply water.'});
