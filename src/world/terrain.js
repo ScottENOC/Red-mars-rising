@@ -9,6 +9,8 @@ const MOLA_PIXELS_PER_DEGREE = 4;
 const MOLA_WIDTH = 360 * MOLA_PIXELS_PER_DEGREE;
 const MOLA_HEIGHT = 180 * MOLA_PIXELS_PER_DEGREE;
 let molaElevationAt = null;
+let terrainWorldState = null;
+export function setTerrainWorldState(worldState) { terrainWorldState = worldState; }
 
 // The PDS MEGDR topography image is a headerless, signed 16-bit big-endian grid
 // in metres, simple cylindrical projection, 0–360°E and 90°N–90°S.
@@ -55,7 +57,21 @@ export async function loadMolaTopography() {
 // Keep the globe at true vertical scale; no artistic terrain exaggeration.
 export function terrainRadiusOffset(lat, lon, verticalExaggeration = 1) {
   if (!molaElevationAt) throw new Error('MOLA terrain requested before NASA elevation data finished loading');
-  return molaElevationAt(lat, lon) * verticalExaggeration / 3390000;
+  const base = molaElevationAt(lat, lon);
+  let deltaM = 0;
+  for (const crater of terrainWorldState?.terrain?.geologicalModifications ?? []) {
+    if (crater.kind !== 'impact-crater') continue;
+    const d = angularDistance(lat, lon, crater.lat, crater.lon) * 3_389_500;
+    const radius = Math.max(0.5, crater.craterDiameterM / 2);
+    if (d > radius * 2.2) continue;
+    const x = d / radius;
+    const floor = crater.terrainDeltaM?.floor ?? -radius * 0.32;
+    const rim = crater.terrainDeltaM?.rim ?? radius * 0.07;
+    deltaM += floor * Math.exp(-((x / 0.58) ** 2));
+    deltaM += rim * Math.exp(-(((x - 1) / 0.18) ** 2));
+    if (x >= 1) deltaM += (crater.terrainDeltaM?.ejecta ?? radius * 0.012) * Math.exp(-(x - 1) / 0.45);
+  }
+  return (base + deltaM) * verticalExaggeration / 3390000;
 }
 
 export function terrainHeight(lat,lon){let h=0;h+=.035*Math.exp(-1 * (angularDistance(lat,lon,10,250)/.52)**2);h+=.018*Math.exp(-1 * (angularDistance(lat,lon,25,147)/.22)**2);
