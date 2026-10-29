@@ -1,4 +1,4 @@
-import { ensureMaterialInventories, processNaturalMeteoroidFlux, transferWater, checkWaterConservation } from './material-inventories.js';
+import { ensureMaterialInventories, processNaturalMeteoroidFlux, processWaterClimate, recycleColonyWater, transferWater, checkMaterialConservation } from './material-inventories.js';
 import { SHORTLISTED_SITES } from './campaign-options.js';
 
 const MARS_RADIUS_M = 3_389_500;
@@ -16,6 +16,7 @@ export function processWorldTick(w) {
   const events = [];
   ensureMaterialInventories(w);
   processNaturalMeteoroidFlux(w, sol);
+  processWaterClimate(w, sol);
   const site = w.settlements.find(s => s.kind === 'primary-colony')?.siteModifiers ?? {waterAccess:.5,heatDemand:1};
   const climate = w.climate;
   climate.energyBalance ??= {};
@@ -134,7 +135,8 @@ export function processWorldTick(w) {
       events.push({type:'cargo-drop-landed',sol,description:drop.sponsorName+' cargo landed at '+drop.siteName+'; no crewed colony has been established.'});
     }
   }
-  checkWaterConservation(w);
+  recycleColonyWater(w, sol);
+  checkMaterialConservation(w);
   w.time.lastProcessedSol = sol;
   w.time.solOfYear = ((sol - 1) % 669) + 1;
   for (const event of events) w.events.push({...event,sol});
