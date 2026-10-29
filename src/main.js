@@ -156,6 +156,58 @@ document.querySelector('#copyTerrainError').addEventListener('click',async()=>{
   document.querySelector('#copyTerrainError').textContent='Select text, then Copy';
  }
 });
+// Remove the colour atlas's baked-in bright polar ice so world-state ice is rendered only once.
+// This is a pragmatic visual mask, not a reconstruction of the geology beneath the real ice caps.
+function removeEmbeddedPolarIce(sourceTexture){
+ const image=sourceTexture.image;
+ if(!image||!image.width||!image.height)return sourceTexture;
+ const canvas=document.createElement('canvas');
+ canvas.width=image.width;canvas.height=image.height;
+ const context=canvas.getContext('2d',{willReadFrequently:true});
+ if(!context)return sourceTexture;
+ context.drawImage(image,0,0);
+ const imageData=context.getImageData(0,0,canvas.width,canvas.height);
+ const pixels=imageData.data,original=new Uint8ClampedArray(pixels);
+ const width=canvas.width,height=canvas.height;
+ const donorRows={
+  north:Math.round((90-60)/180*height),
+  south:Math.round((90+60)/180*height)
+ };
+ for(let y=0;y<height;y++){
+  const latitude=90-y/height*180;
+  if(Math.abs(latitude)<65)continue;
+  const donorBase=latitude>0?donorRows.north:donorRows.south;
+  for(let x=0;x<width;x++){
+   const i=(y*width+x)*4;
+   const red=original[i],green=original[i+1],blue=original[i+2];
+   const brightest=Math.max(red,green,blue),darkest=Math.min(red,green,blue);
+   const chroma=brightest-darkest;
+   // Target only bright, low-chroma pixels characteristic of the baked-in pale caps.
+   if(darkest<145||chroma>42)continue;
+   const whiteness=Math.min(1,(darkest-145)/65);
+   const neutrality=Math.min(1,(42-chroma)/22);
+   const blend=whiteness*neutrality;
+   if(blend<=0)continue;
+   let r=0,g=0,b=0,count=0;
+   for(let offset=-3;offset<=3;offset++){
+    const donorY=Math.max(0,Math.min(height-1,donorBase+offset));
+    const di=(donorY*width+x)*4;
+    r+=original[di];g+=original[di+1];b+=original[di+2];count++;
+   }
+   pixels[i]=red+(r/count-red)*blend;
+   pixels[i+1]=green+(g/count-green)*blend;
+   pixels[i+2]=blue+(b/count-blue)*blend;
+  }
+ }
+ context.putImageData(imageData,0,0);
+ const cleaned=new THREE.CanvasTexture(canvas);
+ cleaned.colorSpace=sourceTexture.colorSpace;
+ cleaned.wrapS=sourceTexture.wrapS;
+ cleaned.wrapT=sourceTexture.wrapT;
+ cleaned.anisotropy=sourceTexture.anisotropy;
+ cleaned.needsUpdate=true;
+ return cleaned;
+}
 function applyMarsTexture(texture){
  if(!mars)return;
  texture.colorSpace=THREE.SRGBColorSpace;texture.wrapS=THREE.RepeatWrapping;
@@ -177,8 +229,8 @@ loadMolaTopography().then(info=>{
  showTerrainError(error);
 });
 loader.load(TEXTURE_URL,texture=>{
- marsTexture=texture;
- if(mars)applyMarsTexture(texture);
+ marsTexture=removeEmbeddedPolarIce(texture);
+ if(mars)applyMarsTexture(marsTexture);
 },undefined,error=>{
  console.warn('Mars colour texture unavailable; the elevation-based globe remains available.',error);
 });
