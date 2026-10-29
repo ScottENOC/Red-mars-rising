@@ -76,6 +76,8 @@ export function processNaturalMeteoroidFlux(w, sol) {
   // Literature estimates are quoted per Earth year; convert to this Martian-sol calendar.
   const kgThisSol = METEOROID_MASS_FLUX_KG_PER_EARTH_YEAR / 365.25 * EARTH_DAYS_PER_MARS_SOL;
   m.planetary.meteoroidInputKgCumulative += kgThisSol;
+  m.planetary.meteoroidMatterKg += kgThisSol;
+  m.planetary.pendingMeteoroidInputKg += kgThisSol;
   m.externalFlows.meteoroidMatterKg += kgThisSol;
   m.planetary.naturalImpactFractionalAccumulator += 320 / MARS_SOLS_PER_YEAR;
   let impacts = 0;
@@ -87,10 +89,10 @@ export function processNaturalMeteoroidFlux(w, sol) {
     m.planetary.naturalImpactsGreaterThan8mCumulative += impacts;
     m.planetary.lastNaturalImpactSol = sol;
   }
-  // Keep this as a planetary external-input ledger entry, not as water: the bulk
-  // of incoming mass is not known to be water and most is fine material.
-  m.ledger.push({ sol, substance: 'mixed meteoroid matter', massKg: kgThisSol, from: 'space', to: 'planet:surface-material', process: 'natural-flux', note: 'Aggregate background influx; composition unresolved.' });
+  // Aggregate tiny incoming particles in the ledger rather than creating one entry per sol.
   if (sol % 30 === 0) {
+    m.ledger.push({ sol, substance: 'mixed meteoroid matter', massKg: m.planetary.pendingMeteoroidInputKg, from: 'space', to: 'planet:meteoroidMatterKg', process: 'natural-flux', note: 'Aggregate background influx over 30 sols; composition unresolved.' });
+    m.planetary.pendingMeteoroidInputKg = 0;
     w.events.push({
       type: 'natural-meteoroid-flux',
       sol,
