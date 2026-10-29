@@ -1,3 +1,4 @@
+import { ensureSponsorCommitments, processSponsorCommitments } from './sponsor-commitments.js';
 import { terrainElevationMeters } from './terrain.js';
 const GOODS = ['food','components','machinery','electronics','aggregate'];
 const clamp = (v,min=0,max=100)=>Math.max(min,Math.min(max,Number(v)||0));
@@ -37,6 +38,7 @@ export function ensureColonyEconomies(w){
   w.colonyTrade.emergencyRequests ??=[];
   w.colonyTrade.aidHistory ??=[];
   w.campaign.emergencyAidPolicy ??={};
+  ensureSponsorCommitments(w);
   for(const s of w.settlements){
     const spec=selectSpecialisation(s,w);
     s.economy ??={};
@@ -273,7 +275,7 @@ function operateColonies(w,sol,events){
       e.inventory.machinery=Math.max(0,Math.min(150,e.inventory.machinery));
       e.inventory.electronics=Math.max(0,Math.min(120,e.inventory.electronics));
     }
-    if(sol%30===0&&e.importDependence>35){
+    if(sol%30===0&&(e.importDependence>35||s.kind==='primary-colony'||s.kind==='rival-colony')&&!(s.kind==='primary-colony'&&(w.campaign?.earthConflictDeclared||w.campaign?.warWithEarth||w.campaign?.survivalGuaranteeSuspended))){
       const thresholds={food:40,components:8,machinery:5,electronics:4,aggregate:8};
       const amounts={food:55,components:18,machinery:12,electronics:10,aggregate:30};
       for(const good of GOODS){
@@ -316,6 +318,7 @@ export function processColonyEconomies(w,sol,events=[]){
   deliverShipments(w,sol,events);
   operateColonies(w,sol,events);
   assessEmergencyAid(w,sol,events);
+  processSponsorCommitments(w,sol,events);
   if(sol%5===0)dispatchIntercolonyTrade(w,sol);
   w.colonyTrade.lastProcessedSol=sol;
   return events;
