@@ -169,11 +169,13 @@ function buildColonyEconomyReport(){
   const e=getColonyEconomySummary(worldState,colony);
   const shortages=goods.filter(([key])=>e.shortages[key]).map(([,label])=>label);
   const inventory=goods.map(([key,label])=>label+' '+Number(e.inventory[key]??0).toFixed(1)).join(' · ');
-  const freight=worldState.colonyTrade.shipments.filter(s=>s.status==='in-transit'&&(s.fromId===colony.id||s.toId===colony.id)).map(s=>(s.toId===colony.id?'Inbound':'Outbound')+' '+s.amount+' '+s.good+' · '+Math.max(0,s.arrivalSol-worldState.time.sol)+' sols'+(s.distanceKm!==null&&s.distanceKm!==undefined?' · '+s.distanceKm+' km':'')+(s.fromId.startsWith('earth:')?' · Earth cargo':'' )).join('<br>')||'No freight currently in transit';
-  return '<div style="padding:9px 0;border-top:1px solid #ffffff18"><strong>'+colony.name+'</strong><div>'+e.specialisation+' · population '+Math.round(colony.population??0)+' · local stability '+e.stability+' · Earth dependence index '+e.importDependence+'</div><div>'+inventory+'</div><div>'+(shortages.length?'Low stocks: '+shortages.join(', '):'No stock currently below its warning threshold')+'</div><div>'+freight+'</div></div>';
+  const freight=worldState.colonyTrade.shipments.filter(s=>s.status==='in-transit'&&(s.fromId===colony.id||s.toId===colony.id)).map(s=>(s.toId===colony.id?'Inbound':'Outbound')+' '+s.amount+' '+s.good+' · '+Math.max(0,s.arrivalSol-worldState.time.sol)+' sols'+(s.distanceKm!==null&&s.distanceKm!==undefined?' · '+s.distanceKm+' km':'')+(s.roadUsed?' · road':'')+(s.terrainProfile?' · relief '+s.terrainProfile.reliefM+' m':'')+(s.fromId.startsWith('earth:')?' · Earth cargo':'' )).join('<br>')||'No freight currently in transit';
+  const policy=worldState.campaign.colonyTradePolicy?.[colony.id]??'normal';
+  const policyControl=colony.kind==='primary-colony'?'':'<label style="display:block;margin-top:5px">Routine exchange policy with this colony <select data-trade-policy-colony="'+colony.id+'" style="max-width:100%"><option value="normal" '+(policy==='normal'?'selected':'')+'>Normal cooperation</option><option value="prioritise" '+(policy==='prioritise'?'selected':'')+'>Prioritise support</option><option value="no-routine" '+(policy==='no-routine'?'selected':'')+'>No routine exchange</option></select></label>';
+  return '<div style="padding:9px 0;border-top:1px solid #ffffff18"><strong>'+colony.name+'</strong><div>'+e.specialisation+' · population '+Math.round(colony.population??0)+' · local stability '+e.stability+' · Earth dependence index '+e.importDependence+'</div><div>'+inventory+'</div><div>'+(shortages.length?'Low stocks: '+shortages.join(', '):'No stock currently below its warning threshold')+'</div><div>'+freight+'</div>'+policyControl+'</div>';
  }).join('');
  const recent=worldState.colonyTrade.tradeLog.slice(-5).reverse().map(item=>'<div>Sol '+item.sol+' · '+item.description+'</div>').join('');
- return '<details style="margin:8px 0;padding:9px;background:#111923;border:1px solid #ffffff22;border-radius:8px"><summary style="cursor:pointer;font-weight:700">Colony economies & freight · '+colonies.length+' operating</summary><div style="margin-top:8px;font-size:12px;line-height:1.55"><div>Colonies now hold separate inventories and production specialisations. Goods move only when a shipment departs and arrives; source stocks are deducted at departure. Current freight uses an abstract surface-haul model with travel time based on map distance.</div>'+rows+'<strong>Recent freight ledger</strong>'+(recent||'<div>No shipments recorded yet.</div>')+'<div style="opacity:.72;margin-top:6px">Stock units are abstract gameplay units, not tonnes or validated industrial throughput. Earth food/parts imports take 240 sols in this prototype. Trade requires a bilateral relationship index of at least 50 and a sender with surplus; it is not a guaranteed market-clearing system. Physical rover fleets, road quality, route blockages, cargo capacity by vehicle, contracts and prices are not modelled yet.</div></div></details>';
+ return '<details style="margin:8px 0;padding:9px;background:#111923;border:1px solid #ffffff22;border-radius:8px"><summary style="cursor:pointer;font-weight:700">Colony economies & freight · '+colonies.length+' operating</summary><div style="margin-top:8px;font-size:12px;line-height:1.55"><div>Colonies hold separate inventories and production specialisations. Routine exchange is automatic: the player sets policy, not individual cargo orders. Goods are deducted at departure and credited on arrival. Flat ordinary terrain uses a 360 km/sol rover baseline; sampled NASA MOLA elevation relief and steep grades slow routes, while an established settlement road improves progress. Two sols are added for handling.</div>'+rows+'<strong>Recent freight ledger</strong>'+(recent||'<div>No shipments recorded yet.</div>')+'<div style="opacity:.72;margin-top:6px">Stock units are abstract gameplay units, not tonnes or validated industrial throughput. Earth food/parts imports take 240 sols in this prototype. Routine exchange requires a bilateral relationship index of at least 50 and a sender with surplus. “Prioritise support” moves that colony ahead when choosing recipients; “No routine exchange” blocks normal transfers with it, but is intended not to prohibit future emergency mutual aid. The MOLA route profile samples 17 points along a great-circle route; it is a coarse relief/grade penalty, not full pathfinding, and a flat-terrain fallback is used if MOLA is not loaded. Rover fleets, cargo capacity, vehicle energy, breakdowns, route blockages, beacon effects, explicit long-term bulk agreements and emergency mutual aid are not yet implemented.</div></div></details>';
 }
 function renderCampaignPanel(){
  if(!worldState.campaign.started)return;
@@ -226,6 +228,15 @@ campaignPanel.addEventListener('change',event=>{
  if(!project||project.status!=='available')return;
  if((project.recipeOptions??[]).some(r=>r.id===recipeSelect.value))project.selectedRecipeId=recipeSelect.value;
  renderCampaignPanel();
+});
+campaignPanel.addEventListener('change',event=>{
+ const tradePolicy=event.target.closest('[data-trade-policy-colony]');
+ if(!tradePolicy)return;
+ worldState.campaign.colonyTradePolicy ??={};
+ worldState.campaign.colonyTradePolicy[tradePolicy.dataset.tradePolicyColony]=tradePolicy.value;
+ notify('Colony exchange policy updated');
+ renderCampaignPanel();
+ saveCampaign('colony-trade-policy');
 });
 campaignPanel.addEventListener('click',event=>{
  const policyButton=event.target.closest('[data-dependency-policy]');
