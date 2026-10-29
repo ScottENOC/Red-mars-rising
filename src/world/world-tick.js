@@ -1,5 +1,6 @@
 import { ensureMaterialInventories, processNaturalMeteoroidFlux, processWaterClimate, settleAtmosphericMeteoroidDust, syncAtmosphereFromInventories, recycleColonyWater, transferWater, checkMaterialConservation, consumeColonyWaterForReaction, addColonyWaterFromReaction } from './material-inventories.js';
 import { SHORTLISTED_SITES, ensureConstructionRecipeOptions } from './campaign-options.js';
+import { ensureColonyPoliticalState, processColonyPolitics } from './colony-politics.js';
 
 const MARS_RADIUS_M = 3_389_500;
 const MARS_SURFACE_AREA_M2 = 4 * Math.PI * MARS_RADIUS_M ** 2;
@@ -20,6 +21,7 @@ export function processWorldTick(w) {
   const sol = ++w.time.sol;
   const events = [];
   ensureMaterialInventories(w);
+  ensureColonyPoliticalState(w);
   checkMaterialConservation(w); // Establish the baseline before any external inputs or transfers this sol.
   processNaturalMeteoroidFlux(w, sol);
   processWaterClimate(w, sol);
@@ -252,6 +254,7 @@ export function processWorldTick(w) {
       events.push({type:'cargo-drop-landed',sol,description:drop.sponsorName+' cargo landed at '+drop.siteName+'; no crewed colony has been established.'});
     }
   }
+  processColonyPolitics(w, sol, events);
   recycleColonyWater(w, sol);
 
   // Heat is an energy stock in joules relative to the colony's 20 °C reference state.
