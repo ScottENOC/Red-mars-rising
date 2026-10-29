@@ -50,7 +50,7 @@ export function createMaterialInventories() {
 export function ensureMaterialInventories(w) {
   w.materials??=createMaterialInventories();
   const m=w.materials;
-  m.colonies??={};m.ledger??=[];m.energy??={electricityConsumedKWh:0,heatReleasedKWh:0};
+  m.colonies??={};m.siteDeposits??={};m.ledger??=[];m.energy??={electricityConsumedKWh:0,heatReleasedKWh:0};
   for(const stock of Object.values(m.planetary.waterKg??{}))stock.compensation??=0;
   m.externalFlows??={importedWaterKg:0,exportedWaterKg:0,meteoroidMatterKg:0};
   m.diagnostics??={waterBalanceErrorKg:0,lastWaterBalanceCheckSol:0,hydrogenBalanceErrorKg:0,oxygenBalanceErrorKg:0};
@@ -58,6 +58,16 @@ export function ensureMaterialInventories(w) {
   if(home&&!m.colonies[home.id]){
     const waterKg=Math.max(0,Number(w.economy?.water??0))*1000;
     m.colonies[home.id]={waterKg:{tanks:waterKg,processWater:0,habitatHumidity:0,wastewater:0},gasesKg:{hydrogen:0,oxygen:0,carbonDioxide:0,nitrogen:0,argon:0},energy:{storedKWh:0},foodKg:0,biomassKg:0,note:'Legacy economy water bridged at 1,000 kg per unit.'};
+  }
+  if(home?.locationId&&!m.siteDeposits[home.locationId]){
+    const access=Math.max(0,Math.min(1,Number(home.siteModifiers?.waterAccess??0.5)));
+    const global=m.planetary.waterKg.subsurfaceIce;
+    const allocatedKg=Math.min(global.mass,global.mass*(0.000001+access*0.000004));
+    const y=-allocatedKg-(global.compensation??0),t=global.mass+y;
+    global.compensation=(t-global.mass)-y;global.mass=t;
+    const stockId='site_'+home.locationId+'_subsurfaceIce';
+    m.planetary.waterKg[stockId]={mass:allocatedKg,compensation:0,confidence:'very-low',note:'Allocated local subsurface-ice deposit; estimated from site prospectivity, not a direct measurement.'};
+    m.siteDeposits[home.locationId]={siteId:home.locationId,waterStockId:stockId,estimatedReserveKg:allocatedKg,waterAccess:access,surveyed:false,confidence:'very-low',extractionRateKgPerSol:500+access*1000};
   }
   return m;
 }
