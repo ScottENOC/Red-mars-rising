@@ -21,6 +21,10 @@ export const SHORTLISTED_SITES = [
  {id:'tyrrhena',name:'Tyrrhena Terra',lat:-20.0,lon:105.0,terrain:'Ancient volcanic highlands',water:'Uncertain',rationale:'Science-led alternative with rougher construction conditions.'},
  {id:'pavonis',name:'Pavonis Foothills',lat:0.0,lon:247.0,terrain:'Volcanic flank',water:'Uncertain',rationale:'Long-term equatorial infrastructure candidate; not a near-term space elevator.'}
 ];
+export const STRATEGIC_PROGRAMS = [
+ {id:'local-components-study',name:'Investigate local component manufacturing',category:'industrial autonomy',cost:{funds:70,materials:16},durationSols:45,description:'Assess which imported fittings and non-critical components could be made from local feedstocks using polymer processing, metalworking and additive manufacturing.',outcome:'A preliminary feasibility assessment, not an automatic factory or a guarantee of substitution.'},
+ {id:'cargo-pipeline',name:'Strengthen sponsor cargo pipeline',category:'supply resilience',cost:{funds:45,materials:10},durationSols:25,description:'Improve cargo handling, shipment scheduling and coordination with the sponsor; this favours dependable imports over immediate self-sufficiency.',outcome:'Better supply reliability and improved sponsor confidence, while the colony remains import-dependent.'}
+];
 export const SPONSORS = [
  {id:'nasa',name:'NASA',type:'national',country:'United States',patience:58,support:88,pressure:58,autonomy:42,description:'Strong technical and logistics support; visible US mission milestones matter.',strengths:'Engineering, science and logistics',obligations:'Demonstrate US leadership and deliver visible results',relations:{esa:8,roscosmos:-15,cnsa:-8,un:10}},
  {id:'esa',name:'European Space Agency (ESA)',type:'national',country:'European multinational agency',patience:64,support:78,pressure:45,autonomy:55,description:'Science-led multinational programme with coalition politics and technical standards.',strengths:'Science and cooperation',obligations:'Share findings and maintain coalition support',relations:{nasa:12,roscosmos:-8,cnsa:2,un:12}},
@@ -41,6 +45,10 @@ export function startCampaign(w,locationId,sponsorId) {
  w.campaign.started=true;w.campaign.startingLocationId=site.id;w.campaign.startingSponsorId=sponsor.id;
  w.campaign.sponsorPatience=sponsor.patience;w.campaign.sponsorPressure=sponsor.pressure;w.campaign.autonomy=sponsor.autonomy;
  w.campaign.supportYearsRemaining=5;
+ w.campaign.strategicPrograms=STRATEGIC_PROGRAMS.map(p=>({...p,cost:{...p.cost},status:'available',remainingSols:p.durationSols,progress:0}));
+ w.campaign.dependencyPolicy='accept-for-now';
+ w.campaign.localManufacturingAssessment=null;
+ w.campaign.logisticsReliability=0.5;
  w.shortlistedSites=SHORTLISTED_SITES.map(x=>({...x}));
  if(w.logistics?.plannedCargoDrops) for(const drop of w.logistics.plannedCargoDrops){const target=SHORTLISTED_SITES.find(x=>x.id===drop.siteId);if(target){drop.lat=target.lat;drop.lon=target.lon;}}
  for(const poi of (w.pointsOfInterest??[])) poi.compromised=false;
