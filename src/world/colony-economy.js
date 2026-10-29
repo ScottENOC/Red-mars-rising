@@ -90,16 +90,24 @@ function routeTerrainProfile(from,to,distanceKm){
 function hasEstablishedRoad(w,from,to){
   return (w.infrastructure?.routes??[]).some(r=>(r.from===from.id&&r.to===to.id)||(r.from===to.id&&r.to===from.id));
 }
+function routeBeaconCount(w,from,to){
+  const beacons=(w.infrastructure?.assets??[]).filter(a=>/beacon/i.test(String(a.kind??a.type??a.name??''))&&!['inactive','destroyed','disabled'].includes(a.status));
+  if(!beacons.length)return 0;
+  const samples=Array.from({length:17},(_,i)=>greatCirclePoint(from,to,i/16));
+  return beacons.filter(asset=>Number.isFinite(asset.lat)&&Number.isFinite(asset.lon)&&samples.some(p=>routeDistanceKm(asset,p)<=50)).length;
+}
 function routeTravel(w,from,to,distanceKm){
   const profile=routeTerrainProfile(from,to,distanceKm);
   // 360 km/sol is the flat, ordinary-terrain baseline. Relief and steep sampled
-  // grades slow an unengineered route; an established road improves average progress.
-  // This remains a strategic abstraction, not a claim about a particular rover.
+  // grades slow an unengineered route; roads and navigation beacons improve progress.
+  // These are strategic modifiers, not claims about a particular rover.
   let terrainFactor=1;
   if(profile)terrainFactor=Math.max(1,Math.min(4,1+profile.ascent/12000+profile.maxGrade*4+profile.relief/5000));
   const road=hasEstablishedRoad(w,from,to);
-  const effectiveSpeed=360*(road?1.3:1)/terrainFactor;
-  return {travelSols:Math.max(2,Math.ceil(distanceKm/effectiveSpeed)+2),profile,road,effectiveSpeed:Math.round(effectiveSpeed)};
+  const beacons=routeBeaconCount(w,from,to);
+  const beaconFactor=1+Math.min(3,beacons)*0.08;
+  const effectiveSpeed=360*(road?1.3:1)*beaconFactor/terrainFactor;
+  return {travelSols:Math.max(2,Math.ceil(distanceKm/effectiveSpeed)+2),profile,road,beacons,effectiveSpeed:Math.round(effectiveSpeed)};
 }
 function routineExchangeAllowed(w,from,to){
   const primary=(w.settlements??[]).find(s=>s.kind==='primary-colony');
@@ -116,10 +124,10 @@ function createShipment(w,from,to,good,amount,sol,kind='trade'){
   const distanceKm=routeDistanceKm(from,to);
   const route=routeTravel(w,from,to,distanceKm);
   const travelSols=route.travelSols;
-  const shipment={id:'colony-haul-'+w.colonyTrade.nextShipmentId++,kind,fromId:from.id,toId:to.id,good,amount:round3(amount),departSol:sol,arrivalSol:sol+travelSols,travelSols,distanceKm:Math.round(distanceKm),terrainProfile:route.profile?{reliefM:Math.round(route.profile.relief),ascentM:Math.round(route.profile.ascent),maxGradePct:Math.round(route.profile.maxGrade*100)}:null,roadUsed:route.road,effectiveSpeedKmPerSol:route.effectiveSpeed,status:'in-transit'};
+  const shipment={id:'colony-haul-'+w.colonyTrade.nextShipmentId++,kind,fromId:from.id,toId:to.id,good,amount:round3(amount),departSol:sol,arrivalSol:sol+travelSols,travelSols,distanceKm:Math.round(distanceKm),terrainProfile:route.profile?{reliefM:Math.round(route.profile.relief),ascentM:Math.round(route.profile.ascent),maxGradePct:Math.round(route.profile.maxGrade*100)}:null,roadUsed:route.road,navigationBeacons:route.beacons,effectiveSpeedKmPerSol:route.effectiveSpeed,status:'in-transit'};
   from.economy.inventory[good]=round3(Math.max(0,from.economy.inventory[good]-amount));
   w.colonyTrade.shipments.push(shipment);
-  addTradeLog(w,{sol,kind:'departed',shipmentId:shipment.id,fromId:from.id,toId:to.id,good,amount:shipment.amount,description:amount+' units of '+good+' departed '+from.name+' for '+to.name+' ('+Math.round(distanceKm)+' km, about '+travelSols+' sols; '+route.effectiveSpeed+' km/sol'+(route.road?', established road':'')+(route.profile?', sampled relief '+Math.round(route.profile.relief)+' m':'')+').'});
+  addTradeLog(w,{sol,kind:'departed',shipmentId:shipment.id,fromId:from.id,toId:to.id,good,amount:shipment.amount,description:amount+' units of '+good+' departed '+from.name+' for '+to.name+' ('+Math.round(distanceKm)+' km, about '+travelSols+' sols; '+route.effectiveSpeed+' km/sol'+(route.road?', established road':'')+(route.beacons?', '+route.beacons+' navigation beacon(s)':'')+(route.profile?', sampled relief '+Math.round(route.profile.relief)+' m':'')+').'});
   return shipment;
 }
 function deliverShipments(w,sol,events){
