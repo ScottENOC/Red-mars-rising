@@ -59,6 +59,14 @@ Thirteen additional shortlisted landing areas are points of interest, distinct f
 Rival sponsors observe the first colony for at least 60 sols, assess whether the crew and infrastructure appear to be surviving, then wait for a represented Earth–Mars launch opportunity and an approximately 240-sol (eight-month) cruise. The transfer-window cycle is currently an approximate 780 sols, not an ephemeris-driven orbital calculation. Consequently, under normal conditions no rival crewed colony should be established during the first 365 sols. The relay/vehicle points of interest have stable IDs and status fields to support future hacking, disabling, or destruction systems.
 
 
+## Persistent terrain and campaign saves
+
+- Natural impact craters and their local material deposits are stored as permanent geological records, separately from the capped recent-impact marker list.
+- Each impact record carries location, sol, crater dimensions, impactor class/mass, a provisional ejecta/deposit composition, and a simple crater cross-section. Local deposits are recorded in kilograms by component and are a subset of the already-counted retained impactor mass, not extra mass.
+- The global NASA MOLA grid remains the immutable baseline. Sparse impact deformation is applied to elevation queries, while local crater meshes provide detail between the coarse global globe vertices. The current physically scaled craters are too small to resolve at planetary zoom; a dedicated close-up surface terrain LOD is still needed for clear inspection.
+- Campaign state, simulation time, inventories and geological modifications autosave to browser local storage once per completed sol, at campaign start, and when the page is backgrounded. A manual “Save now” control is also provided. This is a single local browser save slot; clearing site data or using another browser/device will not carry it across.
+- Local storage quota, mobile-browser behaviour and long-campaign performance still need browser testing. Geological history is intentionally not capped, unlike the transient UI marker cache.
+
 ## Conserved material accounting — in progress
 
 The simulation now has a dedicated `src/world/material-inventories.js` module and an expandable **Material inventories & conservation** view in the colony operations panel. Planetary water is separated into atmospheric vapour, surface ice, subsurface ice, groundwater, surface liquid water and hydrated-mineral water-equivalent stocks. Colony water is held separately in tanks, process-water storage, habitat humidity and wastewater. Stocks are measured in kilograms, and transfers are recorded in a ledger. Initial reservoir sizes are explicitly labelled scenario estimates, not precise global measurements.
