@@ -21,6 +21,18 @@ The global heat response is an explicit **illustrative prototype**, not a calibr
 
 For scale, one 100 W heat source spread over Mars corresponds to roughly 6.93 × 10⁻¹³ W/m², or an initial warming of about 6.15 × 10⁻¹⁵ °C per sol under the prototype's assumed effective heat capacity. This is non-zero, but extraordinarily small. Local heat concentration, atmospheric chemistry, greenhouse projects, ice stability, moisture transport and possible flooding are not yet spatially resolved or scientifically calibrated.
 
+## Strategic agency and industrial choices
+
+The player manages colony-level priorities rather than assigning individual workers or micromanaging production queues. The colony reports dependencies, risks and uncertain opportunities; the player chooses which problems deserve funding and political attention.
+
+The first strategic-priority prototype includes two contrasting programmes:
+
+- **Investigate local component manufacturing** funds a 45-sol assessment of whether selected non-critical imported components could eventually be substituted using local feedstocks, polymer processing, metalworking and additive manufacturing. The current 60–80% substitution range is a low-confidence scenario estimate for a targeted category, not a measured result or a working factory. Processing, quality assurance and component qualification remain necessary.
+- **Strengthen the sponsor cargo pipeline** funds a 25-sol effort focused on cargo handling, shipment coordination and sponsor confidence. This improves the modelled reliability score and sponsor standing, while retaining import dependence.
+- **Accept dependence for now** is a valid choice: preserve funds and materials for other priorities while accepting exposure to shipment delays or interruptions.
+
+Neither self-sufficiency nor dependence is treated as the universally correct strategy. The material simulation currently distinguishes local regolith, aggregate and metal-bearing concentrate, but does not yet manufacture qualified metal parts or finished construction components. These strategic initiatives are a first decision layer; component-specific material recipes, processing capacity, recycling and explicit stockpile/transport constraints remain future work. The player expresses intent and accepts trade-offs while the colony handles routine execution.
+
 ## Code structure
 
 - `index.html` is the page shell and styling; application logic lives in ES modules.
