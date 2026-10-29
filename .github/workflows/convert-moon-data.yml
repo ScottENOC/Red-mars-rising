@@ -45,4 +45,5 @@ jobs:
             exit 0
           fi
           git commit -m 'Add downscaled Phobos and Deimos web assets'
+          git pull --rebase origin development
           git push origin HEAD:development
