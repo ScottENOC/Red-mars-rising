@@ -47,3 +47,12 @@ Work on the `development` branch. Keep `main` for approved releases.
 ## Ground-level exploration — phase 1
 
 The **Ground view** control opens a north-facing surface preview at Jezero Base. Use **Return to globe** to restore the orbital view. This first pass is a camera and interface prototype: the nearby terrain and rocks are procedural visual placeholders, not high-resolution MOLA data or a surveyed reconstruction of Jezero. Planned follow-on phases are camera panning, movement along designated paths, and free roaming.
+
+
+## Wider Solar System and rival expeditions
+
+The first crew arrives in July 2027 after an eight-month transfer. The transfer vehicle remains in Mars orbit as a return vehicle and emergency refuge. The scenario includes three schematic Mars communications relays, a weather orbiter, a robotic Phobos survey package, Earth-side deep-space network infrastructure, a modestly expanded ISS logistics/assembly facility, and a lunar communications relay. These are explicit mild alternate-history assumptions, not claims about real-world 2026 infrastructure. The game currently represents Earth–Mars one-way communications delay as an illustrative ~12.5 minutes; actual light-time varies with orbital geometry.
+
+Thirteen additional shortlisted landing areas are points of interest, distinct from the five player-selectable starting sites. Three pre-positioned sponsor cargo drops are scheduled to land at different sites before the first year ends. These are cargo-only events, not rival crewed colonies.
+
+Rival sponsors observe the first colony for at least 60 sols, assess whether the crew and infrastructure appear to be surviving, then wait for a represented Earth–Mars launch opportunity and an approximately 240-sol (eight-month) cruise. The transfer-window cycle is currently an approximate 780 sols, not an ephemeris-driven orbital calculation. Consequently, under normal conditions no rival crewed colony should be established during the first 365 sols. The relay/vehicle points of interest have stable IDs and status fields to support future hacking, disabling, or destruction systems.
