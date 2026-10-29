@@ -1,11 +1,11 @@
 const clamp=(v,min=0,max=100)=>Math.max(min,Math.min(max,Number(v)||0));
 const PROJECTS={
- 'space-elevator':{name:'Space elevator',category:'strategic infrastructure',description:'A major transport link with continuing power, machinery, electronics and specialist-maintenance needs.',goods:{components:8,machinery:5,electronics:3},mode:'machinery',autonomyCost:18,baseScore:48},
- 'research-laboratory':{name:'Advanced research laboratory',category:'research',description:'Long-term scientific work, instruments, replacement electronics and operating support.',goods:{electronics:4,components:2,machinery:1},mode:'widgets',autonomyCost:3,baseScore:66},
- 'geological-survey':{name:'Planetary geological survey',category:'exploration',description:'Survey equipment, assay instruments and specialist analysis to identify useful deposits.',goods:{electronics:3,machinery:2,components:1},mode:'widgets',autonomyCost:0,baseScore:62},
- 'strategic-extraction':{name:'Strategic mineral extraction',category:'resource exports',description:'Equipment and maintenance for extracting and preparing materials important to Earth-side industry.',goods:{machinery:4,components:3,electronics:1},mode:'machinery',autonomyCost:8,baseScore:58},
- 'local-manufacturing':{name:'Local manufacturing and repair',category:'self-sufficiency',description:'Tools, production equipment and continuing support for making selected parts locally.',goods:{machinery:4,electronics:3,components:2},mode:'machinery',autonomyCost:22,baseScore:52},
- 'life-support-resilience':{name:'Life-support resilience programme',category:'survival',description:'Redundancy, repair tools and critical spares that improve the colony’s ability to recover from failures.',goods:{components:5,machinery:3,electronics:2},mode:'mixed',autonomyCost:12,baseScore:70}
+ 'space-elevator':{name:'Space elevator',category:'strategic infrastructure',operatingGrant:8,description:'A major transport link with continuing power, machinery, electronics and specialist-maintenance needs.',goods:{components:8,machinery:5,electronics:3},mode:'machinery',autonomyCost:18,baseScore:48},
+ 'research-laboratory':{name:'Advanced research laboratory',category:'research',operatingGrant:4,description:'Long-term scientific work, instruments, replacement electronics and operating support.',goods:{electronics:4,components:2,machinery:1},mode:'widgets',autonomyCost:3,baseScore:66},
+ 'geological-survey':{name:'Planetary geological survey',category:'exploration',operatingGrant:3,description:'Survey equipment, assay instruments and specialist analysis to identify useful deposits.',goods:{electronics:3,machinery:2,components:1},mode:'widgets',autonomyCost:0,baseScore:62},
+ 'strategic-extraction':{name:'Strategic mineral extraction',category:'resource exports',operatingGrant:5,description:'Equipment and maintenance for extracting and preparing materials important to Earth-side industry.',goods:{machinery:4,components:3,electronics:1},mode:'machinery',autonomyCost:8,baseScore:58},
+ 'local-manufacturing':{name:'Local manufacturing and repair',category:'self-sufficiency',operatingGrant:5,description:'Tools, production equipment and continuing support for making selected parts locally.',goods:{machinery:4,electronics:3,components:2},mode:'machinery',autonomyCost:22,baseScore:52},
+ 'life-support-resilience':{name:'Life-support resilience programme',category:'survival',operatingGrant:6,description:'Redundancy, repair tools and critical spares that improve the colony’s ability to recover from failures.',goods:{components:5,machinery:3,electronics:2},mode:'mixed',autonomyCost:12,baseScore:70}
 };
 function sponsorFor(w){return (w.sponsors??[]).find(s=>s.id===w.campaign?.startingSponsorId);}
 function primaryColony(w){return (w.settlements??[]).find(s=>s.kind==='primary-colony');}
@@ -64,7 +64,7 @@ export function requestSponsorProject(w,projectId){
  state.requests.push(request);
  record(w,{sol:w.time?.sol??0,kind:approved?'project-approved':'project-declined',requestId:id,projectId,description:sponsor.name+(approved?' approved ':' declined ')+project.name+'. '+request.reason});
  if(!approved)return {ok:true,approved:false,reason:sponsor.name+' declined the proposal. You can revisit it after circumstances change.'};
- const commitment={id:'commitment-'+id,requestId:id,projectId,name:project.name,category:project.category,status:'active',approvedSol:w.time?.sol??0,sponsorId:sponsor.id,sponsorName:sponsor.name,supportMode:mode,goods:{...project.goods},nextSupportSol:(w.time?.sol??0),lastSupportSol:null,suspendedReason:null,operationalSupport:true,maintenanceSupport:true,repairSupport:true,autonomyCost:project.autonomyCost,terms:typeTerms(sponsor,mode),supportHistory:[]};
+ const commitment={id:'commitment-'+id,requestId:id,projectId,name:project.name,category:project.category,status:'active',approvedSol:w.time?.sol??0,sponsorId:sponsor.id,sponsorName:sponsor.name,supportMode:mode,goods:{...project.goods},nextSupportSol:(w.time?.sol??0),lastSupportSol:null,suspendedReason:null,operationalSupport:true,maintenanceSupport:true,repairSupport:true,autonomyCost:project.autonomyCost,operatingGrant:project.operatingGrant??0,terms:typeTerms(sponsor,mode),supportHistory:[]};
  state.commitments.push(commitment);
  request.commitmentId=commitment.id;
  const home=primaryColony(w);
@@ -114,12 +114,14 @@ export function processSponsorCommitments(w,sol,events=[]){
   if(sol<(c.nextSupportSol??0))continue;
   const goods=Object.entries(c.goods??{});
   let dispatched=0;
+  const operatingGrant=Number(c.operatingGrant)||0;
+  if(operatingGrant>0&&w.economy){w.economy.funds=Number(w.economy.funds??0)+operatingGrant;c.lastOperatingGrantSol=sol;c.lastOperatingGrantAmount=operatingGrant;}
   for(const [good,amount] of goods){
    const ship=createSponsorShipment(w,home,good,amount,sol,'project-support','earth:'+c.sponsorId,sponsor.name+' supplied '+amount+' units of '+good+' under its ongoing '+c.name+' commitment.',c.id);
    if(ship)dispatched++;
   }
   c.lastSupportSol=sol;c.nextSupportSol=sol+30;
-  logCommitment(w,c,sol,'support-cycle',dispatched?'Sponsor dispatched recurring operations/maintenance support for '+c.name+'.':'Support cycle assessed; matching cargo is already in transit.');
+  logCommitment(w,c,sol,'support-cycle',(operatingGrant>0?'Sponsor transferred '+operatingGrant+' funds for operations. ':'')+(dispatched?'Sponsor dispatched recurring operations/maintenance support for '+c.name+'.':'Support cycle assessed; matching cargo is already in transit.'));
  }
  // Alternative external assistance is triggered by the survival crisis, not by ordinary low stocks.
  const criticallyLow=['food','components','machinery','electronics'].filter(g=>Number(home.economy?.inventory?.[g]??0)<({food:8,components:0.8,machinery:0.35,electronics:0.2}[g]));
