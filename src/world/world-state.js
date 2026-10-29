@@ -7,7 +7,7 @@ export function createInitialWorldState() {
     planet: { id: 'mars', meanDiameterKm: 6779, ageYears: 4_500_000_000 },
     terrain: { source: 'procedural-prototype', geologicalModifications: [] },
     climate: {
-      meanSurfaceTemperatureC: -63,
+      meanSurfaceTemperatureC: -63, referenceMeanTemperatureC: -63,
       atmosphere: { pressurePa: 610, composition: 'present-day-approximation', co2Fraction: 0.953, waterVapourPa: 0.03 },
       water: { accessibleIceIndex: 35, subsurfaceWaterIndex: 20, surfaceLiquidWaterKm3: 0, atmosphericWaterKg: 1e9 },
       energyBalance: { greenhouseWm2: 0, humanWasteHeatWm2: 0, radiativeLossWm2: 0 }, history: []
