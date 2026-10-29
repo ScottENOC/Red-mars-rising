@@ -34,6 +34,9 @@ export function ensureColonyEconomies(w){
   w.campaign.colonyTradePolicy ??= {};
   w.colonyTrade.shipments ??=[];
   w.colonyTrade.tradeLog ??=[];
+  w.colonyTrade.emergencyRequests ??=[];
+  w.colonyTrade.aidHistory ??=[];
+  w.campaign.emergencyAidPolicy ??={};
   for(const s of w.settlements){
     const spec=selectSpecialisation(s,w);
     s.economy ??={};
@@ -120,6 +123,74 @@ function priorityFor(w,settlement){
   const primary=(w.settlements??[]).find(s=>s.kind==='primary-colony');
   return primary&&settlement.id!==primary.id&&w.campaign.colonyTradePolicy?.[settlement.id]==='prioritise'?1:0;
 }
+function aidReserve(good){return {food:35,components:12,machinery:8,electronics:6,aggregate:18}[good]??10;}
+function emergencyThreshold(good){return {food:12,components:1,machinery:0.5,electronics:0.25,aggregate:1}[good]??1;}
+function emergencyNeed(colony,good){return Number(colony?.economy?.inventory?.[good]??0)<emergencyThreshold(good);}
+function aidPolicy(w,recipient){return w.campaign.emergencyAidPolicy?.[recipient.id]??'automatic';}
+function aidPriority(w,colony){return priorityFor(w,colony)+(aidPolicy(w,colony)==='prioritise'?2:0);}
+function noteAid(w,entry){
+  w.colonyTrade.aidHistory.push(entry);
+  if(w.colonyTrade.aidHistory.length>100)w.colonyTrade.aidHistory.splice(0,w.colonyTrade.aidHistory.length-100);
+  addTradeLog(w,entry);
+}
+function relationIncident(w,recipient,sol,amount,reason){
+  for(const other of (w.settlements??[])){
+    if(other.id===recipient.id||['failed','abandoned'].includes(other.status))continue;
+    const current=relationship(recipient,other);
+    recipient.politics ??={relations:{}};
+    other.politics ??={relations:{}};
+    recipient.politics.relations ??={};
+    other.politics.relations ??={};
+    const next=clamp(current-amount);
+    recipient.politics.relations[other.id]=next;
+    other.politics.relations[recipient.id]=next;
+  }
+  noteAid(w,{sol,kind:'aid-consequences',toId:recipient.id,description:recipient.name+' collapsed after a feasible emergency aid request was refused; relations with other operating colonies deteriorated ('+reason+').'});
+}
+function assessEmergencyAid(w,sol,events){
+  const alive=(w.settlements??[]).filter(s=>!['failed','abandoned'].includes(s.status));
+  for(const recipient of alive){
+    for(const good of GOODS){
+      if(!emergencyNeed(recipient,good))continue;
+      let request=w.colonyTrade.emergencyRequests.find(r=>r.toId===recipient.id&&r.good===good&&['open','in-transit'].includes(r.status));
+      if(!request){
+        request={id:'aid-request-'+(w.colonyTrade.nextShipmentId++),toId:recipient.id,good,openedSol:sol,status:'open',attempts:0,feasibleAidRefused:false};
+        w.colonyTrade.emergencyRequests.push(request);
+        noteAid(w,{sol,kind:'aid-requested',toId:recipient.id,good,description:recipient.name+' raised an emergency request for '+good+'; humanitarian aid is assessed separately from routine trade.'});
+        events.push({type:'colony-emergency-aid-request',sol,description:recipient.name+' requested emergency '+good+' supplies.'});
+      }
+      if(request.status!=='open')continue;
+      request.attempts++;
+      const donors=alive.filter(d=>d.id!==recipient.id&&Number(d.economy.inventory[good]??0)>aidReserve(good));
+      const ranked=donors.map(d=>({donor:d,rel:relationship(d,recipient),distance:routeDistanceKm(d,recipient)})).sort((a,b)=>aidPriority(w,b.donor)-aidPriority(w,a.donor)||b.rel-a.rel||a.distance-b.distance);
+      const primary=(w.settlements??[]).find(s=>s.kind==='primary-colony');
+      const primaryPolicy=primary&&recipient.id!==primary.id?aidPolicy(w,recipient):'automatic';
+      const donor=ranked.find(x=>x.donor.id!==primary?.id||primaryPolicy!=='protect-reserves');
+      if(donor){
+        const amount=Math.min(good==='food'?25:good==='components'?5:good==='machinery'?4:good==='electronics'?3:8,donor.donor.economy.inventory[good]-aidReserve(good));
+        const route=routeTravel(w,donor.donor,recipient,donor.distance);
+        const foodRunway=good==='food'?Math.max(0,Math.floor((recipient.economy.inventory.food-2)/Math.max(0.1,recipient.population*0.018-(SPECIALISATIONS[recipient.economy.specialisation]?.produces.food??0)))):Infinity;
+        const arrivesInTime=good!=='food'||route.travelSols<=Math.max(0,foodRunway);
+        if(primary&&donor.donor.id===primary.id&&primaryPolicy==='protect-reserves'&&arrivesInTime){
+          request.feasibleAidRefused=true;
+          request.refusedByPrimary=true;
+        }else if(arrivesInTime){
+          const shipment=createShipment(w,donor.donor,recipient,good,amount,sol,'emergency-aid');
+          shipment.requestId=request.id;
+          request.status='in-transit';request.shipmentId=shipment.id;request.donorId=donor.donor.id;request.amount=amount;request.arrivalSol=shipment.arrivalSol;
+          noteAid(w,{sol,kind:'aid-dispatched',shipmentId:shipment.id,requestId:request.id,fromId:donor.donor.id,toId:recipient.id,good,amount,description:donor.donor.name+' dispatched '+amount+' units of '+good+' to '+recipient.name+' as emergency humanitarian aid; estimated arrival in '+route.travelSols+' sols.'});
+          events.push({type:'colony-emergency-aid-dispatched',sol,description:donor.donor.name+' dispatched emergency '+good+' aid to '+recipient.name+'.'});
+        }else if(sol-request.openedSol>=10){
+          request.status='unreachable';
+          noteAid(w,{sol,kind:'aid-unreachable',requestId:request.id,toId:recipient.id,good,description:'Emergency '+good+' aid for '+recipient.name+' could not arrive before the modelled survival window; no refusal penalty applies.'});
+        }
+      }else if(sol-request.openedSol>=10){
+        request.status='unavailable';
+        noteAid(w,{sol,kind:'aid-unavailable',requestId:request.id,toId:recipient.id,good,description:'No colony had enough '+good+' surplus to provide emergency aid to '+recipient.name+'; no refusal penalty applies.'});
+      }
+    }
+  }
+}
 function createShipment(w,from,to,good,amount,sol,kind='trade'){
   const distanceKm=routeDistanceKm(from,to);
   const route=routeTravel(w,from,to,distanceKm);
@@ -141,6 +212,18 @@ function deliverShipments(w,sol,events){
     }
     destination.economy.inventory[ship.good]=round3((destination.economy.inventory[ship.good]??0)+ship.amount);
     ship.status='delivered';
+    if(ship.kind==='emergency-aid'){
+      const request=w.colonyTrade.emergencyRequests.find(r=>r.id===ship.requestId);
+      if(request)request.status='delivered';
+      const sender=w.settlements.find(s=>s.id===ship.fromId);
+      if(sender){
+        sender.politics ??={relations:{} };destination.politics ??={relations:{}};
+        sender.politics.relations ??={};destination.politics.relations ??={};
+        const next=clamp(relationship(sender,destination)+3);
+        sender.politics.relations[destination.id]=next;destination.politics.relations[sender.id]=next;
+      }
+      noteAid(w,{sol,kind:'aid-received',shipmentId:ship.id,requestId:ship.requestId,fromId:ship.fromId,toId:destination.id,good:ship.good,amount:ship.amount,description:(w.settlements.find(s=>s.id===ship.fromId)?.name??'A neighbouring colony')+' delivered emergency '+ship.good+' aid to '+destination.name+'.'});
+    }
     if(ship.kind==='earth-import'){destination.economy.importDependence=clamp(destination.economy.importDependence+1);destination.economy.pendingImports=(destination.economy.pendingImports??[]).filter(good=>good!==ship.good);destination.economy.pendingImport=destination.economy.pendingImports.length>0;}
     addTradeLog(w,{sol,kind:'delivered',shipmentId:ship.id,fromId:ship.fromId,toId:ship.toId,good:ship.good,amount:ship.amount,description:ship.amount+' units of '+ship.good+' arrived at '+destination.name+'.'});
     events.push({type:'colony-shipment-arrived',sol,description:ship.amount+' units of '+ship.good+' arrived at '+destination.name+(ship.kind==='trade'?' from '+(w.settlements.find(s=>s.id===ship.fromId)?.name??'another colony'):' from its Earth sponsor')+'.'});
@@ -174,6 +257,8 @@ function operateColonies(w,sol,events){
           s.population=Math.max(0,Math.round((s.population??0)-1));
           if(s.population===0){
             s.status='failed';
+            const refused=(w.colonyTrade.emergencyRequests??[]).some(r=>r.toId===s.id&&r.good==='food'&&r.feasibleAidRefused&&r.status==='open');
+            if(refused)relationIncident(w,s,sol,8,'the player colony protected its reserves despite a feasible food shipment');
             events.push({type:'colony-failed',sol,description:s.name+' has been abandoned after prolonged food shortages.'});
           }
         }
@@ -227,6 +312,7 @@ export function processColonyEconomies(w,sol,events=[]){
   ensureColonyEconomies(w);
   deliverShipments(w,sol,events);
   operateColonies(w,sol,events);
+  assessEmergencyAid(w,sol,events);
   if(sol%5===0)dispatchIntercolonyTrade(w,sol);
   w.colonyTrade.lastProcessedSol=sol;
   return events;
