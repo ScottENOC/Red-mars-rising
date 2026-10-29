@@ -194,7 +194,7 @@ export function recycleColonyWater(w,sol){
       const electricity=wastewaterRecovery*.001;
       m.energy.electricityConsumedKWh+=electricity;
       if(w.economy)w.economy.water=(Number(w.economy.water)||0)+wastewaterRecovery/1000;
-      m.ledger.push({sol,substance:'energy',massKg:0,from:'colony:'+id+':electricity',to:'colony:'+id+':water-treatment',process:'electricity-consumption',note:electricity+' kWh used for wastewater treatment.'});
+      m.ledger.push({sol,substance:'electricity',energyKWh:electricity,from:'colony:'+id+':electricity',to:'colony:'+id+':water-treatment',process:'electricity-consumption',note:'Electricity used for wastewater treatment.'});
     }
     const humidityRecovery=stock.habitatHumidity*.95;
     if(humidityRecovery>0){
@@ -202,7 +202,7 @@ export function recycleColonyWater(w,sol){
       const electricity=humidityRecovery*.0015;
       m.energy.electricityConsumedKWh+=electricity;
       if(w.economy)w.economy.water=(Number(w.economy.water)||0)+humidityRecovery/1000;
-      m.ledger.push({sol,substance:'energy',massKg:0,from:'colony:'+id+':electricity',to:'colony:'+id+':humidity-condenser',process:'electricity-consumption',note:electricity+' kWh used for humidity recovery.'});
+      m.ledger.push({sol,substance:'electricity',energyKWh:electricity,from:'colony:'+id+':electricity',to:'colony:'+id+':humidity-condenser',process:'electricity-consumption',note:'Electricity used for humidity recovery.'});
     }
   }
 }
