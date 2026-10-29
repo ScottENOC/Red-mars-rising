@@ -1,3 +1,4 @@
+import { createMaterialInventories, ensureMaterialInventories, checkWaterConservation } from './material-inventories.js';
 export const STARTING_LOCATIONS = [
  {id:'elysium',name:'Elysium Planitia',lat:4.5,lon:154.5,terrain:'Open volcanic plain',climate:'Near-equatorial; relatively favourable solar and thermal conditions',water:'Moderate prospects; accessible ice is less dependable than northern mid-latitudes',construction:'Easy',security:'Exposed',opportunity:'Best long-term candidate for an equatorial space-elevator programme.',heatDemand:.85,waterAccess:.55,buildEase:.9,vulnerability:.8,elevationKm:-1.5},
  {id:'arcadia',name:'Arcadia Planitia',lat:46.7,lon:164,terrain:'Broad northern plains',climate:'Colder, with greater seasonal variation',water:'Strong prospects for accessible buried water ice',construction:'Easy to moderate',security:'Exposed',opportunity:'Water extraction can reduce Earth dependence for life support and propellant.',heatDemand:1.2,waterAccess:.9,buildEase:.85,vulnerability:.8,elevationKm:-3},
@@ -51,7 +52,7 @@ export function startCampaign(w,locationId,sponsorId) {
   {id:'solar-expansion',name:'Expand power array',category:'infrastructure',cost:{funds:45,materials:18,machinery:5},durationSols:24,remainingSols:24,progress:0,status:'available',description:'Increase available electrical capacity.'},
   {id:'water-extractor',name:'Pilot water extraction',category:'industry',cost:{funds:55,materials:20,machinery:10},durationSols:30,remainingSols:30,progress:0,status:'available',description:'Test local ice extraction and reduce imported water demand.'}
  ];
- w.economy.funds+=Math.round(sponsor.support*1.5);w.economy.materials+=Math.round(sponsor.support*.25);
+ w.economy.funds+=Math.round(sponsor.support*1.5);w.economy.materials+=Math.round(sponsor.support*.25);\n w.materials=createMaterialInventories();ensureMaterialInventories(w);checkWaterConservation(w);
  w.events.push({type:'campaign-start',sol:w.time.sol,description:'Five-year expedition support begins at '+site.name+', backed by '+sponsor.name+'.'});
  w.events.push({type:'sponsor-system-activated',sol:w.time.sol,description:'All sponsor blocs are active; rival colonies can emerge independently.'});
  return {site,sponsor};
