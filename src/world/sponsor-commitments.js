@@ -64,12 +64,10 @@ export function requestSponsorProject(w,projectId){
  state.requests.push(request);
  record(w,{sol:w.time?.sol??0,kind:approved?'project-approved':'project-declined',requestId:id,projectId,description:sponsor.name+(approved?' approved ':' declined ')+project.name+'. '+request.reason});
  if(!approved)return {ok:true,approved:false,reason:sponsor.name+' declined the proposal. You can revisit it after circumstances change.'};
- const commitment={id:'commitment-'+id,requestId:id,projectId,name:project.name,category:project.category,status:'active',approvedSol:w.time?.sol??0,sponsorId:sponsor.id,sponsorName:sponsor.name,supportMode:mode,goods:{...project.goods},nextSupportSol:(w.time?.sol??0),lastSupportSol:null,suspendedReason:null,operationalSupport:true,maintenanceSupport:true,repairSupport:true,autonomyCost:project.autonomyCost,operatingGrant:project.operatingGrant??0,terms:typeTerms(sponsor,mode),supportHistory:[]};
+ const commitment={id:'commitment-'+id,requestId:id,projectId,name:project.name,category:project.category,status:'active',projectState:'approved',approvedSol:w.time?.sol??0,sponsorId:sponsor.id,sponsorName:sponsor.name,supportMode:mode,goods:{...project.goods},nextSupportSol:(w.time?.sol??0),lastSupportSol:null,suspendedReason:null,operationalSupport:true,maintenanceSupport:true,repairSupport:true,autonomyCost:project.autonomyCost,operatingGrant:project.operatingGrant??0,terms:typeTerms(sponsor,mode),supportHistory:[]};
  state.commitments.push(commitment);
  request.commitmentId=commitment.id;
- const home=primaryColony(w);
- if(home){home.infrastructure??=[];if(!home.infrastructure.includes('sponsor-project:'+projectId))home.infrastructure.push('sponsor-project:'+projectId);}
- return {ok:true,approved:true,reason:sponsor.name+' approved '+project.name+'. Ongoing operations, maintenance and repair support are now a standing commitment; support mode: '+mode.replaceAll('-',' ')+'.'};
+ return {ok:true,approved:true,reason:sponsor.name+' approved '+project.name+'. Ongoing operations, maintenance and repair support are now a standing commitment; support mode: '+mode.replaceAll('-',' ')+'. Project construction itself is not yet simulated.'};
 }
 function typeTerms(sponsor,mode){
  if(mode==='licensed-machinery'||mode==='restricted-machinery'||mode==='licensed-widgets')return 'Sponsor-controlled equipment or proprietary interfaces may limit local repair and reproduction; continuing access depends on the sponsor honouring this commitment.';
