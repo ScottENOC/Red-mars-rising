@@ -199,6 +199,24 @@ let zoom=4.2,minZoom=0.12,maxZoom=28,showLabels=true,showGrid=false;
 const cameraFocus=new THREE.Vector3();let focusedMoon=null;
 const moonSpecs={phobos:{name:'Phobos',orbit:2.76,periodHours:7.65,radius:0.00327,phase:.2,color:0x8b8178},deimos:{name:'Deimos',orbit:6.92,periodHours:30.3,radius:0.00183,phase:2.2,color:0xaaa097}};
 const moonObjects={};
+const moonAssetPromises={};
+function loadMoonAssets(id){
+ if(moonAssetPromises[id])return moonAssetPromises[id];
+ const m=moonObjects[id];if(!m)return Promise.resolve();
+ const base=new URL('../data/moons/optimized/',import.meta.url);
+ moonAssetPromises[id]=fetch(new URL(id+'-mesh.json',base)).then(r=>{if(!r.ok)throw new Error('Moon mesh request failed: '+r.status);return r.json();}).then(data=>{
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.Float32BufferAttribute(data.vertices.flat(),3));
+  geometry.setAttribute('uv',new THREE.Float32BufferAttribute(data.uvs.flat(),2));
+  geometry.setIndex(data.indices);geometry.computeVertexNormals();
+  m.body.geometry.dispose();m.body.geometry=geometry;
+  return new Promise((resolve,reject)=>loader.load(new URL(id+'-texture.jpg',base).href,texture=>{
+   texture.colorSpace=THREE.SRGBColorSpace;
+   m.body.material.map=texture;m.body.material.color.set(0xffffff);m.body.material.needsUpdate=true;resolve();
+  },undefined,reject));
+ }).catch(error=>{console.warn('Could not load '+id+' surface assets; keeping fallback sphere.',error);delete moonAssetPromises[id];});
+ return moonAssetPromises[id];
+}
 for(const [id,spec] of Object.entries(moonSpecs)){
  const pts=[];for(let i=0;i<=240;i++){const a=i/240*Math.PI*2;pts.push(new THREE.Vector3(Math.cos(a)*spec.orbit,0,Math.sin(a)*spec.orbit));}
  const orbitLine=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:0xc2a18e,transparent:true,opacity:.24}));orbitLine.visible=false;scene.add(orbitLine);
@@ -217,7 +235,7 @@ function updateMoonOrbits(){
  }
 }
 function focusMoon(id){
- const m=moonObjects[id];if(!m)return;focusedMoon=id;
+ const m=moonObjects[id];if(!m)return;focusedMoon=id;loadMoonAssets(id);
  for(const [otherId,o] of Object.entries(moonObjects)){o.focusedScale=otherId===id;o.body.scale.setScalar(otherId===id?.03:moonSpecs[otherId].radius);o.marker.visible=otherId!==id&&zoom>1.8;o.halo.visible=otherId!==id&&zoom>6.5;}
  cameraFocus.copy(m.group.position);setZoom(.18);
  document.querySelectorAll('[data-moon]').forEach(el=>el.classList.toggle('active',el.dataset.moon===id));
