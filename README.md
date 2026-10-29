@@ -54,6 +54,16 @@ The first playable diplomacy slice adds two player initiatives against an establ
 
 This is a foundation, not a full political simulation. The indices and drift rates are explicit prototype assumptions, not empirically calibrated forecasts. Internal factions, elections and leadership, sponsor coercion, actual trade and specialisation, treaties, sanctions, military alliances, secession and war are not implemented yet. In particular, colony trade does not yet transfer goods or change physical inventories; the current cooperation score is preparatory state for that later system.
 
+## Colony operational economies and freight prototype
+
+Every settlement now receives its own operational inventory, a production specialisation, stock warnings, a stability index and an Earth-dependence index. The first specialisations are agriculture, resource extraction, fabrication, engineering and electronics/science. Colonies consume basic stocks, produce according to their specialisation, and can suffer population and stability pressure when food reserves are exhausted. Low stocks can trigger sponsor cargo orders with a 240-sol interplanetary transit delay.
+
+Inter-colony freight is now simulated as actual inventory transfers: the sender's stock is deducted when cargo departs, the shipment has an origin, destination, cargo, departure/arrival sol and estimated surface distance, and the destination receives the stock only when it arrives. Dispatch is attempted every five sols where bilateral colony relations are at least 50, a sender has surplus above its reserve, and a recipient has a shortage. Freight is constrained by per-shipment amounts and one in-transit trade shipment per sender/good. Successful local trade lowers the colonies' Earth-dependence indices; sponsor imports increase them. The colony operations panel shows inventories, warnings, freight in transit and a recent shipment ledger.
+
+**Transport-system limitation:** prior to this addition, the map's orbital assets, scheduled cargo drops and optional infrastructure route visuals did not move goods between colonies. This prototype adds an abstract surface-haul model based on great-circle distance, with an assumed average progress of 180 km per sol plus two sols for loading and handling. It does not yet simulate rover fleets, roads, terrain-aware pathfinding, vehicle capacity, fuel/energy, breakdowns, route security or cargo contracts. Earth cargo uses a fixed 240-sol delay. These are gameplay assumptions, not validated transport-performance estimates.
+
+Operational inventory quantities are abstract game units, not tonnes, and this first economy is not yet reconciled with the existing kilogram-level life-support/material-conservation ledger or all construction-project costs. The existing primary-colony life-support and physical material simulations continue to run separately. Thus the trade transfers are real within the new operational economy, but they do not yet add kilograms to habitat construction stock or directly satisfy engineering recipes. That reconciliation is a deliberate next integration step, not something the current UI should imply has already happened. Trade currently runs automatically rather than through player-negotiated contracts; prices, production investment, water/energy balancing, political trade disputes and explicit specialisation choices remain future work.
+
 ## Code structure
 
 - `index.html` is the page shell and styling; application logic lives in ES modules.
@@ -63,6 +73,7 @@ This is a foundation, not a full political simulation. The indices and drift rat
 - `src/world/campaign-options.js` defines the five candidate landing sites, sponsor profiles and the campaign-start function.
 - `src/world/world-tick.js` contains the sol-based simulation and project commissioning rules.
 - `src/world/colony-politics.js` stores colony-level political agency and pairwise relationships, advances identity/autonomy indices, and resolves the first player influence initiatives.
+- `src/world/colony-economy.js` stores per-colony operational stocks and specialisations, processes consumption and production, orders sponsor imports, and dispatches/settles inter-colony freight.
 - `src/world/colony-logistics.js` renders settlement modules and zoom-dependent Earth-to-Mars cargo traffic. The interplanetary view compresses distance for readability; ship trajectories are illustrative, not a physical ephemeris.
 - `src/world/terrain.js` loads NASA MOLA MEGDR global topography when the source is reachable and uses the terrain surface for the globe and polar ice layers.
 
