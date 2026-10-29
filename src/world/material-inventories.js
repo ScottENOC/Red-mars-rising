@@ -18,7 +18,7 @@ export function createMaterialInventories() {
         surfaceLiquid: { mass: 0, confidence: 'high', note: 'No stable open surface liquid-water reservoir assumed under present-day conditions.' },
         hydratedMinerals: { mass: 1e15, confidence: 'very-low', note: 'Illustrative water-equivalent bound; not currently extractable without processing.' }
       },
-      meteoroidInputKgCumulative: 0,
+      meteoroidInputKgCumulative: 0,\n      meteoroidMatterKg: 0,\n      pendingMeteoroidInputKg: 0,
       naturalImpactsGreaterThan8mCumulative: 0,
       naturalImpactFractionalAccumulator: 0,
       lastNaturalImpactSol: 0
