@@ -5,6 +5,7 @@ import { createColonyAndLogistics } from './world/colony-logistics.js';
 import { STARTING_LOCATIONS, SPONSORS, STRATEGIC_PROGRAMS, HABITAT_COMPONENT_CATALOGUE, ensureConstructionRecipeOptions, startCampaign } from './world/campaign-options.js';
 import { processWorldTick, commissionProject, commissionStrategicProgram } from './world/world-tick.js';
 import { METEOROID_TYPES } from './world/material-inventories.js';
+import { ensureColonyPoliticalState, influenceColony, getColonyPoliticalSummary } from './world/colony-politics.js';
 
 const TEXTURE_URL=new URL('../data/mars/8k_mars.jpg', import.meta.url).href;
 const worldState = createInitialWorldState();
@@ -35,6 +36,7 @@ if (worldState.campaign?.started) {
  worldState.campaign.dependencyPolicy ??= 'accept-for-now';
  worldState.campaign.localManufacturingAssessment ??= null;
  worldState.campaign.logisticsReliability ??= 0.5;
+ ensureColonyPoliticalState(worldState);
 }
 let colonyLogistics = null;
 let terrainReady = false;
@@ -141,6 +143,23 @@ function buildHabitatComponentReport(){
  const cargoStatus='Cargo reliability: '+Math.round((worldState.campaign.logisticsReliability??0.5)*100)+'% model score'+(cargoProgram?.status==='complete'?' (pipeline programme complete).':cargoProgram?.status==='active'?' (pipeline programme in progress).':'.');
  return '<details style="margin:8px 0;padding:9px;background:#111923;border:1px solid #ffffff22;border-radius:8px"><summary style="cursor:pointer;font-weight:700">Habitat component dependencies · '+recipe.name+'</summary><div style="margin-top:8px;font-size:11px;line-height:1.55">'+rows+'<div style="padding:8px 0;border-top:1px solid #ffffff20"><strong>Strategic implications</strong><div>'+studyStatus+'</div><div>'+cargoStatus+'</div><div style="margin-top:5px">Current recipe still relies on imported qualified pressure/critical hardware. To reduce this dependency, investigate component-specific feedstock processing, fabrication, inspection and qualification; do not assume 3D printing or the study alone makes parts usable.</div></div></div></details>';
 }
+function buildColonyPoliticsReport(){
+ ensureColonyPoliticalState(worldState);
+ const home=worldState.settlements.find(s=>s.kind==='primary-colony');
+ if(!home)return '';
+ const rivals=worldState.settlements.filter(s=>s.kind==='rival-colony');
+ const pending=(worldState.sponsors??[]).filter(s=>s.id!==worldState.campaign.startingSponsorId&&!s.colonyFounded).length;
+ const rows=rivals.map(colony=>{
+  const p=getColonyPoliticalSummary(worldState,colony);
+  const lastJoint=Number(colony.politics.lastPlayerActions['joint-research']);
+  const lastAutonomy=Number(colony.politics.lastPlayerActions['martian-autonomy']);
+  const jointReady=!Number.isFinite(lastJoint)||worldState.time.sol-lastJoint>=90;
+  const autonomyReady=!Number.isFinite(lastAutonomy)||worldState.time.sol-lastAutonomy>=120;
+  const sponsor=worldState.sponsors.find(s=>s.id===colony.sponsorId);
+  return '<div style="padding:9px 0;border-top:1px solid #ffffff18"><strong>'+colony.name+'</strong><div>'+ (sponsor?.name??'Independent sponsor')+' · population '+Math.round(colony.population??0)+' · '+(colony.status??'status unknown')+'</div><div style="margin-top:4px">Martian identity index '+p.martianIdentity+' · local autonomy '+p.localAutonomy+' · sponsor influence '+p.sponsorInfluence+'</div><div>Political stability '+p.politicalStability+' · relationship with your colony '+p.relationToPlayer+' · cooperation '+p.cooperation+'</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:7px"><button data-colony-action="joint-research" data-colony-id="'+colony.id+'" '+(!jointReady||worldState.economy.funds<20?'disabled':'')+'>Joint research · 20 funds'+(!jointReady?' · cooldown':'')+'</button><button data-colony-action="martian-autonomy" data-colony-id="'+colony.id+'" '+(!autonomyReady||worldState.economy.funds<15?'disabled':'')+'>Support Martian autonomy · 15 funds'+(!autonomyReady?' · cooldown':'')+'</button></div></div>';
+ }).join('');
+ return '<details open style="margin:8px 0;padding:9px;background:#111923;border:1px solid #ffffff22;border-radius:8px"><summary style="cursor:pointer;font-weight:700">Martian colonies & diplomacy · '+rivals.length+' established</summary><div style="margin-top:8px;font-size:12px;line-height:1.55"><div>Each colony has its own political state. Sponsor relationships shape initial conditions but do not dictate colony-to-colony relations. Identity, autonomy and cooperation can evolve independently; unity is not guaranteed.</div>'+(rivals.length?rows:'<div style="padding:8px 0">No rival crewed colony has arrived yet. '+pending+' sponsor expedition plan(s) remain active; this section will become actionable when another colony is established.</div>')+'<div style="opacity:.72;margin-top:6px">These 0–100 values are prototype political indices, not measured probabilities. Joint research and autonomy initiatives are early influence actions; trade, treaties, factions, sanctions and war are not implemented yet.</div></div></details>';
+}
 function renderCampaignPanel(){
  if(!worldState.campaign.started)return;
  const sponsor=worldState.sponsors.find(x=>x.id===worldState.campaign.startingSponsorId);
@@ -172,6 +191,7 @@ function renderCampaignPanel(){
  campaignPanel.innerHTML='<div class="cp-heading"><span>Colony operations</span><span>Sol '+worldState.time.sol+'</span></div>'+
  '<div class="cp-metrics"><strong>'+home.name+'</strong><br>'+sponsor.name+' · '+worldState.settlements.length+' settlement(s)<br>Earth link: '+(worldState.pointsOfInterest.filter(p=>p.kind==='mars-orbit-comms'&&p.status==='operational').length)+' Mars relays · ~12.5 min one-way light time<br>Transfer vehicle: '+(worldState.pointsOfInterest.find(p=>p.id==='mars-crewship')?.status??'unknown')+' in Mars orbit<br>Funds '+worldState.economy.funds+' · Materials '+worldState.economy.materials+' · Water '+worldState.economy.water.toFixed(1)+'<br>Morale '+worldState.colonists.morale.toFixed(1)+' · Sponsor patience '+worldState.campaign.sponsorPatience.toFixed(1)+'<br>Global heat contribution: '+tempAnomaly.toExponential(3)+' °C anomaly</div>'+
  materialPanel+
+ buildColonyPoliticsReport()+
  buildHabitatComponentReport()+
  '<div class="cp-heading"><span>Strategic priorities</span><span>Colony-level decisions</span></div>'+
  '<div class="cp-metrics"><strong>Import dependence</strong><br>Current policy: '+({ 'accept-for-now':'Accept dependence for now', 'investigate-local-production':'Investigate local production', 'strengthen-supply-chain':'Strengthen supply chain' }[worldState.campaign.dependencyPolicy]??'Accept dependence for now')+'<br>Imported specialist components remain a potential bottleneck. Local regolith processing currently produces aggregate and metal-bearing concentrate, not qualified metal parts or finished components. The player sets priorities; the colony handles day-to-day execution.</div>'+
@@ -196,6 +216,14 @@ campaignPanel.addEventListener('click',event=>{
  if(policyButton){worldState.campaign.dependencyPolicy=policyButton.dataset.dependencyPolicy;notify('Strategic policy updated');renderCampaignPanel();saveCampaign('strategic-policy');return;}
  const strategicButton=event.target.closest('[data-strategic-program]');
  if(strategicButton){const result=commissionStrategicProgram(worldState,strategicButton.dataset.strategicProgram);notify(result.ok?'Strategic programme commissioned':result.reason);renderCampaignPanel();return;}
+ const diplomacyButton=event.target.closest('[data-colony-action]');
+ if(diplomacyButton){
+  const result=influenceColony(worldState,diplomacyButton.dataset.colonyId,diplomacyButton.dataset.colonyAction);
+  notify(result.reason);
+  renderCampaignPanel();
+  if(result.ok)saveCampaign('colony-diplomacy');
+  return;
+ }
  const saveButton=event.target.closest('[data-save-now]');
  if(saveButton){const ok=saveCampaign('manual');notify(ok?'Campaign saved on this device':'Could not save campaign; check browser storage');return;}
  const button=event.target.closest('[data-project]');if(!button)return;
