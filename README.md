@@ -28,7 +28,7 @@ Open `index.html` through GitHub Pages or a local web server. The globe uses Thr
 
 ## Asset attribution
 
-The Mars surface texture is from [Solar System Scope](https://www.solarsystemscope.com/textures/), based on NASA elevation and imagery data, used under the [Creative Commons Attribution 4.0 International licence](https://creativecommons.org/licenses/by/4.0/). The texture's colours are artistically adjusted by its creator; it is a visual atlas texture, not a scientific elevation layer.
+The Mars surface texture is from [Solar System Scope](https://www.solarsystemscope.com/textures/), based on NASA elevation and imagery data, used under the [Creative Commons Attribution 4.0 International licence](https://creativecommons.org/licenses/by/4.0/). The original asset is retained unchanged. At load time, `src/main.js` creates a derived canvas texture that suppresses bright, low-chroma pixels in the high-latitude regions where the atlas has baked-in polar ice; this allows the separate world-state polar-cap meshes to be the only rendered ice layer. This is a pragmatic visual cleanup, not a reconstruction of the terrain hidden beneath the real caps, and should be replaced or calibrated against a suitable ice-free reference dataset when one is selected. The source texture's colours are artistically adjusted by its creator; it is a visual atlas texture, not a scientific elevation layer.
 
 ## Development workflow
 
