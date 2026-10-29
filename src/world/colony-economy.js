@@ -261,6 +261,7 @@ function operateColonies(w,sol,events){
             s.status='failed';
             const refused=(w.colonyTrade.emergencyRequests??[]).some(r=>r.toId===s.id&&r.good==='food'&&r.feasibleAidRefused&&['open','unreachable','unavailable'].includes(r.status));
             if(refused)relationIncident(w,s,sol,8,'the player colony protected its reserves despite a feasible food shipment');
+            for(const request of (w.colonyTrade.emergencyRequests??[]))if(request.toId===s.id&&['open','in-transit'].includes(request.status))request.status='recipient-failed';
             events.push({type:'colony-failed',sol,description:s.name+' has been abandoned after prolonged food shortages.'});
           }
         }
