@@ -1,5 +1,6 @@
 import { createMaterialInventories, ensureMaterialInventories, checkMaterialConservation } from './material-inventories.js';
 import { ensureColonyPoliticalState } from './colony-politics.js';
+import { createPlayerCharacter } from './player-character.js';
 export const STARTING_LOCATIONS = [
  {id:'elysium',name:'Elysium Planitia',lat:4.5,lon:154.5,terrain:'Open volcanic plain',climate:'Near-equatorial; relatively favourable solar and thermal conditions',water:'Moderate prospects; accessible ice is less dependable than northern mid-latitudes',construction:'Easy',security:'Exposed',opportunity:'Best long-term candidate for an equatorial space-elevator programme.',heatDemand:.85,waterAccess:.55,buildEase:.9,vulnerability:.8,elevationKm:-1.5},
  {id:'arcadia',name:'Arcadia Planitia',lat:46.7,lon:164,terrain:'Broad northern plains',climate:'Colder, with greater seasonal variation',water:'Strong prospects for accessible buried water ice',construction:'Easy to moderate',security:'Exposed',opportunity:'Water extraction can reduce Earth dependence for life support and propellant.',heatDemand:1.2,waterAccess:.9,buildEase:.85,vulnerability:.8,elevationKm:-3},
@@ -56,11 +57,12 @@ export const SPONSORS = [
  {id:'kepler',name:'Kepler Research Alliance',type:'corporate',patience:62,support:62,pressure:48,autonomy:58,description:'Science-led alliance values discoveries but expects regular results.',strengths:'Laboratories and scientific collaboration',obligations:'Produce discoveries and maintain research access'},
  {id:'pioneer',name:'Pioneer Habitat Corporation',type:'corporate',patience:40,support:74,pressure:74,autonomy:46,description:'Habitat developer seeking rapid settlement growth.',strengths:'Habitat and life-support equipment',obligations:'Demonstrate rapid population and infrastructure growth'}
 ];
-export function startCampaign(w,locationId,sponsorId) {
+export function startCampaign(w,locationId,sponsorId,playerOptions={}) {
  if(w.campaign.started) throw new Error('Campaign has already started.');
  const site=STARTING_LOCATIONS.find(x=>x.id===locationId), sponsor=SPONSORS.find(x=>x.id===sponsorId);
  if(!site||!sponsor) throw new Error('Choose a valid landing site and sponsor.');
  w.campaign.started=true;w.campaign.startingLocationId=site.id;w.campaign.startingSponsorId=sponsor.id;
+ w.campaign.playerCharacter=createPlayerCharacter(playerOptions);
  w.campaign.sponsorPatience=sponsor.patience;w.campaign.sponsorPressure=sponsor.pressure;w.campaign.autonomy=sponsor.autonomy;
  w.campaign.supportYearsRemaining=5;
  w.campaign.strategicPrograms=STRATEGIC_PROGRAMS.map(p=>({...p,cost:{...p.cost},status:'available',remainingSols:p.durationSols,progress:0}));
