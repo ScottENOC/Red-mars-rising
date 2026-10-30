@@ -1,4 +1,15 @@
+import { IDEOLOGIES } from './player-character.js';
+
 const clamp = (value, min = 0, max = 100) => Math.max(min, Math.min(max, Number(value) || 0));
+
+const BASE_IDEOLOGICAL_SUPPORT = {
+  transformation: 46, preservation: 42, communitarian: 36,
+  sovereignty: 28, pragmatism: 48, commercial: 38
+};
+const BASE_IDEOLOGICAL_SALIENCE = {
+  transformation: 62, preservation: 58, communitarian: 48,
+  sovereignty: 68, pragmatism: 54, commercial: 56
+};
 
 function sponsorRelationship(a, b) {
   if (!a || !b || a.id === b.id) return 50;
@@ -26,6 +37,21 @@ export function ensureColonyPoliticalState(w) {
     p.lastPlayerActions ??= {};
     p.history ??= [];
     p.sponsorName ??= sponsor?.name ?? 'Unknown sponsor';
+    // Every settlement receives the same political data model. These are aggregate
+    // population attitudes, not mutually exclusive votes and not colony-level loyalty.
+    p.ideologies ??= Object.fromEntries(IDEOLOGIES.map(ideology => {
+      let support = BASE_IDEOLOGICAL_SUPPORT[ideology.id];
+      if (ideology.id === 'commercial' && sponsor?.type === 'corporate') support += 12;
+      if (ideology.id === 'pragmatism' && sponsor?.type === 'national') support += 5;
+      if (ideology.id === 'communitarian' && sponsor?.type === 'multilateral') support += 5;
+      if (ideology.id === 'sovereignty' && !isPrimary) support += 4;
+      return [ideology.id, { support: clamp(support), salience: BASE_IDEOLOGICAL_SALIENCE[ideology.id] }];
+    }));
+    p.sponsorDependence ??= isPrimary ? 88 : 82;
+    p.sponsorRelationship ??= isPrimary ? 75 : clamp(45 + (sponsor?.support ?? 50) * 0.15);
+    settlement.populationOrigins ??= settlement.sponsorId
+      ? [{ sponsorId: settlement.sponsorId, populationShare: 100 }]
+      : [];
   }
 
   for (let i = 0; i < w.settlements.length; i++) {
@@ -147,6 +173,11 @@ export function getColonyPoliticalSummary(w, settlement) {
     sponsorInfluence: Math.round(p.sponsorInfluence),
     politicalStability: Math.round(p.politicalStability),
     relationToPlayer: home && settlement.id !== home.id ? Math.round(p.relations[home.id] ?? 50) : null,
-    cooperation: Math.round(p.cooperation)
+    cooperation: Math.round(p.cooperation),
+    sponsorDependence: Math.round(p.sponsorDependence ?? 0),
+    sponsorRelationship: Math.round(p.sponsorRelationship ?? 0),
+    ideologies: Object.fromEntries(Object.entries(p.ideologies ?? {}).map(([id, profile]) => [id, {
+      support: Math.round(profile.support), salience: Math.round(profile.salience)
+    }]))
   };
 }
