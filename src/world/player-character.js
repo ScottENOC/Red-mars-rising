@@ -14,7 +14,7 @@ export const IDEOLOGIES = [
 export const PLAYER_BACKGROUNDS = [
   {id:'scientist',name:'Scientist',description:'A distinguished research career and a strong scientific network.',expertise:{science:5,chemistry:4,biology:3,geology:3,atmosphericScience:3},attributes:{diplomacy:2,leadership:2,communication:3,administration:2,engineering:2}},
   {id:'engineer',name:'Engineer',description:'A record of delivering complex infrastructure and industrial systems.',expertise:{engineering:5,robotics:3,programming:3,materialsScience:4},attributes:{diplomacy:2,leadership:3,communication:2,administration:3,science:3}},
-  {id:'pilot',name:'Pilot',description:'Extensive operational experience with demanding vehicles and transport systems.',expertise:{piloting:5,engineering:2,robotics:2},attributes:{diplomacy:2,leadership:3,communication:3,administration:2,science:2}},
+  {id:'pilot',name:'Pilot',description:'Extensive operational experience with demanding vehicles and transport systems.',expertise:{piloting:5,engineering:2,robotics:2},vehicleCompetence:{aircraft:5,spacecraft:4,zeppelin:3,rover:2},attributes:{diplomacy:2,leadership:3,communication:3,administration:2,science:2}},
   {id:'diplomat',name:'Diplomat',description:'A career in international negotiation, institutions and complex agreements.',expertise:{diplomacy:5,administration:4,communication:4},attributes:{leadership:4,engineering:1,science:2}},
   {id:'organiser',name:'Political organiser',description:'A proven ability to build coalitions, movements and public campaigns.',expertise:{leadership:5,communication:4,administration:3},attributes:{diplomacy:4,engineering:1,science:2}},
   {id:'technologist',name:'Robotics and cyber specialist',description:'Deep experience in software, autonomous systems and network security.',expertise:{programming:5,robotics:5,cyberOperations:4,engineering:3},attributes:{diplomacy:2,leadership:2,communication:2,administration:2,science:3}},
@@ -55,6 +55,7 @@ export function createPlayerCharacter({majorIdeology='sovereignty',minorIdeology
     backgroundName:origin.name,
     attributes,
     expertise,
+    vehicleCompetence:{rover:0,aircraft:0,zeppelin:0,spacecraft:0,...origin.vehicleCompetence},
     qualifications:[origin.name,...(secondaryExpertise?[SECONDARY_EXPERTISE.find(x=>x.id===secondaryExpertise)?.name].filter(Boolean):[])],
     reputation:0,
     politicalInfluence:10,
