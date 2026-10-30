@@ -16,7 +16,7 @@ export function createInitialWorldState() {
       residualCaps: { north: { extentDeg: 11.5, material: 'water-ice' }, south: { extentDeg: 8.5, material: 'water-ice-and-residual-co2' } },
       seasonalFrost: { north: { maxExtentDeg: 30, material: 'co2-frost' }, south: { maxExtentDeg: 40, material: 'co2-frost' } }
     } },
-    campaign: { started: false, startingLocationId: null, startingSponsorId: null, sponsorRelations: {}, sponsorPatience: 0, sponsorPressure: 0, reputation: 0, autonomy: 0, diplomaticIncidents: [], flags: [], supportYearsRemaining: 5 },
+    campaign: { started: false, startingLocationId: null, startingSponsorId: null, playerCharacter: null, sponsorRelations: {}, sponsorPatience: 0, sponsorPressure: 0, reputation: 0, autonomy: 0, diplomaticIncidents: [], flags: [], supportYearsRemaining: 5 },
     sponsors: [], settlements: [],
     shortlistedSites: [],
     pointsOfInterest: [
