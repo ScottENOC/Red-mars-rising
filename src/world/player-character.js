@@ -42,7 +42,7 @@ export function createPlayerCharacter({majorIdeology='sovereignty',minorIdeology
   const origin=PLAYER_BACKGROUNDS.find(x=>x.id===background);
   if(!major||!minor||major.id===minor.id||!origin) throw new Error('Choose two different ideologies and a valid professional background.');
   const attributes={diplomacy:1,leadership:1,communication:1,administration:1,engineering:1,science:1,...origin.attributes};
-  const expertise={programming:0,robotics:0,cyberOperations:0,chemistry:0,biology:0,geology:0,medicine:0,materialsScience:0,atmosphericScience:0,piloting:0,...origin.expertise};
+  const expertise={science:0,programming:0,robotics:0,cyberOperations:0,chemistry:0,biology:0,geology:0,medicine:0,materialsScience:0,atmosphericScience:0,piloting:0,...origin.expertise};
   if(secondaryExpertise && Object.hasOwn(expertise,secondaryExpertise)) expertise[secondaryExpertise]=Math.max(3,expertise[secondaryExpertise]);
   // Routine rover operation is ordinary competence, not a professional pilot qualification.
   expertise.roverOperation=0;
