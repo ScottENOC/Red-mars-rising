@@ -6,6 +6,7 @@ import { STARTING_LOCATIONS, SPONSORS, STRATEGIC_PROGRAMS, HABITAT_COMPONENT_CAT
 import { processWorldTick, commissionProject, commissionStrategicProgram } from './world/world-tick.js';
 import { METEOROID_TYPES } from './world/material-inventories.js';
 import { ensureColonyPoliticalState, influenceColony, getColonyPoliticalSummary } from './world/colony-politics.js';
+import { IDEOLOGIES, PLAYER_BACKGROUNDS, SECONDARY_EXPERTISE, createPlayerCharacter } from './world/player-character.js';
 import { ensureColonyEconomies, getColonyEconomySummary } from './world/colony-economy.js';
 import { getSponsorCommitmentSummary, requestSponsorProject } from './world/sponsor-commitments.js';
 import { getAsteroidOperationsSummary, commissionOrbitalOperations, commissionOrbitalDefence, launchAsteroidCapture, launchOrbitalAttack } from './world/asteroid-operations.js';
@@ -39,6 +40,7 @@ if (worldState.campaign?.started) {
  worldState.campaign.dependencyPolicy ??= 'accept-for-now';
  worldState.campaign.localManufacturingAssessment ??= null;
  worldState.campaign.logisticsReliability ??= 0.5;
+ worldState.campaign.playerCharacter ??= createPlayerCharacter();
  ensureColonyPoliticalState(worldState);
 }
 let colonyLogistics = null;
@@ -110,6 +112,15 @@ campaignStart.innerHTML=`
    <div class="cs-field"><label for="csSite">Starting site</label><select id="csSite"></select><div class="cs-detail" id="csSiteDetail"></div></div>
    <div class="cs-field"><label for="csSponsor">Starting sponsor</label><select id="csSponsor"></select><div class="cs-detail" id="csSponsorDetail"></div></div>
   </div>
+  <div class="cs-grid" style="margin-top:16px">
+   <div class="cs-field"><label for="csMajor">Major ideology</label><select id="csMajor"></select></div>
+   <div class="cs-field"><label for="csMinor">Minor ideology</label><select id="csMinor"></select></div>
+  </div>
+  <div class="cs-grid" style="margin-top:12px">
+   <div class="cs-field"><label for="csBackground">Professional background</label><select id="csBackground"></select></div>
+   <div class="cs-field"><label for="csExpertise">Secondary expertise</label><select id="csExpertise"><option value="">No additional specialisation</option></select></div>
+  </div>
+  <div class="cs-detail" id="csCharacterDetail" style="margin-top:12px"></div>
   <div class="cs-footer"><button id="csStart" type="button">Begin expedition</button></div>
  </div>`;
 document.querySelector('#app').appendChild(campaignStart);
@@ -117,6 +128,18 @@ const siteSelect=campaignStart.querySelector('#csSite');
 const sponsorSelect=campaignStart.querySelector('#csSponsor');
 const siteDetail=campaignStart.querySelector('#csSiteDetail');
 const sponsorDetail=campaignStart.querySelector('#csSponsorDetail');
+const majorSelect=campaignStart.querySelector('#csMajor');
+const minorSelect=campaignStart.querySelector('#csMinor');
+const backgroundSelect=campaignStart.querySelector('#csBackground');
+const expertiseSelect=campaignStart.querySelector('#csExpertise');
+const characterDetail=campaignStart.querySelector('#csCharacterDetail');
+for(const ideology of IDEOLOGIES){
+ const majorOption=document.createElement('option');majorOption.value=ideology.id;majorOption.textContent=ideology.name;majorSelect.appendChild(majorOption);
+ const minorOption=document.createElement('option');minorOption.value=ideology.id;minorOption.textContent=ideology.name;minorSelect.appendChild(minorOption);
+}
+for(const background of PLAYER_BACKGROUNDS){const option=document.createElement('option');option.value=background.id;option.textContent=background.name;backgroundSelect.appendChild(option);}
+for(const expertise of SECONDARY_EXPERTISE){const option=document.createElement('option');option.value=expertise.id;option.textContent=expertise.name;expertiseSelect.appendChild(option);}
+majorSelect.value='sovereignty';minorSelect.value='communitarian';backgroundSelect.value='scientist';expertiseSelect.value='';
 for(const site of STARTING_LOCATIONS){const option=document.createElement('option');option.value=site.id;option.textContent=site.name;siteSelect.appendChild(option);}
 for(const sponsor of SPONSORS){const option=document.createElement('option');option.value=sponsor.id;option.textContent=sponsor.name;sponsorSelect.appendChild(option);}
 siteSelect.value='elysium';sponsorSelect.value='nasa';
@@ -126,6 +149,13 @@ function refreshStartDetails(){
  sponsorDetail.innerHTML='<strong>'+sponsor.name+'</strong><div class="cs-meta">'+sponsor.type+' sponsor · patience '+sponsor.patience+'/100</div><div>'+sponsor.description+'</div><div><b>Strengths:</b> '+sponsor.strengths+'</div><div><b>Obligations:</b> '+sponsor.obligations+'</div>';
 }
 siteSelect.addEventListener('change',refreshStartDetails);sponsorSelect.addEventListener('change',refreshStartDetails);refreshStartDetails();
+function refreshCharacterDetails(){
+ const major=IDEOLOGIES.find(x=>x.id===majorSelect.value),minor=IDEOLOGIES.find(x=>x.id===minorSelect.value),background=PLAYER_BACKGROUNDS.find(x=>x.id===backgroundSelect.value),specialty=SECONDARY_EXPERTISE.find(x=>x.id===expertiseSelect.value);
+ characterDetail.innerHTML='<strong>'+background.name+' · First Hundred</strong><div>'+background.description+'</div><div style="margin-top:6px"><b>Major:</b> '+major.name+' — '+major.description+'</div><div><b>Minor:</b> '+minor.name+' — '+minor.description+'</div><div><b>Additional expertise:</b> '+(specialty?.name??'None selected')+'</div><div style="margin-top:6px;opacity:.8">Professional capabilities are established qualifications, not rapidly levelled RPG stats. Basic rover operation is assumed; specialist piloting is a separate qualification.</div>';
+ minorSelect.querySelectorAll('option').forEach(option=>option.disabled=option.value===majorSelect.value);
+ majorSelect.querySelectorAll('option').forEach(option=>option.disabled=option.value===minorSelect.value);
+}
+[majorSelect,minorSelect,backgroundSelect,expertiseSelect].forEach(el=>el.addEventListener('change',refreshCharacterDetails));refreshCharacterDetails();
 const campaignPanel=document.createElement('section');campaignPanel.id='campaignPanel';campaignPanel.hidden=true;document.querySelector('#app').appendChild(campaignPanel);
 const managementNav=document.querySelector('#managementNav');
 document.querySelector('#navColony').addEventListener('click',()=>{campaignPanel.hidden=!campaignPanel.hidden;document.querySelector('#navColony').classList.toggle('active',!campaignPanel.hidden);});
@@ -299,7 +329,9 @@ campaignPanel.addEventListener('click',event=>{
 });
 function beginSelectedCampaign(){
  if(worldState.campaign.started)return;
- const {site,sponsor}=startCampaign(worldState,siteSelect.value,sponsorSelect.value);
+ if(majorSelect.value===minorSelect.value){notify('Choose two different ideological traditions.');return;}
+ const playerOptions={majorIdeology:majorSelect.value,minorIdeology:minorSelect.value,background:backgroundSelect.value,secondaryExpertise:expertiseSelect.value||null};
+ const {site,sponsor}=startCampaign(worldState,siteSelect.value,sponsorSelect.value,playerOptions);
  locations.colony={name:worldState.settlements[0].name,lat:site.lat,lon:site.lon,zoom:.15,description:'The first settlement at '+site.name+'. Five years of expedition supplies are committed to this site.'};
  const colonyNav=document.querySelector('[data-place="colony"] .place-name');if(colonyNav)colonyNav.textContent=worldState.settlements[0].name+' · First colony';
  const jezeroNav=document.querySelector('[data-place="jezero"]');if(jezeroNav&&site.id==='jezero')jezeroNav.querySelector('.place-name').textContent='Jezero Crater · First colony';
