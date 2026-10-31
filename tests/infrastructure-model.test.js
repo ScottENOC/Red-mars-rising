@@ -10,6 +10,7 @@ import {
 import { createMaterialInventories, ensureMaterialInventories, checkMaterialConservation } from '../src/world/material-inventories.js';
 import { ensureSettlementInfrastructureAssets, installOxygenGenerator, processOxygenGenerators, processNonPrimaryColonyMetabolism, getColonyOxygenStatus, deliverInfrastructureEquipmentShipment } from '../src/world/infrastructure-services.js';
 import { processSponsorCommitments } from '../src/world/sponsor-commitments.js';
+import { ensureColonyEconomies, processColonyEconomies } from '../src/world/colony-economy.js';
 
 function world(){
   return {
