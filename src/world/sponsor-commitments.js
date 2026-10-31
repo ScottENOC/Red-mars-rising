@@ -1,8 +1,8 @@
 import { getColonyOxygenStatus, installOxygenGenerator } from './infrastructure-services.js';
 import { registerInfrastructureAsset } from './infrastructure-model.js';
 import { SHORTLISTED_SITES } from './campaign-options.js';
+import { FOOD_KG_PER_ECONOMY_UNIT } from './relief-outpost-food.js';
 
-const FOOD_KG_PER_ECONOMY_UNIT=0.62*(88775.244/86400)/0.018;
 const clamp=(v,min=0,max=100)=>Math.max(min,Math.min(max,Number(v)||0));
 const PROJECTS={
  'space-elevator':{name:'Space elevator',category:'strategic infrastructure',operatingGrant:8,description:'A major transport link with continuing power, machinery, electronics and specialist-maintenance needs.',goods:{components:8,machinery:5,electronics:3},mode:'machinery',autonomyCost:18,baseScore:48},
