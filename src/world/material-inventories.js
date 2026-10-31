@@ -1,4 +1,3 @@
-// test
 // Material inventories for the Mars campaign.
 // Water is tracked as H2O mass; free hydrogen and oxygen are tracked as elemental gas stocks.
 // Initial global reservoirs are order-of-magnitude scenario estimates, not a calibrated geochemical model.
@@ -70,7 +69,7 @@ export function ensureMaterialInventories(w) {
       colony.biomassKg=0;
       colony.solidWasteKg=0;
       colony.materialsKg={regolith:0,aggregate:0,metalConcentrate:0,tailings:0,constructionComponents:0,constructionInProgress:0,slag:0,nutrients:500,spareParts:250,polymers:100};
-      colony.gasesKg.oxygen=(colony.gasesKg.oxygen??0)+(isHome?5000:Math.max(0,Number(settlement.initialLifeSupport?.oxygenKg??10000)));
+      colony.gasesKg.oxygen=(colony.gasesKg.oxygen??0)+(isHome?20000:Math.max(0,Number(settlement.initialLifeSupport?.oxygenKg??10000)));
       colony.thermal??={storedEnergyJ:0,capacityJPerK:2e9,referenceTemperatureC:20,temperatureC:20,heatInputCumulativeJ:0,heatLossCumulativeJ:0};
       colony.physicalStocksVersion=1;
       if(isHome){
