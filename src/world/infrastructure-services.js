@@ -1,8 +1,12 @@
 import { ensureInfrastructureModel, registerInfrastructureAsset, recordInfrastructureActivity } from './infrastructure-model.js';
-import { ensureMaterialInventories, electrolyseWater } from './material-inventories.js';
+import { ensureMaterialInventories, electrolyseWater, addColonyWaterFromReaction } from './material-inventories.js';
 
 const OXYGEN_PER_WATER=0.5*31.9988/18.01528;
 const ELECTRICITY_KWH_PER_KG_OXYGEN=4.5/OXYGEN_PER_WATER;
+const GLUCOSE_MOLAR_G=6*12.011+12*1.00794+6*15.9994;
+const O2_PER_GLUC=6*31.9988/GLUCOSE_MOLAR_G;
+const CO2_PER_GLUC=6*(12.011+2*15.9994)/GLUCOSE_MOLAR_G;
+const WATER_PER_GLUC=6*18.01528/GLUCOSE_MOLAR_G;
 
 const TAG_OUTPUTS={
   greenhouse:['food','oxygen'],
@@ -97,8 +101,40 @@ export function getColonyOxygenStatus(w,colonyId){
   const population=Math.max(0,Number(settlement?.population)||0);
   const oxygenKg=Math.max(0,Number(colony.gasesKg?.oxygen)||0);
   // Approximate crew metabolic demand from the existing glucose-equivalent food model.
-  const demandKgPerSol=population*0.62*(88775.244/86400)*0.9*(0.5*31.9988/180.156);
+  const demandKgPerSol=population*0.62*(88775.244/86400)*0.9*O2_PER_GLUC;
   const generators=(w.infrastructure?.assets??[]).filter(asset=>asset.kind==='oxygen-generator'&&asset.status==='operational'&&(asset.operatorId??asset.ownerId)===colonyId);
   const capacityKgPerSol=generators.reduce((sum,asset)=>sum+Math.max(0,Number(asset.capacityOxygenKgPerSol)||0),0);
   return {colonyId,population,oxygenKg,demandKgPerSol,runwaySols:demandKgPerSol>0?oxygenKg/demandKgPerSol:null,generatorCapacityKgPerSol:capacityKgPerSol,generators:generators.map(asset=>asset.id)};
+}
+
+export function processNonPrimaryColonyMetabolism(w,sol,events=[]){
+  ensureMaterialInventories(w);
+  for(const settlement of (w.settlements??[])){
+    if(settlement.kind==='primary-colony'||['failed','abandoned'].includes(settlement.status))continue;
+    const colony=w.materials.colonies[settlement.id];
+    if(!colony)continue;
+    const people=Math.max(0,Number(settlement.population)||0);
+    const dailyFoodKg=people*0.62*(88775.244/86400);
+    const wasteFraction=0.10;
+    const requestedFoodKg=Math.min(Math.max(0,colony.foodKg??0),dailyFoodKg);
+    const oxygenLimitedFoodKg=Math.max(0,(colony.gasesKg.oxygen??0)/(O2_PER_GLUC*(1-wasteFraction)));
+    const foodEatenKg=Math.min(requestedFoodKg,oxygenLimitedFoodKg);
+    const metabolisedFoodKg=foodEatenKg*(1-wasteFraction);
+    const oxygenUsedKg=metabolisedFoodKg*O2_PER_GLUC;
+    const co2ProducedKg=metabolisedFoodKg*CO2_PER_GLUC;
+    const metabolicWaterKg=metabolisedFoodKg*WATER_PER_GLUC;
+    if(foodEatenKg>0){
+      colony.foodKg-=foodEatenKg;
+      colony.solidWasteKg=(colony.solidWasteKg??0)+foodEatenKg*wasteFraction;
+      colony.gasesKg.oxygen=Math.max(0,colony.gasesKg.oxygen-oxygenUsedKg);
+      colony.gasesKg.carbonDioxide=(colony.gasesKg.carbonDioxide??0)+co2ProducedKg;
+      addColonyWaterFromReaction(w,{colonyId:settlement.id,massKg:metabolicWaterKg,sol,process:'human-metabolism',note:'Glucose-equivalent food oxidation yields CO2 and metabolic water; 10% of consumed food mass becomes solid waste.'});
+      w.materials.ledger.push({sol,process:'human-metabolism',substance:'food',massKg:foodEatenKg,from:'colony:'+settlement.id+':food',to:'colony:'+settlement.id+':biomass-and-products',note:'Simplified colony respiration and food oxidation.'});
+    }
+    settlement.health=Math.max(0,Number(settlement.health??82)-(foodEatenKg+1e-9<dailyFoodKg?0.25:-0.006));
+    settlement.morale=Math.max(0,Math.min(100,Number(settlement.morale??65)+(foodEatenKg+1e-9<dailyFoodKg?-0.35:0.01)));
+    if(foodEatenKg+1e-9<dailyFoodKg&&sol%10===0){
+      events.push({type:'colony-oxygen-or-food-shortage',sol,description:settlement.name+' cannot sustain full metabolic rations because food or breathable oxygen is insufficient; health and morale are declining.'});
+    }
+  }
 }
