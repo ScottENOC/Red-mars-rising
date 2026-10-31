@@ -1,3 +1,5 @@
+import { getColonyOxygenStatus } from './infrastructure-services.js';
+
 const clamp=(v,min=0,max=100)=>Math.max(min,Math.min(max,Number(v)||0));
 const PROJECTS={
  'space-elevator':{name:'Space elevator',category:'strategic infrastructure',operatingGrant:8,description:'A major transport link with continuing power, machinery, electronics and specialist-maintenance needs.',goods:{components:8,machinery:5,electronics:3},mode:'machinery',autonomyCost:18,baseScore:48},
@@ -88,6 +90,42 @@ function createSponsorShipment(w,home,good,amount,sol,kind,sourceId,description,
  w.colonyTrade.tradeLog.push(entry);if(w.colonyTrade.tradeLog.length>100)w.colonyTrade.tradeLog.shift();
  return ship;
 }
+function processSponsorOxygenRelief(w,sol,state,events){
+ const settlements=(w.settlements??[]).filter(item=>!['failed','abandoned'].includes(item.status));
+ for(const settlement of settlements){
+  const oxygen=getColonyOxygenStatus(w,settlement.id);
+  if(!oxygen||oxygen.runwaySols===null||oxygen.runwaySols>300)continue;
+  const existing=(w.infrastructure?.assets??[]).some(asset=>asset.kind==='oxygen-generator'&&asset.status==='operational'&&(asset.operatorId??asset.ownerId)===settlement.id);
+  const pending=(w.colonyTrade?.shipments??[]).some(ship=>ship.kind==='infrastructure-equipment'&&ship.equipment?.kind==='oxygen-generator'&&ship.toId===settlement.id&&ship.status==='in-transit');
+  if(existing||pending)continue;
+  const preferred=(w.sponsors??[]).find(item=>item.id===settlement.sponsorId&&item.status!=='inactive');
+  const primarySponsor=sponsorFor(w);
+  const conflict=!!(w.campaign?.earthConflictDeclared||w.campaign?.warWithEarth||w.campaign?.survivalGuaranteeSuspended||w.campaign?.sponsorCommitmentsSuspended);
+  let sponsor=preferred;
+  if(!sponsor||conflict&&sponsor.id===w.campaign?.startingSponsorId){
+   const candidates=(w.sponsors??[]).filter(item=>item.id!==w.campaign?.startingSponsorId&&item.status!=='inactive').map(item=>{
+    const relation=Number(settlement.politics?.relations?.[item.id]??item.relations?.[primarySponsor?.id]??50);
+    const score=25+(Number(item.support)||50)*.18+(Number(item.patience)||50)*.08+relation*.18-(Number(item.pressure)||50)*.12+(item.type==='multilateral'?5:0);
+    return {item,score};
+   }).sort((a,b)=>b.score-a.score);
+   sponsor=candidates[0]?.score>=50?candidates[0].item:null;
+  }
+  if(!sponsor)continue;
+  const relation=Number(settlement.politics?.relations?.[sponsor.id]??(sponsor.id===settlement.sponsorId?75:50));
+  const score=35+(Number(sponsor.support)||50)*.18+(Number(sponsor.patience)||50)*.08+relation*.18-(Number(sponsor.pressure)||50)*.12+(sponsor.type==='multilateral'?5:0);
+  if(score<45)continue;
+  w.colonyTrade??={shipments:[],nextShipmentId:1,tradeLog:[]};
+  w.colonyTrade.shipments??=[];w.colonyTrade.tradeLog??=[];w.colonyTrade.nextShipmentId??=1;
+  const assetId='relief-oxygen-generator-'+settlement.id+'-'+sponsor.id;
+  const ship={id:'colony-haul-'+w.colonyTrade.nextShipmentId++,kind:'infrastructure-equipment',fromId:'earth:'+sponsor.id,toId:settlement.id,good:'oxygen-generator',amount:1,departSol:sol,arrivalSol:sol+240,travelSols:240,distanceKm:null,status:'in-transit',equipment:{kind:'oxygen-generator',assetId,name:'Sponsor-supplied portable oxygen generator',colonyId:settlement.id,ownerId:sponsor.id,funderId:sponsor.id,builderId:sponsor.id,operatorId:settlement.id,controllerId:sponsor.id,technologyProviderId:sponsor.id,softwareProviderId:sponsor.id,softwareControllerId:settlement.id,softwareModifiedByIds:[settlement.id],capacityOxygenKgPerSol:40,source:'autonomous-sponsor-survival-relief'}};
+  w.colonyTrade.shipments.push(ship);
+  const description=sponsor.name+' independently dispatched a portable oxygen generator to '+settlement.name+' after its oxygen reserve fell to about '+Math.floor(oxygen.runwaySols)+' sols at current metabolic demand. Estimated arrival: 240 sols.';
+  w.colonyTrade.tradeLog.push({sol,kind:'sponsor-relief-launched',shipmentId:ship.id,toId:settlement.id,good:'oxygen-generator',description});
+  if(w.colonyTrade.tradeLog.length>100)w.colonyTrade.tradeLog.shift();
+  record(w,{sol,kind:'oxygen-relief-launched',shipmentId:ship.id,toId:settlement.id,sponsorId:sponsor.id,oxygenRunwaySols:oxygen.runwaySols,description});
+  events.push({type:'sponsor-oxygen-relief-launched',sol,description});
+ }
+}
 export function processSponsorCommitments(w,sol,events=[]){
  const state=ensureSponsorCommitments(w);
  if(!state)return events;
@@ -140,6 +178,7 @@ export function processSponsorCommitments(w,sol,events=[]){
   if(a.status==='in-transit'&&sol>=a.arrivalSol)a.status='delivered';
   return a;
  });
+ processSponsorOxygenRelief(w,sol,state,events);
  state.lastProcessedSol=sol;
  return events;
 }
