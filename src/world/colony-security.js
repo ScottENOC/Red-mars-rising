@@ -1,10 +1,10 @@
 const clamp = (v,min=0,max=100)=>Math.max(min,Math.min(max,Number(v)||0));
 const live = c => c && !['failed','abandoned','severely-damaged'].includes(c.status);
 const evidence = {
-  imminent-threat:{label:'Imminent threat',justification:28,description:'Verified preparations or an active attack by the target'},
-  repeated-interference:{label:'Repeated interference',justification:18,description:'Documented disruption of communications, navigation or shared infrastructure'},
-  debris-danger:{label:'Orbital safety emergency',justification:12,description:'A dangerous object or debris event requiring urgent intervention'},
-  political-dispute:{label:'Political dispute',justification:-18,description:'A serious disagreement without a direct security threat'}
+  'imminent-threat':{label:'Imminent threat',justification:28,description:'Verified preparations or an active attack by the target'},
+  'repeated-interference':{label:'Repeated interference',justification:18,description:'Documented disruption of communications, navigation or shared infrastructure'},
+  'debris-danger':{label:'Orbital safety emergency',justification:12,description:'A dangerous object or debris event requiring urgent intervention'},
+  'political-dispute':{label:'Political dispute',justification:-18,description:'A serious disagreement without a direct security threat'}
 };
 export function ensureColonySecurity(w){
  if(!w?.campaign?.started)return null;
