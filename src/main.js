@@ -1,6 +1,7 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js';
 import { createInitialWorldState } from './world/world-state.js';
 import { getInfrastructureAssetSummary } from './world/infrastructure-model.js';
+import { getColonyOxygenStatus } from './world/infrastructure-services.js';
 import { terrainHeight, terrainRadiusOffset, loadMolaTopography, updatePolarCaps, setTerrainWorldState } from './world/terrain.js';
 import { createColonyAndLogistics } from './world/colony-logistics.js';
 import { STARTING_LOCATIONS, SPONSORS, STRATEGIC_PROGRAMS, HABITAT_COMPONENT_CATALOGUE, ensureConstructionRecipeOptions, startCampaign } from './world/campaign-options.js';
@@ -661,6 +662,8 @@ stars=new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xc8c5bf,size:.02
 function xyz(lat,lon,r=1.009){const a=THREE.MathUtils.degToRad(lat),b=THREE.MathUtils.degToRad(lon);return new THREE.Vector3(-r*Math.cos(a)*Math.sin(b),r*Math.sin(a),r*Math.cos(a)*Math.cos(b));}
 markerGroup=new THREE.Group();root.add(markerGroup);
 const orbitalMapGroup=new THREE.Group();scene.add(orbitalMapGroup);
+const surfaceInfrastructureGroup=new THREE.Group();root.add(surfaceInfrastructureGroup);
+const surfaceInfrastructureObjects=new Map();
 const orbitalMapObjects=new Map();
 const orbitalThreatObjects=new Map();
 function syncOrbitalThreats(){
@@ -679,6 +682,39 @@ function syncOrbitalThreats(){
   const radius=1.62-(.44*progress),phase=(Number(m.launchedSol??0)*.013)% (Math.PI*2);
   obj.marker.position.set(Math.cos(phase)*radius,Math.sin(phase)*radius*.2,Math.sin(phase)*radius);
  });
+}
+
+function syncSurfaceInfrastructureMap(){
+ const assets=(worldState.infrastructure?.assets??[]).filter(asset=>asset.domain==='surface'&&Number.isFinite(asset.location?.lat)&&Number.isFinite(asset.location?.lon));
+ const wanted=assets.filter(asset=>!['failed','abandoned','destroyed'].includes(asset.status));
+ for(const [id,obj] of surfaceInfrastructureObjects){
+  if(!wanted.some(asset=>asset.id===id)){
+   surfaceInfrastructureGroup.remove(obj.marker);
+   obj.marker.geometry.dispose();obj.marker.material.dispose();
+   surfaceInfrastructureObjects.delete(id);
+  }
+ }
+ const grouped=new Map();
+ for(const asset of wanted){const key=asset.location.siteId??asset.ownerId??asset.id;(grouped.get(key)??grouped.set(key,[]).get(key)).push(asset);}
+ for(const groupAssets of grouped.values()){
+  groupAssets.forEach((asset,index)=>{
+   let obj=surfaceInfrastructureObjects.get(asset.id);
+   if(!obj){
+    const marker=new THREE.Mesh(new THREE.SphereGeometry(.008,12,10),new THREE.MeshBasicMaterial({color:0xd7c6a7,depthWrite:false}));
+    marker.userData={kind:'infrastructure-asset',assetId:asset.id};
+    surfaceInfrastructureGroup.add(marker);obj={marker};surfaceInfrastructureObjects.set(asset.id,obj);
+   }
+   const colours={'oxygen-generator':0x7bd6e4,greenhouse:0x83c98c,'power-array':0xe6c27a,habitats:0xd7c6a7,'water-extractor':0x6fa9db,workshop:0xd9a078,laboratory:0xb69be0};
+   const angle=index/Math.max(1,groupAssets.length)*Math.PI*2;
+   const offset=groupAssets.length>1?.035:0;
+   const lat=asset.location.lat+Math.sin(angle)*offset;
+   const lon=asset.location.lon+Math.cos(angle)*offset;
+   obj.marker.position.copy(xyz(lat,lon,1+terrainRadiusOffset(lat,lon)+.006));
+   obj.marker.material.color.set(asset.status==='disabled'?0x777777:(colours[asset.kind]??0xd7c6a7));
+   obj.marker.userData={kind:'infrastructure-asset',assetId:asset.id};
+  });
+ }
+ surfaceInfrastructureGroup.visible=zoom<1.6&&zoom>0.02&&wanted.length>0;
 }
 
 function orbitalColour(owner,id=''){return owner==='player'?0x8bd3c7:id.startsWith('captured-asteroid-')?0xe6c27a:0xe29a78;}
@@ -826,9 +862,11 @@ const assetInspector=document.querySelector('#assetInspector'),assetInspectorTit
 document.querySelector('#closeAssetInspector').addEventListener('click',()=>{assetInspector.hidden=true;});
 function showInfrastructureAsset(assetId){
  const asset=getInfrastructureAssetSummary(worldState,assetId);if(!asset)return;
+ const rawAsset=worldState.infrastructure.assets.find(item=>item.id===assetId);
  const activeThreats=(worldState.asteroidOperations?.aiMissions??[]).filter(m=>m.status==='active'&&m.targetId===assetId);
- const activeMissions=(worldState.asteroidOperations?.missions??[]).filter(m=>m.status==='active');
- const location=asset.location?.kind==='orbit'?(asset.location.body??'Mars')+' orbit · detailed orbital elements not yet modelled':'Surface location or trajectory not recorded';
+ const activeMissions=asset.domain==='orbital'?(worldState.asteroidOperations?.missions??[]).filter(m=>m.status==='active'):(worldState.infrastructure.activities??[]).filter(a=>a.assetId===assetId&&a.status==='active');
+ const location=asset.location?.kind==='orbit'?(asset.location.body??'Mars')+' orbit · detailed orbital elements not yet modelled':asset.location?.kind==='surface'?(asset.location.siteId??'Mars surface')+' · '+(Number.isFinite(asset.location.lat)?asset.location.lat.toFixed(2)+'°, ':'')+(Number.isFinite(asset.location.lon)?asset.location.lon.toFixed(2)+'°':'coordinates not recorded'):'Location not recorded';
+ const oxygenStatus=rawAsset?.kind==='oxygen-generator'?getColonyOxygenStatus(worldState,rawAsset.operatorId??rawAsset.ownerId):null;
  const integrity=asset.condition?.integrity;
  const rows=[
   ['Status',asset.status],
@@ -844,11 +882,12 @@ function showInfrastructureAsset(assetId){
   ['Software modified by',asset.softwareModifiers],
   ['Occupants',asset.occupants],
   ['Location / trajectory',location],
-  ['Threat status',activeThreats.length?'Active hostile operation detected':'No active hostile operation detected'],
-  ['Current activity',activeMissions.length?activeMissions.map(m=>m.name+' · '+m.remainingSols+' sols remaining').join('; '):'No active orbital mission'],
+  ['Threat status',asset.domain==='orbital'?(activeThreats.length?'Active hostile operation detected':'No active hostile operation detected'):'Not currently assessed'],
+  ['Current activity',activeMissions.length?activeMissions.map(m=>m.description??m.name??m.type).join('; '):'No active activity recorded'],
   ['Condition',Number.isFinite(integrity)?Math.round(integrity*100)+'% integrity':'Not yet assessed'],
   ['Dependencies',(asset.dependencies??[]).length?asset.dependencies.join(', '):'Not recorded'],
-  ['Services / outputs',(asset.outputs??[]).length?asset.outputs.join(', '):'Not recorded']
+  ['Services / outputs',(asset.outputs??[]).length?asset.outputs.join(', '):'Not recorded'],
+  ...(oxygenStatus?[['Oxygen production capacity',oxygenStatus.generatorCapacityKgPerSol.toFixed(1)+' kg/sol'],['Colony oxygen reserve',oxygenStatus.oxygenKg.toFixed(0)+' kg'],['Estimated oxygen runway',oxygenStatus.runwaySols===null?'No current net deficit':Math.floor(oxygenStatus.runwaySols)+' sols'],['Estimated net oxygen demand',oxygenStatus.netDemandKgPerSol.toFixed(1)+' kg/sol'],['Last oxygen output',Number.isFinite(rawAsset.lastOutputKg)?rawAsset.lastOutputKg.toFixed(1)+' kg/sol':'Not yet operated']]:[])
  ];
  assetInspectorTitle.textContent=asset.name;
  assetInspectorBody.replaceChildren();
@@ -875,7 +914,7 @@ space.addEventListener('pointerdown',e=>{space.setPointerCapture(e.pointerId);po
 space.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2){const a=[...pointers.values()];const dist=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);const angle=Math.atan2(a[1].y-a[0].y,a[1].x-a[0].x);if(pinchStart>0)setZoom(pinchZoom*pinchStart/dist);if(lastPinchAngle!==null){let twist=angle-lastPinchAngle;while(twist>Math.PI)twist-=Math.PI*2;while(twist< -Math.PI)twist+=Math.PI*2;if(Math.abs(twist)>.001){const axis=new THREE.Vector3(0,0,1);const rotation=new THREE.Quaternion().setFromAxisAngle(axis,twist);if(focusedMoon)targetViewRotation.premultiply(rotation).normalize();else targetRotation.premultiply(rotation).normalize();showGlobeCompass();}}lastPinchAngle=angle;dragged=true;return;}if(pointer===e.pointerId){const next=trackballPoint(e.clientX,e.clientY);if(lastTrackball){const delta=new THREE.Quaternion().setFromUnitVectors(lastTrackball,next);if(focusedMoon&&moonObjects[focusedMoon])targetViewRotation.premultiply(delta).normalize();else targetRotation.premultiply(delta).normalize();}lastTrackball=next;if(pointers.size===1)dragged=true;}});
 function endPointer(e){pointers.delete(e.pointerId);if(pointer===e.pointerId){pointer=null;lastTrackball=null;}if(pointers.size<2){pinchStart=0;lastPinchAngle=null;}if(!pointers.size)space.classList.remove('dragging');}
 space.addEventListener('pointerup',endPointer);space.addEventListener('pointercancel',endPointer);
-space.addEventListener('click',e=>{if(dragged)return;const rect=renderer.domElement.getBoundingClientRect();pointerNdc.x=((e.clientX-rect.left)/rect.width)*2-1;pointerNdc.y=-((e.clientY-rect.top)/rect.height)*2+1;raycaster.setFromCamera(pointerNdc,camera);const hits=raycaster.intersectObjects([...markerGroup.children,...Object.values(moonObjects).map(m=>m.marker),...(zoom>=1.6&&zoom<8.5?(colonyLogistics?.settlementPickTargets??[]):[]),...(zoom>=1.6?(colonyLogistics?.poiPickTargets??[]).filter(p=>p.visible):[]),...(zoom>3.5&&zoom<25?[...orbitalMapObjects.values()].map(o=>o.marker):[]),...(zoom>11.5?(colonyLogistics?.shipPickTargets??[]):[])],false);if(hits.length){const hit=hits[0].object;if(hit.userData.kind==='infrastructure-asset'){showInfrastructureAsset(hit.userData.assetId);}else if(hit.userData.kind==='supply-ship'){notify(hit.userData.cargo+' · inbound · about '+Math.ceil(hit.userData.etaSols??0)+' sols remaining');}else if(hit.userData.kind==='point-of-interest'||hit.userData.kind==='natural-impact-crater'){notify(hit.userData.name+' · '+hit.userData.status+' · '+hit.userData.description);}else if(hit.userData.kind==='settlement')focusPlace('colony');else if(hit.userData.id)focusPlace(hit.userData.id);else for(const [id,m] of Object.entries(moonObjects))if(hit===m.marker){focusMoon(id);break;}}});
+space.addEventListener('click',e=>{if(dragged)return;const rect=renderer.domElement.getBoundingClientRect();pointerNdc.x=((e.clientX-rect.left)/rect.width)*2-1;pointerNdc.y=-((e.clientY-rect.top)/rect.height)*2+1;raycaster.setFromCamera(pointerNdc,camera);const hits=raycaster.intersectObjects([...markerGroup.children,...Object.values(moonObjects).map(m=>m.marker),...(zoom>=1.6&&zoom<8.5?(colonyLogistics?.settlementPickTargets??[]):[]),...(zoom>=1.6?(colonyLogistics?.poiPickTargets??[]).filter(p=>p.visible):[]),...(zoom>3.5&&zoom<25?[...orbitalMapObjects.values()].map(o=>o.marker):[]),...(zoom<1.6?[...surfaceInfrastructureObjects.values()].map(o=>o.marker):[]),...(zoom>11.5?(colonyLogistics?.shipPickTargets??[]):[])],false);if(hits.length){const hit=hits[0].object;if(hit.userData.kind==='infrastructure-asset'){showInfrastructureAsset(hit.userData.assetId);}else if(hit.userData.kind==='supply-ship'){notify(hit.userData.cargo+' · inbound · about '+Math.ceil(hit.userData.etaSols??0)+' sols remaining');}else if(hit.userData.kind==='point-of-interest'||hit.userData.kind==='natural-impact-crater'){notify(hit.userData.name+' · '+hit.userData.status+' · '+hit.userData.description);}else if(hit.userData.kind==='settlement')focusPlace('colony');else if(hit.userData.id)focusPlace(hit.userData.id);else for(const [id,m] of Object.entries(moonObjects))if(hit===m.marker){focusMoon(id);break;}}});
 function resize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);}
 addEventListener('resize',resize);
 addEventListener('pagehide',()=>saveCampaign('pagehide'));
