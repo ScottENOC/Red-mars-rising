@@ -673,7 +673,7 @@ function syncOrbitalMap(){
    const group=new THREE.Group();
    const isAsteroid=asset.id.startsWith('captured-asteroid-');
    const colour=asset.status==='disabled'?0x777777:orbitalColour(asset.owner);
-   const marker=new THREE.Mesh(new THREE.SphereGeometry(isAsteroid?.018:.012,12,10),new THREE.MeshBasicMaterial({color:colour}));
+   const marker=new THREE.Mesh(new THREE.SphereGeometry(isAsteroid ? .018 : .012,12,10),new THREE.MeshBasicMaterial({color:colour}));
    group.add(marker);
    const orbitRadius=isAsteroid?1.42:asset.owner==='player'?1.18:1.28+(index%4)*.035;
    const pts=[];for(let i=0;i<=180;i++){const a=i/180*Math.PI*2;pts.push(new THREE.Vector3(Math.cos(a)*orbitRadius,Math.sin(a)*orbitRadius*.22,Math.sin(a)*orbitRadius));}
