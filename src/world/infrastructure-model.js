@@ -88,16 +88,31 @@ export function ensureInfrastructureModel(w){
     asset.outputs??=[];
     asset.condition??={integrity:asset.status==='disabled'?0.5:1};
     asset.createdSol??=w.time?.sol??0;
-    const ownerId=asset.ownerId??(asset.owner==='player'?primaryColonyId(w):asset.owner??null);
-    if(ownerId){
-      asset.ownerId=ownerId;
-      if(!infra.actors.some(item=>item.id===ownerId))ensureActor(w,ownerId,{type:'organisation',name:ownerId});
-      ensureInfrastructureRelationship(w,{type:'owns',fromId:ownerId,toId:asset.id,metadata:{origin:'asset-owner-field'}});
+    if(!asset.location&&Number.isFinite(asset.lat)&&Number.isFinite(asset.lon))asset.location={kind:'surface',lat:asset.lat,lon:asset.lon};
+    const legacyOwner=asset.ownerId??(asset.owner==='player'?primaryColonyId(w):asset.owner??null);
+    if(legacyOwner&&!asset.ownerId)asset.ownerId=legacyOwner;
+    const roleFields=[
+      {fields:['ownerId','ownerIds'],type:'owns'},
+      {fields:['funderId','funderIds'],type:'funds'},
+      {fields:['builderId','builderIds'],type:'built'},
+      {fields:['operatorId','operatorIds'],type:'operates'},
+      {fields:['controllerId','controllerIds'],type:'controls'},
+      {fields:['maintainerId','maintainerIds'],type:'maintains'},
+      {fields:['technologyProviderId','technologyProviderIds'],type:'provides-technology'},
+      {fields:['softwareProviderId','softwareProviderIds'],type:'provides-software'},
+      {fields:['softwareControllerId','softwareControllerIds'],type:'controls-software'}
+    ];
+    for(const role of roleFields){
+      const ids=[...new Set(role.fields.flatMap(field=>Array.isArray(asset[field])?asset[field]:asset[field]?[asset[field]]:[]))];
+      for(const actorId of ids){
+        if(!infra.actors.some(item=>item.id===actorId))ensureActor(w,actorId,{type:'organisation',name:actorId});
+        ensureInfrastructureRelationship(w,{type:role.type,fromId:actorId,toId:asset.id,metadata:{origin:'asset-'+role.type}});
+      }
     }
-    for(const [field,type] of [['funderId','funds'],['builderId','built'],['operatorId','operates'],['controllerId','controls'],['maintainerId','maintains']]){
-      if(asset[field])ensureInfrastructureRelationship(w,{type,fromId:asset[field],toId:asset.id,metadata:{origin:'asset-'+field}});
+    for(const actorId of [...new Set([...(asset.occupantIds??[]),...(asset.softwareModifiedByIds??[])])]){
+      if(!infra.actors.some(item=>item.id===actorId))ensureActor(w,actorId,{type:'organisation',name:actorId});
+      ensureInfrastructureRelationship(w,{type:(asset.softwareModifiedByIds??[]).includes(actorId)?'modified-software':'occupies',fromId:actorId,toId:asset.id});
     }
-    for(const occupantId of (asset.occupantIds??[]))ensureInfrastructureRelationship(w,{type:'occupies',fromId:occupantId,toId:asset.id});
   }
   return infra;
 }
@@ -140,5 +155,5 @@ export function getInfrastructureAssetSummary(w,assetId){
     const actor=actors.get(relation.fromId);
     (roles[role]??=[]).push(actor?.name??relation.fromId);
   }
-  return {id:asset.id,name:asset.name??asset.id,domain:asset.domain,kind:asset.kind??asset.type??'infrastructure',status:asset.status??'unknown',owner:(roles.owns??[]).join(', ')||'Unassigned',funder:(roles.funds??[]).join(', ')||'Not recorded',builder:(roles.built??[]).join(', ')||'Not recorded',operator:(roles.operates??[]).join(', ')||'Not recorded',controller:(roles.controls??[]).join(', ')||'Not recorded',occupants:(roles.occupies??[]).join(', ')||'None recorded',location:asset.location??null,dependencies:[...(asset.dependencies??[])],outputs:[...(asset.outputs??[])],condition:asset.condition??null,relationships:relations.map(item=>({...item}))};
+  return {id:asset.id,name:asset.name??asset.id,domain:asset.domain,kind:asset.kind??asset.type??'infrastructure',status:asset.status??'unknown',owner:(roles.owns??[]).join(', ')||'Unassigned',funder:(roles.funds??[]).join(', ')||'Not recorded',builder:(roles.built??[]).join(', ')||'Not recorded',operator:(roles.operates??[]).join(', ')||'Not recorded',controller:(roles.controls??[]).join(', ')||'Not recorded',maintainer:(roles.maintains??[]).join(', ')||'Not recorded',technologyProviders:(roles['provides-technology']??[]).join(', ')||'Not recorded',softwareProviders:(roles['provides-software']??[]).join(', ')||'Not recorded',softwareControllers:(roles['controls-software']??[]).join(', ')||'Not recorded',softwareModifiers:(roles['modified-software']??[]).join(', ')||'Not recorded',occupants:(roles.occupies??[]).join(', ')||'None recorded',location:asset.location??null,dependencies:[...(asset.dependencies??[])],outputs:[...(asset.outputs??[])],condition:asset.condition??null,relationships:relations.map(item=>({...item}))};
 }
