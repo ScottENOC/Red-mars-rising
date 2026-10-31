@@ -1,7 +1,3 @@
-import { getColonyOxygenStatus, installOxygenGenerator } from './infrastructure-services.js';
-import { registerInfrastructureAsset } from './infrastructure-model.js';
-import { SHORTLISTED_SITES } from './campaign-options.js';
-import { FOOD_KG_PER_ECONOMY_UNIT } from './relief-outpost-food.js';
 
 const clamp=(v,min=0,max=100)=>Math.max(min,Math.min(max,Number(v)||0));
 const PROJECTS={
@@ -99,84 +95,6 @@ function reliefDistanceKm(a,b){
  const h=Math.sin(dlat/2)**2+Math.cos(lat1)*Math.cos(lat2)*Math.sin(dlon/2)**2;
  return 3389.5*2*Math.asin(Math.sqrt(Math.max(0,Math.min(1,h))));
 }
-function chooseReliefSponsor(w,settlement){
- const preferred=(w.sponsors??[]).find(item=>item.id===settlement.sponsorId&&item.status!=='inactive');
- const primarySponsor=sponsorFor(w);
- const conflict=!!(w.campaign?.earthConflictDeclared||w.campaign?.warWithEarth||w.campaign?.survivalGuaranteeSuspended||w.campaign?.sponsorCommitmentsSuspended);
- if(preferred&&!(conflict&&preferred.id===w.campaign?.startingSponsorId))return preferred;
- const candidates=(w.sponsors??[]).filter(item=>item.id!==w.campaign?.startingSponsorId&&item.status!=='inactive').map(item=>{
-  const relation=Number(settlement.politics?.relations?.[item.id]??item.relations?.[primarySponsor?.id]??50);
-  const score=25+(Number(item.support)||50)*.18+(Number(item.patience)||50)*.08+relation*.18-(Number(item.pressure)||50)*.12+(item.type==='multilateral'?5:0);
-  return {item,score};
- }).sort((a,b)=>b.score-a.score);
- return candidates[0]?.score>=50?candidates[0].item:null;
-}
-function processSponsorReliefOutposts(w,sol,events){
- const plans=w.sponsorReliefOutposts??[];
- for(const plan of plans){
-  if(plan.status!=='in-transit'||sol<plan.arrivalSol)continue;
-  const target=(w.settlements??[]).find(item=>item.id===plan.targetColonyId);
-  if(!target||['failed','abandoned'].includes(target.status)){plan.status='cancelled';plan.cancelledSol=sol;continue;}
-  const site=(w.shortlistedSites??SHORTLISTED_SITES).find(item=>item.id===plan.siteId&&!w.settlements.some(s=>s.id===item.id||reliefDistanceKm(s,item)<350)&&!(w.sponsors??[]).some(sponsor=>sponsor.rivalPlan?.siteId===item.id&&sponsor.rivalPlan?.status!=='established'));
-  if(!site){plan.status='site-unavailable';plan.lastCheckedSol=sol;continue;}
-  const outpostId='relief-outpost-'+plan.id;
-  const outpost={...site,id:outpostId,locationId:site.id,name:plan.sponsorName+' Relief Outpost',kind:'rival-colony',settlementType:'relief-outpost',population:8,status:'established',sponsorId:plan.sponsorId,infrastructure:['habitats','power-array','greenhouse'],health:82,morale:65,reliefMissionId:plan.id,initialLifeSupport:{foodKg:55*FOOD_KG_PER_ECONOMY_UNIT,waterKg:15000,oxygenKg:10000},economy:{specialisation:'agriculture',inventory:{food:55}}};
-  w.settlements.push(outpost);
-  installOxygenGenerator(w,{colonyId:outpostId,assetId:'outpost-life-support-oxygen-'+plan.id,name:'Relief outpost life-support electrolyser',ownerId:plan.sponsorId,funderId:plan.sponsorId,builderId:plan.sponsorId,operatorId:outpostId,controllerId:plan.sponsorId,technologyProviderId:plan.sponsorId,softwareProviderId:plan.sponsorId,softwareControllerId:outpostId,capacityOxygenKgPerSol:10,source:'hermit-crab-relief-outpost-life-support'});
-  const equipmentId='stored-relief-generator-'+plan.id;
-  registerInfrastructureAsset(w,{
-   id:equipmentId,name:'Portable oxygen generator (relief reserve)',domain:'surface',kind:'oxygen-generator',status:'stored',
-   ownerId:plan.sponsorId,funderId:plan.sponsorId,builderId:plan.sponsorId,operatorId:outpostId,controllerId:plan.sponsorId,
-   technologyProviderId:plan.sponsorId,softwareProviderId:plan.sponsorId,softwareControllerId:outpostId,
-   location:{kind:'surface',lat:site.lat??null,lon:site.lon??null,siteId:site.id},
-   dependencies:['water','electricity'],outputs:['oxygen'],capacityOxygenKgPerSol:40,
-   condition:{integrity:1},source:'autonomous-hermit-crab-relief-outpost'
-  });
-  plan.outpostId=outpostId;plan.equipmentAssetId=equipmentId;plan.establishedSol=sol;plan.status='outpost-established';
-  // The outpost dispatches its spare machine over the surface freight network.
-  // It is not installed at the distressed colony until the cargo actually arrives.
-  const surfaceDistanceKm=reliefDistanceKm(outpost,target);
-  const surfaceTravelSols=Math.max(2,Math.ceil(surfaceDistanceKm/300));
-  const shipment={id:'colony-haul-'+(w.colonyTrade.nextShipmentId++),kind:'infrastructure-equipment',fromId:outpostId,toId:target.id,good:'oxygen-generator',amount:1,departSol:sol,arrivalSol:sol+surfaceTravelSols,travelSols:surfaceTravelSols,distanceKm:Math.round(surfaceDistanceKm),status:'in-transit',equipment:{kind:'oxygen-generator',assetId:'relief-oxygen-generator-'+target.id+'-'+plan.sponsorId,name:'Hermit-crab relief oxygen generator',colonyId:target.id,ownerId:plan.sponsorId,funderId:plan.sponsorId,builderId:plan.sponsorId,operatorId:target.id,controllerId:plan.sponsorId,technologyProviderId:plan.sponsorId,softwareProviderId:plan.sponsorId,softwareControllerId:target.id,softwareModifiedByIds:[target.id],capacityOxygenKgPerSol:40,source:'hermit-crab-relief-outpost',sourceAssetId:equipmentId},reliefPlanId:plan.id};
-  w.colonyTrade.shipments.push(shipment);
-  w.colonyTrade.tradeLog.push({sol,kind:'relief-outpost-equipment-dispatched',shipmentId:shipment.id,fromId:outpostId,toId:target.id,good:'oxygen-generator',amount:1,description:outpost.name+' dispatched its spare oxygen generator to '+target.name+'; estimated surface delivery in '+surfaceTravelSols+' sols.'});
-  plan.equipmentShipmentId=shipment.id;plan.status='equipment-in-transit';
-  const description=outpost.name+' has established an eight-person relief outpost and dispatched its spare oxygen generator to '+target.name+'.';
-  record(w,{sol,kind:'relief-outpost-established',outpostId,targetColonyId:target.id,sponsorId:plan.sponsorId,description});
-  events.push({type:'sponsor-relief-outpost-established',sol,description});
- }
-}
-function processSponsorOxygenRelief(w,sol,state,events){
- const settlements=(w.settlements??[]).filter(item=>!['failed','abandoned'].includes(item.status));
- w.sponsorReliefOutposts??=[];
- for(const settlement of settlements){
-  const oxygen=getColonyOxygenStatus(w,settlement.id);
-  if(!oxygen||oxygen.runwaySols===null||oxygen.runwaySols>300)continue;
-  const existing=(w.infrastructure?.assets??[]).some(asset=>asset.kind==='oxygen-generator'&&asset.status==='operational'&&(asset.operatorId??asset.ownerId)===settlement.id);
-  const pendingShipment=(w.colonyTrade?.shipments??[]).some(ship=>ship.kind==='infrastructure-equipment'&&ship.equipment?.kind==='oxygen-generator'&&ship.toId===settlement.id&&ship.status==='in-transit');
-  const pendingPlan=w.sponsorReliefOutposts.some(plan=>plan.targetColonyId===settlement.id&&['in-transit','outpost-established','equipment-in-transit'].includes(plan.status));
-  if(existing||pendingShipment||pendingPlan)continue;
-  const sponsor=chooseReliefSponsor(w,settlement);
-  if(!sponsor)continue;
-  const relation=Number(settlement.politics?.relations?.[sponsor.id]??(sponsor.id===settlement.sponsorId?75:50));
-  const score=35+(Number(sponsor.support)||50)*.18+(Number(sponsor.patience)||50)*.08+relation*.18-(Number(sponsor.pressure)||50)*.12+(sponsor.type==='multilateral'?5:0);
-  if(score<45)continue;
-  const occupied=(w.settlements??[]).map(item=>item.id);
-  const available=(w.shortlistedSites??SHORTLISTED_SITES).filter(site=>!occupied.includes(site.id)&&!(w.settlements??[]).some(item=>reliefDistanceKm(item,site)<350)&&!(w.sponsors??[]).some(item=>item.rivalPlan?.siteId===site.id&&item.rivalPlan?.status!=='established')&&!(w.sponsorReliefOutposts??[]).some(plan=>plan.siteId===site.id&&['in-transit','outpost-established','equipment-in-transit'].includes(plan.status)));
-  const site=available.map(item=>({item,distance:reliefDistanceKm(item,settlement)})).filter(entry=>entry.distance>=350).sort((a,b)=>a.distance-b.distance)[0]?.item;
-  if(!site)continue;
-  const id='hermit-crab-'+settlement.id+'-'+sponsor.id+'-'+sol;
-  const plan={id,targetColonyId:settlement.id,sponsorId:sponsor.id,sponsorName:sponsor.name,siteId:site.id,siteName:site.name,launchedSol:sol,arrivalSol:sol+240,status:'in-transit',oxygenRunwayAtLaunch:oxygen.runwaySols,score};
-  w.sponsorReliefOutposts.push(plan);
-  w.colonyTrade??={shipments:[],nextShipmentId:1,tradeLog:[]};
-  w.colonyTrade.shipments??=[];w.colonyTrade.tradeLog??=[];w.colonyTrade.nextShipmentId??=1;
-  const description=sponsor.name+' launched an autonomous eight-person hermit-crab relief outpost for '+settlement.name+' after its oxygen runway fell to about '+Math.floor(oxygen.runwaySols)+' sols. The outpost is expected in 240 sols and carries a spare oxygen generator.';
-  w.colonyTrade.tradeLog.push({sol,kind:'relief-outpost-launched',reliefPlanId:id,toId:settlement.id,description});
-  record(w,{sol,kind:'relief-outpost-launched',reliefPlanId:id,targetColonyId:settlement.id,sponsorId:sponsor.id,oxygenRunwaySols:oxygen.runwaySols,description});
-  events.push({type:'sponsor-relief-outpost-launched',sol,description});
- }
-}
-
 export function processSponsorCommitments(w,sol,events=[]){
  const state=ensureSponsorCommitments(w);
  if(!state)return events;
@@ -229,13 +147,11 @@ export function processSponsorCommitments(w,sol,events=[]){
   if(a.status==='in-transit'&&sol>=a.arrivalSol)a.status='delivered';
   return a;
  });
- processSponsorReliefOutposts(w,sol,events);
- processSponsorOxygenRelief(w,sol,state,events);
  state.lastProcessedSol=sol;
  return events;
 }
 export function getSponsorCommitmentSummary(w){
  const state=ensureSponsorCommitments(w);
  if(!state)return null;
- return {survivalGuaranteeActive:state.survivalGuaranteeActive,commitments:state.commitments.map(c=>({...c,goods:{...c.goods}})),requests:state.requests.slice(-10).reverse(),history:state.history.slice(-8).reverse(),externalAppeals:state.externalAppeals.slice(-8).reverse(),reliefOutposts:(w.sponsorReliefOutposts??[]).slice(-10).reverse().map(item=>({...item})),availableProjects:Object.entries(PROJECTS).map(([id,p])=>({id,...p}))};
+ return {survivalGuaranteeActive:state.survivalGuaranteeActive,commitments:state.commitments.map(c=>({...c,goods:{...c.goods}})),requests:state.requests.slice(-10).reverse(),history:state.history.slice(-8).reverse(),externalAppeals:state.externalAppeals.slice(-8).reverse(),availableProjects:Object.entries(PROJECTS).map(([id,p])=>({id,...p}))};
 }
