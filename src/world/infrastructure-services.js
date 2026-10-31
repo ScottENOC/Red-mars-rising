@@ -1,6 +1,5 @@
 import { ensureInfrastructureModel, registerInfrastructureAsset, recordInfrastructureActivity } from './infrastructure-model.js';
 import { ensureMaterialInventories, electrolyseWater, addColonyWaterFromReaction } from './material-inventories.js';
-import { FOOD_KG_PER_ECONOMY_UNIT } from './relief-outpost-food.js';
 
 const OXYGEN_PER_WATER=0.5*31.9988/18.01528;
 const ELECTRICITY_KWH_PER_KG_OXYGEN=4.5/OXYGEN_PER_WATER;
@@ -151,7 +150,6 @@ export function processNonPrimaryColonyMetabolism(w,sol,events=[]){
     const metabolicWaterKg=metabolisedFoodKg*WATER_PER_GLUC;
     if(foodEatenKg>0){
       colony.foodKg-=foodEatenKg;
-      if(settlement.settlementType==='relief-outpost'&&settlement.economy){settlement.economy.inventory.food=Math.max(0,(Number(settlement.economy.inventory.food)||0)-foodEatenKg/FOOD_KG_PER_ECONOMY_UNIT);}
       colony.solidWasteKg=(colony.solidWasteKg??0)+foodEatenKg*wasteFraction;
       colony.gasesKg.oxygen=Math.max(0,colony.gasesKg.oxygen-oxygenUsedKg);
       colony.gasesKg.carbonDioxide=(colony.gasesKg.carbonDioxide??0)+co2ProducedKg;
