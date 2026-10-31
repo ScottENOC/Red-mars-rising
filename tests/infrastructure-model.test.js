@@ -237,3 +237,30 @@ test('oxygen generator output is capped by shared power headroom',()=>{
   assert.ok(output[0].oxygenKg<10);
   assert.ok(getColonyOxygenStatus(w,'first-colony').generatorCapacityKgPerSol<10);
 });
+
+
+test('hermit-crab outpost establishes and transfers its spare oxygen generator',()=>{
+  const w=campaignWorld();
+  w.materials.colonies['first-colony'].gasesKg.oxygen=100;
+  const events=[];
+  processSponsorCommitments(w,1,events);
+  const plan=w.sponsorReliefOutposts[0];
+  assert.ok(plan);
+  processSponsorCommitments(w,241,events);
+  const outpost=w.settlements.find(item=>item.id===plan.outpostId);
+  assert.ok(outpost);
+  assert.equal(outpost.kind,'relief-outpost');
+  assert.equal(outpost.population,8);
+  const spare=w.infrastructure.assets.find(item=>item.id===plan.equipmentAssetId);
+  assert.equal(spare.status,'stored');
+  const shipment=w.colonyTrade.shipments.find(item=>item.id===plan.equipmentShipmentId);
+  assert.equal(shipment.fromId,outpost.id);
+  assert.equal(shipment.toId,'first-colony');
+  assert.equal(shipment.arrivalSol,253);
+  assert.equal(deliverInfrastructureEquipmentShipment(w,shipment,w.settlements[0],253,events),true);
+  assert.equal(spare.status,'transferred');
+  assert.equal(plan.status,'delivered');
+  const installed=w.infrastructure.assets.find(item=>item.id===shipment.equipment.assetId);
+  assert.equal(installed.ownerId,'nasa');
+  assert.equal(installed.operatorId,'first-colony');
+});
