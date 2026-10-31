@@ -167,6 +167,14 @@ export function processNonPrimaryColonyMetabolism(w,sol,events=[]){
 export function deliverInfrastructureEquipmentShipment(w,ship,destination,sol,events=[]){
   if(ship?.kind!=='infrastructure-equipment'||ship.equipment?.kind!=='oxygen-generator')return false;
   installOxygenGenerator(w,ship.equipment);
+  if(ship.equipment.sourceAssetId){
+    const sourceAsset=(w.infrastructure?.assets??[]).find(asset=>asset.id===ship.equipment.sourceAssetId);
+    if(sourceAsset){sourceAsset.status='transferred';sourceAsset.transferredToAssetId=ship.equipment.assetId;sourceAsset.transferredSol=sol;}
+  }
+  if(ship.reliefPlanId){
+    const plan=(w.sponsorReliefOutposts??[]).find(item=>item.id===ship.reliefPlanId);
+    if(plan){plan.status='delivered';plan.deliveredSol=sol;}
+  }
   ship.status='delivered';
   events.push({type:'sponsor-oxygen-equipment-arrived',sol,description:'A sponsor-supplied oxygen generator has arrived and been installed at '+destination.name+'.'});
   w.colonyTrade??={shipments:[],nextShipmentId:1,tradeLog:[]};
