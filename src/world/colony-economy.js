@@ -1,5 +1,6 @@
 import { ensureSponsorCommitments, processSponsorCommitments } from './sponsor-commitments.js';
 import { terrainElevationMeters } from './terrain.js';
+import { installOxygenGenerator } from './infrastructure-services.js';
 const GOODS = ['food','components','machinery','electronics','aggregate'];
 const clamp = (v,min=0,max=100)=>Math.max(min,Math.min(max,Number(v)||0));
 const round3 = v=>Math.round(v*1000)/1000;
@@ -212,6 +213,13 @@ function deliverShipments(w,sol,events){
     if(!destination||destination.status==='failed'||destination.status==='abandoned'){
       ship.status='lost';
       addTradeLog(w,{sol,kind:'lost',shipmentId:ship.id,description:'A shipment was lost because its destination is no longer operational.'});
+      continue;
+    }
+    if(ship.kind==='infrastructure-equipment'&&ship.equipment?.kind==='oxygen-generator'){
+      installOxygenGenerator(w,ship.equipment);
+      ship.status='delivered';
+      events.push({type:'sponsor-oxygen-equipment-arrived',sol,description:'A sponsor-supplied oxygen generator has arrived and been installed at '+destination.name+'.'});
+      addTradeLog(w,{sol,kind:'equipment-installed',shipmentId:ship.id,toId:destination.id,good:ship.good,description:'Sponsor-supplied oxygen generator installed at '+destination.name+'.'});
       continue;
     }
     destination.economy.inventory[ship.good]=round3((destination.economy.inventory[ship.good]??0)+ship.amount);
