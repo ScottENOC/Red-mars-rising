@@ -1,8 +1,7 @@
 import { ensureSponsorCommitments, processSponsorCommitments } from './sponsor-commitments.js';
 import { terrainElevationMeters } from './terrain.js';
 import { deliverInfrastructureEquipmentShipment } from './infrastructure-services.js';
-import { ensureMaterialInventories } from './material-inventories.js';
-import { FOOD_KG_PER_ECONOMY_UNIT as FOOD_KG_PER_UNIT, ensureReliefOutpostFoodBridge, processReliefOutpostAgriculture } from './relief-outpost-food.js';
+import { ensureMaterialInventories, FOOD_KG_PER_ECONOMY_UNIT as FOOD_KG_PER_UNIT } from './material-inventories.js';
 const GOODS = ['food','components','machinery','electronics','aggregate'];
 const clamp = (v,min=0,max=100)=>Math.max(min,Math.min(max,Number(v)||0));
 const round3 = v=>Math.round(v*1000)/1000;
@@ -64,7 +63,6 @@ export function ensureColonyEconomies(w){
     e.lastTradeSol ??= -10000;
     e.stability ??=70;
     e.specialisationLabel ??=SPECIALISATIONS[e.specialisation]?.label??'General settlement';
-    ensureReliefOutpostFoodBridge(w,s);
   }
   return w.colonyTrade;
 }
@@ -130,7 +128,7 @@ function priorityFor(w,settlement){
   const primary=(w.settlements??[]).find(s=>s.kind==='primary-colony');
   return primary&&settlement.id!==primary.id&&w.campaign.colonyTradePolicy?.[settlement.id]==='prioritise'?1:0;
 }
-function aidReserve(good,settlement=null){if(good==='food'&&settlement?.settlementType==='relief-outpost')return 55;return {food:35,components:12,machinery:8,electronics:6,aggregate:18}[good]??10;}
+function aidReserve(good){return {food:35,components:12,machinery:8,electronics:6,aggregate:18}[good]??10;}
 function emergencyThreshold(good){return {food:12,components:1,machinery:0.5,electronics:0.25,aggregate:1}[good]??1;}
 function emergencyNeed(colony,good){return Number(colony?.economy?.inventory?.[good]??0)<emergencyThreshold(good);}
 function aidPolicy(w,recipient){return w.campaign.emergencyAidPolicy?.[recipient.id]??'automatic';}
@@ -205,15 +203,12 @@ function createShipment(w,from,to,good,amount,sol,kind='trade'){
   const distanceKm=routeDistanceKm(from,to);
   const route=routeTravel(w,from,to,distanceKm);
   const travelSols=route.travelSols;
-  let shippedAmount=Number(amount)||0;
-  if(good==='food'&&w.materials?.colonies?.[from.id]){
-    shippedAmount=Math.min(shippedAmount,Math.max(0,Number(w.materials.colonies[from.id].foodKg)||0)/FOOD_KG_PER_UNIT);
-  }
+  const shippedAmount=Number(amount)||0;
   if(shippedAmount<=0)return null;
   const shipment={id:'colony-haul-'+w.colonyTrade.nextShipmentId++,kind,fromId:from.id,toId:to.id,good,amount:round3(shippedAmount),departSol:sol,arrivalSol:sol+travelSols,travelSols,distanceKm:Math.round(distanceKm),terrainProfile:route.profile?{reliefM:Math.round(route.profile.relief),ascentM:Math.round(route.profile.ascent),maxGradePct:Math.round(route.profile.maxGrade*100)}:null,roadUsed:route.road,navigationBeacons:route.beacons,effectiveSpeedKmPerSol:route.effectiveSpeed,status:'in-transit'};
   from.economy.inventory[good]=round3(Math.max(0,from.economy.inventory[good]-shipment.amount));
   if(good==='food'&&w.materials?.colonies?.[from.id]){
-    const foodMassKg=shipment.amount*FOOD_KG_PER_UNIT;
+    const foodMassKg=Math.min(shipment.amount*FOOD_KG_PER_UNIT,Math.max(0,Number(w.materials.colonies[from.id].foodKg)||0));
     w.materials.colonies[from.id].foodKg=Math.max(0,w.materials.colonies[from.id].foodKg-foodMassKg);
     w.materials.inTransitFoodKg=(Number(w.materials.inTransitFoodKg)||0)+foodMassKg;
     shipment.foodMassKg=foodMassKg;
@@ -236,7 +231,7 @@ function deliverShipments(w,sol,events){
     if(deliverInfrastructureEquipmentShipment(w,ship,destination,sol,events))continue;
     destination.economy.inventory[ship.good]=round3((destination.economy.inventory[ship.good]??0)+ship.amount);
     if(ship.good==='food'){
-      const foodMassKg=Number(ship.foodMassKg??(ship.kind==='earth-import'&&destination.settlementType==='relief-outpost'?ship.amount*FOOD_KG_PER_UNIT:0));
+      const foodMassKg=Number(ship.foodMassKg??(ship.kind==='earth-import'?ship.amount*FOOD_KG_PER_UNIT:0));
       if(foodMassKg>0){
         if(ship.foodMassInTransit)w.materials.inTransitFoodKg=Math.max(0,(w.materials.inTransitFoodKg||0)-foodMassKg);
         else w.materials.externalFlows.colonyMatterImportsKg=(w.materials.externalFlows.colonyMatterImportsKg||0)+foodMassKg;
@@ -293,12 +288,10 @@ function operateColonies(w,sol,events){
     for(const good of GOODS){
       const baselineFood=good==='food'?0.45*Math.max(0.25,pop/45):0;
       const produced=((spec.produces[good]??0)*(Math.max(0.25,pop/45)))+baselineFood;
-      const reliefOutpost=s.settlementType==='relief-outpost';
-      const consumed=good==='food'?(reliefOutpost?0:pop*0.018):good==='components'?0.035:good==='machinery'?0.018:good==='electronics'?0.012:0.025;
-      e.inventory[good]=round3(Math.max(0,e.inventory[good]+(reliefOutpost&&good==='food'?0:produced)-consumed));
+      const consumed=good==='food'?pop*0.018:good==='components'?0.035:good==='machinery'?0.018:good==='electronics'?0.012:0.025;
+      e.inventory[good]=round3(Math.max(0,e.inventory[good]+produced-consumed));
       e.shortages[good]=e.inventory[good]< (good==='food'?12:good==='components'?3:good==='machinery'?2:good==='electronics'?1.5:3);
     }
-    if(s.settlementType==='relief-outpost')processReliefOutpostAgriculture(w,s,sol);
     const food=e.inventory.food;
     if(food<5){
       e.stability=clamp(e.stability-0.15);
@@ -346,7 +339,7 @@ function dispatchIntercolonyTrade(w,sol){
   const alive=(w.settlements??[]).filter(s=>!['failed','abandoned'].includes(s.status));
   for(const from of alive){
     for(const good of GOODS){
-      const exportReserve=good==='food'&&from.settlementType==='relief-outpost'?55:(good==='food'?45:good==='components'?18:good==='machinery'?12:good==='electronics'?10:25);
+      const exportReserve=good==='food'?45:good==='components'?18:good==='machinery'?12:good==='electronics'?10:25;
       if(from.economy.inventory[good]<=exportReserve)continue;
       if(w.colonyTrade.shipments.some(x=>x.status==='in-transit'&&x.fromId===from.id&&x.good===good))continue;
       const needThreshold={food:25,components:10,machinery:6,electronics:5,aggregate:12}[good];
@@ -354,7 +347,7 @@ function dispatchIntercolonyTrade(w,sol){
         .sort((a,b)=>priorityFor(w,b)-priorityFor(w,a)||a.economy.inventory[good]-b.economy.inventory[good])[0];
       if(!to)continue;
       if(!routineExchangeAllowed(w,from,to))continue;
-      const reserve=good==='food'&&from.settlementType==='relief-outpost'?55:{food:35,components:12,machinery:8,electronics:6,aggregate:18}[good];
+      const reserve={food:35,components:12,machinery:8,electronics:6,aggregate:18}[good];
       const targetStock={food:55,components:18,machinery:12,electronics:10,aggregate:25}[good];
       const amount=Math.min(good==='food'?30:good==='components'?12:good==='machinery'?8:good==='electronics'?6:18,from.economy.inventory[good]-reserve,targetStock-to.economy.inventory[good]);
       if(amount<=0)continue;
