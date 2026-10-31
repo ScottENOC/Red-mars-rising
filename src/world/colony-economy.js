@@ -308,14 +308,6 @@ function operateColonies(w,sol,events){
       const reliefOutpost=s.settlementType==='relief-outpost';
       const consumed=good==='food'?(reliefOutpost?0:pop*0.018):good==='components'?0.035:good==='machinery'?0.018:good==='electronics'?0.012:0.025;
       e.inventory[good]=round3(Math.max(0,e.inventory[good]+(reliefOutpost&&good==='food'?0:produced)-consumed));
-      if(good==='food'&&reliefOutpost){
-        const producedMassKg=produced*FOOD_KG_PER_UNIT;
-        if(producedMassKg>0){
-          w.materials.colonies[s.id].foodKg+=producedMassKg;
-          w.materials.externalFlows.colonyMatterImportsKg=(w.materials.externalFlows.colonyMatterImportsKg||0)+producedMassKg;
-          w.materials.ledger.push({sol,process:'relief-outpost-agriculture-proxy',substance:'food',massKg:producedMassKg,from:'local-agriculture-model',to:'colony:'+s.id+':food',note:'Existing abstract agricultural output is converted to physical food mass for the relief-outpost ration store; crop chemistry and feedstock are not yet simulated.'});
-        }
-      }
       e.shortages[good]=e.inventory[good]< (good==='food'?12:good==='components'?3:good==='machinery'?2:good==='electronics'?1.5:3);
     }
     if(s.settlementType==='relief-outpost'){
