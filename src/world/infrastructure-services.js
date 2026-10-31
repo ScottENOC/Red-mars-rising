@@ -41,7 +41,7 @@ export function installOxygenGenerator(w,{
   colonyId,assetId,name='Portable oxygen generation unit',ownerId=null,funderId=null,
   builderId=null,operatorId=colonyId,controllerId=null,technologyProviderId=null,
   softwareProviderId=null,softwareControllerId=operatorId,softwareModifiedByIds=[],
-  capacityOxygenKgPerSol=60,maxElectricityKWhPerSol=null,source='sponsor-relief-cargo'
+  capacityOxygenKgPerSol=60,maxElectricityKWhPerSol=null,source='sponsor-equipment-delivery'
 }={}){
   const settlement=(w.settlements??[]).find(item=>item.id===colonyId);
   if(!settlement)throw new Error('Cannot install oxygen equipment at an unknown colony.');
@@ -170,10 +170,6 @@ export function deliverInfrastructureEquipmentShipment(w,ship,destination,sol,ev
   if(ship.equipment.sourceAssetId){
     const sourceAsset=(w.infrastructure?.assets??[]).find(asset=>asset.id===ship.equipment.sourceAssetId);
     if(sourceAsset){sourceAsset.status='transferred';sourceAsset.transferredToAssetId=ship.equipment.assetId;sourceAsset.transferredSol=sol;}
-  }
-  if(ship.reliefPlanId){
-    const plan=(w.sponsorReliefOutposts??[]).find(item=>item.id===ship.reliefPlanId);
-    if(plan){plan.status='delivered';plan.deliveredSol=sol;}
   }
   ship.status='delivered';
   events.push({type:'sponsor-oxygen-equipment-arrived',sol,description:'A sponsor-supplied oxygen generator has arrived and been installed at '+destination.name+'.'});
