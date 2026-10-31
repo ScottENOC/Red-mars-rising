@@ -119,7 +119,7 @@ function processSponsorReliefOutposts(w,sol,events){
   const site=(w.shortlistedSites??SHORTLISTED_SITES).find(item=>item.id===plan.siteId&&!w.settlements.some(s=>s.id===item.id||reliefDistanceKm(s,item)<350));
   if(!site){plan.status='site-unavailable';plan.lastCheckedSol=sol;continue;}
   const outpostId='relief-outpost-'+plan.id;
-  const outpost={...site,id:outpostId,locationId:site.id,name:plan.sponsorName+' Relief Outpost',kind:'relief-outpost',population:8,status:'established',sponsorId:plan.sponsorId,infrastructure:['habitats','power-array'],health:82,morale:65,reliefMissionId:plan.id};
+  const outpost={...site,id:outpostId,locationId:site.id,name:plan.sponsorName+' Relief Outpost',kind:'rival-colony',settlementType:'relief-outpost',population:8,status:'established',sponsorId:plan.sponsorId,infrastructure:['habitats','power-array'],health:82,morale:65,reliefMissionId:plan.id};
   w.settlements.push(outpost);
   const equipmentId='stored-relief-generator-'+plan.id;
   registerInfrastructureAsset(w,{
