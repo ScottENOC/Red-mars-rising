@@ -18,7 +18,7 @@ function capability(w,colonyId){
 }
 function corroborated(w,proposer,target,reason){
  const ops=w.asteroidOperations;
- if(reason==='imminent-threat')return (ops?.aiMissions??[]).some(m=>m.owner===target.id&&m.targetId==='rival-relay-'+proposer.id&&m.status==='active')||(w.colonySecurity?.proposals??[]).some(p=>p.proposerId===target.id&&p.targetId===proposer.id&&['approved','under-review'].includes(p.status));
+ if(reason==='imminent-threat'){const relayId=proposer.kind==='primary-colony'?'player-relay':'rival-relay-'+proposer.id;return (ops?.aiMissions??[]).some(m=>m.owner===target.id&&m.targetId===relayId&&m.status==='active')||(w.colonySecurity?.proposals??[]).some(p=>p.proposerId===target.id&&p.targetId===proposer.id&&['approved','under-review'].includes(p.status));}
  if(reason==='repeated-interference')return (w.colonySecurity?.history??[]).some(h=>h.actorId===target.id&&h.targetId===proposer.id&&w.time.sol-h.sol<=120);
  if(reason==='debris-danger')return (w.events??[]).some(e=>e.type==='orbital-debris-threat'&&e.colonyId===proposer.id&&w.time.sol-(e.sol??0)<=30);
  return false;
