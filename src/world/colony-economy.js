@@ -1,9 +1,11 @@
 import { ensureSponsorCommitments, processSponsorCommitments } from './sponsor-commitments.js';
 import { terrainElevationMeters } from './terrain.js';
 import { deliverInfrastructureEquipmentShipment } from './infrastructure-services.js';
+import { ensureMaterialInventories } from './material-inventories.js';
 const GOODS = ['food','components','machinery','electronics','aggregate'];
 const clamp = (v,min=0,max=100)=>Math.max(min,Math.min(max,Number(v)||0));
 const round3 = v=>Math.round(v*1000)/1000;
+const FOOD_KG_PER_UNIT = 0.62*(88775.244/86400)/0.018;
 const SPECIALISATIONS = {
   agriculture: {label:'Agriculture',produces:{food:0.35},description:'Greenhouse and biological production'},
   fabrication: {label:'Fabrication',produces:{components:0.34,aggregate:0.12},description:'Construction components and processed local feedstock'},
@@ -31,6 +33,7 @@ function relationship(a,b){
 }
 export function ensureColonyEconomies(w){
   if(!Array.isArray(w.settlements))return;
+  ensureMaterialInventories(w);
   w.colonyTrade ??= {shipments:[],nextShipmentId:1,lastProcessedSol:0,tradeLog:[]};
   w.campaign ??= {};
   w.campaign.colonyTradePolicy ??= {};
@@ -61,6 +64,15 @@ export function ensureColonyEconomies(w){
     e.lastTradeSol ??= -10000;
     e.stability ??=70;
     e.specialisationLabel ??=SPECIALISATIONS[e.specialisation]?.label??'General settlement';
+    if(s.settlementType==='relief-outpost'&&e.physicalFoodBridgeVersion!==1){
+      const colony=w.materials.colonies[s.id];
+      const desiredFoodKg=Math.max(0,Number(e.inventory.food)||0)*FOOD_KG_PER_UNIT;
+      const delta=desiredFoodKg-(Number(colony.foodKg)||0);
+      colony.foodKg=desiredFoodKg;
+      const baseline=w.materials.diagnostics.initialTrackedStocks?.colonies?.[s.id];
+      if(baseline){baseline.foodKg=(Number(baseline.foodKg)||0)+delta;w.materials.diagnostics.initialColonyMatterMassKg=(Number(w.materials.diagnostics.initialColonyMatterMassKg)||0)+delta;}
+      e.physicalFoodBridgeVersion=1;
+    }
   }
   return w.colonyTrade;
 }
@@ -202,6 +214,12 @@ function createShipment(w,from,to,good,amount,sol,kind='trade'){
   const travelSols=route.travelSols;
   const shipment={id:'colony-haul-'+w.colonyTrade.nextShipmentId++,kind,fromId:from.id,toId:to.id,good,amount:round3(amount),departSol:sol,arrivalSol:sol+travelSols,travelSols,distanceKm:Math.round(distanceKm),terrainProfile:route.profile?{reliefM:Math.round(route.profile.relief),ascentM:Math.round(route.profile.ascent),maxGradePct:Math.round(route.profile.maxGrade*100)}:null,roadUsed:route.road,navigationBeacons:route.beacons,effectiveSpeedKmPerSol:route.effectiveSpeed,status:'in-transit'};
   from.economy.inventory[good]=round3(Math.max(0,from.economy.inventory[good]-amount));
+  if(good==='food'&&w.materials?.colonies?.[from.id]){
+    const foodMassKg=Math.min(Number(w.materials.colonies[from.id].foodKg)||0,shipment.amount*FOOD_KG_PER_UNIT);
+    w.materials.colonies[from.id].foodKg-=foodMassKg;
+    w.materials.inTransitFoodKg=(Number(w.materials.inTransitFoodKg)||0)+foodMassKg;
+    shipment.foodMassKg=foodMassKg;
+  }
   w.colonyTrade.shipments.push(shipment);
   addTradeLog(w,{sol,kind:'departed',shipmentId:shipment.id,fromId:from.id,toId:to.id,good,amount:shipment.amount,description:amount+' units of '+good+' departed '+from.name+' for '+to.name+' ('+Math.round(distanceKm)+' km, about '+travelSols+' sols; '+route.effectiveSpeed+' km/sol'+(route.road?', established road':'')+(route.beacons?', '+route.beacons+' navigation beacon(s)':'')+(route.profile?', sampled relief '+Math.round(route.profile.relief)+' m':'')+').'});
   return shipment;
@@ -211,12 +229,22 @@ function deliverShipments(w,sol,events){
     if(ship.status!=='in-transit'||sol<ship.arrivalSol)continue;
     const destination=w.settlements.find(s=>s.id===ship.toId);
     if(!destination||destination.status==='failed'||destination.status==='abandoned'){
+      if(ship.foodMassKg>0){w.materials.inTransitFoodKg=Math.max(0,(w.materials.inTransitFoodKg||0)-ship.foodMassKg);w.materials.externalFlows.colonyMatterExportsKg=(w.materials.externalFlows.colonyMatterExportsKg||0)+ship.foodMassKg;}
       ship.status='lost';
       addTradeLog(w,{sol,kind:'lost',shipmentId:ship.id,description:'A shipment was lost because its destination is no longer operational.'});
       continue;
     }
     if(deliverInfrastructureEquipmentShipment(w,ship,destination,sol,events))continue;
     destination.economy.inventory[ship.good]=round3((destination.economy.inventory[ship.good]??0)+ship.amount);
+    if(ship.good==='food'){
+      const foodMassKg=Number(ship.foodMassKg??(ship.kind==='earth-import'?ship.amount*FOOD_KG_PER_UNIT:0));
+      if(foodMassKg>0){
+        if(ship.foodMassKg>0)w.materials.inTransitFoodKg=Math.max(0,(w.materials.inTransitFoodKg||0)-foodMassKg);
+        else w.materials.externalFlows.colonyMatterImportsKg=(w.materials.externalFlows.colonyMatterImportsKg||0)+foodMassKg;
+        w.materials.colonies[destination.id].foodKg+=foodMassKg;
+        w.materials.ledger.push({sol,process:'food-cargo-delivery',substance:'food',massKg:foodMassKg,from:ship.fromId,to:'colony:'+destination.id+':food',note:'Food shipment converted from the existing economy cargo unit into physical glucose-equivalent food mass.'});
+      }
+    }
     ship.status='delivered';
     if(ship.kind==='emergency-aid'){
       const request=w.colonyTrade.emergencyRequests.find(r=>r.id===ship.requestId);
@@ -266,10 +294,20 @@ function operateColonies(w,sol,events){
     for(const good of GOODS){
       const baselineFood=good==='food'?0.45*Math.max(0.25,pop/45):0;
       const produced=((spec.produces[good]??0)*(Math.max(0.25,pop/45)))+baselineFood;
-      const consumed=good==='food'?pop*0.018:good==='components'?0.035:good==='machinery'?0.018:good==='electronics'?0.012:0.025;
+      const reliefOutpost=s.settlementType==='relief-outpost';
+      const consumed=good==='food'?(reliefOutpost?0:pop*0.018):good==='components'?0.035:good==='machinery'?0.018:good==='electronics'?0.012:0.025;
       e.inventory[good]=round3(Math.max(0,e.inventory[good]+produced-consumed));
+      if(good==='food'&&reliefOutpost){
+        const producedMassKg=produced*FOOD_KG_PER_UNIT;
+        if(producedMassKg>0){
+          w.materials.colonies[s.id].foodKg+=producedMassKg;
+          w.materials.externalFlows.colonyMatterImportsKg=(w.materials.externalFlows.colonyMatterImportsKg||0)+producedMassKg;
+          w.materials.ledger.push({sol,process:'relief-outpost-agriculture-proxy',substance:'food',massKg:producedMassKg,from:'local-agriculture-model',to:'colony:'+s.id+':food',note:'Existing abstract agricultural output is converted to physical food mass for the relief-outpost ration store; crop chemistry and feedstock are not yet simulated.'});
+        }
+      }
       e.shortages[good]=e.inventory[good]< (good==='food'?12:good==='components'?3:good==='machinery'?2:good==='electronics'?1.5:3);
     }
+    if(s.settlementType==='relief-outpost')e.inventory.food=round3(Math.max(0,w.materials.colonies[s.id].foodKg/FOOD_KG_PER_UNIT));
     const food=e.inventory.food;
     if(food<5){
       e.stability=clamp(e.stability-0.15);
