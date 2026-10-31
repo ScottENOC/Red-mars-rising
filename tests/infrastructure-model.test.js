@@ -211,3 +211,18 @@ test('sponsor oxygen cargo is installed on arrival with sponsor ownership and co
   assert.equal(w.colonyTrade.shipments[0].status,'delivered');
   assert.ok(events.some(event=>event.type==='sponsor-oxygen-equipment-arrived'));
 });
+
+test('a different sponsor can independently send oxygen equipment to a rival colony',()=>{
+  const w=campaignWorld();
+  w.sponsors.push({id:'esa',name:'ESA',type:'multilateral',support:78,patience:64,pressure:45,status:'active',relations:{nasa:12}});
+  w.settlements.push({id:'small-colony',name:'Small Colony',kind:'rival-colony',status:'established',sponsorId:'esa',population:45,lat:12,lon:24,infrastructure:['habitats','power-array']});
+  ensureMaterialInventories(w);
+  w.materials.colonies['small-colony'].gasesKg.oxygen=1000;
+  const events=[];
+  processSponsorCommitments(w,1,events);
+  const ship=w.colonyTrade.shipments.find(item=>item.toId==='small-colony'&&item.kind==='infrastructure-equipment');
+  assert.ok(ship);
+  assert.equal(ship.equipment.ownerId,'esa');
+  assert.equal(ship.equipment.operatorId,'small-colony');
+  assert.ok(events.some(event=>event.type==='sponsor-oxygen-relief-launched'&&event.description.includes('Small Colony')));
+});
