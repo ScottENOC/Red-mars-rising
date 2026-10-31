@@ -71,7 +71,7 @@ export function ensureMaterialInventories(w) {
       colony.materialsKg={regolith:0,aggregate:0,metalConcentrate:0,tailings:0,constructionComponents:0,constructionInProgress:0,slag:0,nutrients:500,spareParts:250,polymers:100};
       colony.gasesKg.oxygen=(colony.gasesKg.oxygen??0)+(isHome?20000:Math.max(0,Number(settlement.initialLifeSupport?.oxygenKg??10000)));
       colony.thermal??={storedEnergyJ:0,capacityJPerK:2e9,referenceTemperatureC:20,temperatureC:20,heatInputCumulativeJ:0,heatLossCumulativeJ:0};
-      colony.physicalStocksVersion=1;
+      colony.physicalStocksVersion=2;
       if(isHome){
         // Older prototype saves predate the physical food/gas manifest. Rebaseline once after migration.
         m.diagnostics.initialTotalWaterKg=undefined;
@@ -94,6 +94,19 @@ export function ensureMaterialInventories(w) {
         const initialMass=Object.values(c.waterKg).reduce((sum,value)=>sum+value,0)+Object.values(c.gasesKg).reduce((sum,value)=>sum+(Number(value)||0),0)+(c.foodKg??0)+(c.biomassKg??0)+(c.solidWasteKg??0)+Object.values(c.materialsKg??{}).reduce((sum,value)=>sum+(Number(value)||0),0);
         m.diagnostics.initialColonyMatterMassKg=(m.diagnostics.initialColonyMatterMassKg??0)+initialMass;
       }
+    }
+    if(Number(colony.physicalStocksVersion??0)<2){
+      // Version 1 saves started with a 5,000 kg oxygen reserve. Increase that legacy reserve
+      // once so the model can represent the real interplanetary relief lead time.
+      if(isHome){
+        colony.gasesKg.oxygen=(Number(colony.gasesKg.oxygen)||0)+15000;
+        const baseline=m.diagnostics.initialTrackedStocks?.colonies?.[settlement.id];
+        if(baseline)baseline.gasesKg.oxygen=(Number(baseline.gasesKg.oxygen)||0)+15000;
+        if(Number.isFinite(m.diagnostics.initialColonyMatterMassKg))m.diagnostics.initialColonyMatterMassKg+=15000;
+        if(Number.isFinite(m.diagnostics.initialTotalWaterKg))m.diagnostics.initialTotalWaterKg+=15000;
+        if(Number.isFinite(m.diagnostics.initialOxygenEquivalentKg))m.diagnostics.initialOxygenEquivalentKg+=15000;
+      }
+      colony.physicalStocksVersion=2;
     }
     colony.gasesKg.carbonDioxide??=0;
     colony.gasesKg.carbonMonoxide??=0;
