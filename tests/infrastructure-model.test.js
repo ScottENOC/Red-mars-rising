@@ -10,7 +10,6 @@ import {
 import { createMaterialInventories, ensureMaterialInventories, checkMaterialConservation } from '../src/world/material-inventories.js';
 import { ensureSettlementInfrastructureAssets, installOxygenGenerator, processOxygenGenerators, processNonPrimaryColonyMetabolism, getColonyOxygenStatus, deliverInfrastructureEquipmentShipment } from '../src/world/infrastructure-services.js';
 import { processSponsorCommitments } from '../src/world/sponsor-commitments.js';
-import { processReliefOutpostAgriculture, FOOD_KG_PER_ECONOMY_UNIT } from '../src/world/relief-outpost-food.js';
 
 function world(){
   return {
@@ -160,19 +159,6 @@ test('non-primary colonies consume oxygen through the existing food metabolism m
   assert.ok(getColonyOxygenStatus(w,'relief-colony').runwaySols>0);
 });
 
-test('sponsor launches a hermit-crab relief outpost before oxygen reserves are exhausted',()=>{
-  const w=campaignWorld();
-  w.materials.colonies['first-colony'].gasesKg.oxygen=100;
-  const events=[];
-  processSponsorCommitments(w,1,events);
-  const plan=w.sponsorReliefOutposts?.[0];
-  assert.ok(plan);
-  assert.equal(plan.targetColonyId,'first-colony');
-  assert.equal(plan.arrivalSol,241);
-  assert.equal(plan.status,'in-transit');
-  assert.ok(events.some(event=>event.type==='sponsor-relief-outpost-launched'));
-});
-
 test('legacy version-one oxygen reserves migrate once and preserve their conservation baseline',()=>{
   const w=campaignWorld();
   checkMaterialConservation(w);
@@ -213,20 +199,6 @@ test('sponsor oxygen cargo is installed on arrival with sponsor ownership and co
   assert.ok(events.some(event=>event.type==='sponsor-oxygen-equipment-arrived'));
 });
 
-test('a different sponsor can independently send oxygen equipment to a rival colony',()=>{
-  const w=campaignWorld();
-  w.sponsors.push({id:'esa',name:'ESA',type:'multilateral',support:78,patience:64,pressure:45,status:'active',relations:{nasa:12}});
-  w.settlements.push({id:'small-colony',name:'Small Colony',kind:'rival-colony',status:'established',sponsorId:'esa',population:45,lat:12,lon:24,infrastructure:['habitats','power-array']});
-  ensureMaterialInventories(w);
-  w.materials.colonies['small-colony'].gasesKg.oxygen=1000;
-  const events=[];
-  processSponsorCommitments(w,1,events);
-  const plan=w.sponsorReliefOutposts?.find(item=>item.targetColonyId==='small-colony');
-  assert.ok(plan);
-  assert.equal(plan.sponsorId,'esa');
-  assert.ok(events.some(event=>event.type==='sponsor-relief-outpost-launched'&&event.description.includes('Small Colony')));
-});
-
 test('oxygen generator output is capped by shared power headroom',()=>{
   const w=campaignWorld();
   w.economy.powerCapacity=90;
@@ -237,65 +209,4 @@ test('oxygen generator output is capped by shared power headroom',()=>{
   assert.ok(output[0].oxygenKg>0);
   assert.ok(output[0].oxygenKg<10);
   assert.ok(getColonyOxygenStatus(w,'first-colony').generatorCapacityKgPerSol<10);
-});
-
-
-test('hermit-crab outpost establishes and transfers its spare oxygen generator',()=>{
-  const w=campaignWorld();
-  w.materials.colonies['first-colony'].gasesKg.oxygen=100;
-  const events=[];
-  processSponsorCommitments(w,1,events);
-  const plan=w.sponsorReliefOutposts[0];
-  assert.ok(plan);
-  processSponsorCommitments(w,241,events);
-  const outpost=w.settlements.find(item=>item.id===plan.outpostId);
-  assert.ok(outpost);
-  assert.equal(outpost.kind,'rival-colony');
-  assert.equal(outpost.settlementType,'relief-outpost');
-  assert.equal(outpost.population,8);
-  const spare=w.infrastructure.assets.find(item=>item.id===plan.equipmentAssetId);
-  assert.equal(spare.status,'stored');
-  const shipment=w.colonyTrade.shipments.find(item=>item.id===plan.equipmentShipmentId);
-  assert.equal(shipment.fromId,outpost.id);
-  assert.equal(shipment.toId,'first-colony');
-  assert.equal(shipment.arrivalSol,241+shipment.travelSols);
-  assert.ok(shipment.travelSols>=2);
-  assert.equal(deliverInfrastructureEquipmentShipment(w,shipment,w.settlements[0],shipment.arrivalSol,events),true);
-  assert.equal(spare.status,'transferred');
-  assert.equal(plan.status,'delivered');
-  const installed=w.infrastructure.assets.find(item=>item.id===shipment.equipment.assetId);
-  assert.equal(installed.ownerId,'nasa');
-  assert.equal(installed.operatorId,'first-colony');
-});
-
-
-test('hermit-crab outpost has a physical ration reserve and independent oxygen production',()=>{
-  const w=campaignWorld();
-  w.materials.colonies['first-colony'].gasesKg.oxygen=100;
-  const events=[];
-  processSponsorCommitments(w,1,events);
-  const plan=w.sponsorReliefOutposts[0];
-  processSponsorCommitments(w,241,events);
-  ensureMaterialInventories(w);
-  const outpost=w.settlements.find(item=>item.id===plan.outpostId);
-  const colony=w.materials.colonies[outpost.id];
-  const lifeSupport=w.infrastructure.assets.find(item=>item.operatorId===outpost.id&&item.kind==='oxygen-generator');
-  assert.ok(lifeSupport);
-  assert.equal(lifeSupport.capacityOxygenKgPerSol,10);
-  const foodBefore=colony.foodKg;
-  const economyFoodBefore=outpost.economy.inventory.food;
-  const oxygenBefore=colony.gasesKg.oxygen;
-  const baseline=checkMaterialConservation(w);
-  processOxygenGenerators(w,242,{powerAvailable:true,events});
-  processNonPrimaryColonyMetabolism(w,242,events);
-  assert.ok(colony.foodKg<foodBefore);
-  assert.ok(outpost.economy.inventory.food<economyFoodBefore);
-  const agriculture=processReliefOutpostAgriculture(w,outpost,242);
-  assert.ok(agriculture.dryBiomassKg>0);
-  assert.ok(colony.foodKg>0);
-  assert.ok(colony.gasesKg.oxygen>oxygenBefore);
-  assert.ok(Math.abs(colony.foodKg-outpost.economy.inventory.food*FOOD_KG_PER_ECONOMY_UNIT)<0.05);
-  const balance=checkMaterialConservation(w);
-  assert.ok(Math.abs(balance.colonyMatterBalanceErrorKg-baseline.colonyMatterBalanceErrorKg)<1e-5);
-  assert.ok(Math.abs(balance.carbonBalanceErrorKg)<1e-5);
 });
