@@ -887,7 +887,7 @@ function showInfrastructureAsset(assetId){
   ['Condition',Number.isFinite(integrity)?Math.round(integrity*100)+'% integrity':'Not yet assessed'],
   ['Dependencies',(asset.dependencies??[]).length?asset.dependencies.join(', '):'Not recorded'],
   ['Services / outputs',(asset.outputs??[]).length?asset.outputs.join(', '):'Not recorded'],
-  ...(oxygenStatus?[['Oxygen production capacity',oxygenStatus.generatorCapacityKgPerSol.toFixed(1)+' kg/sol'],['Colony oxygen reserve',oxygenStatus.oxygenKg.toFixed(0)+' kg'],['Estimated oxygen runway',oxygenStatus.runwaySols===null?'No current net deficit':Math.floor(oxygenStatus.runwaySols)+' sols'],['Estimated net oxygen demand',oxygenStatus.netDemandKgPerSol.toFixed(1)+' kg/sol'],['Last oxygen output',Number.isFinite(rawAsset.lastOutputKg)?rawAsset.lastOutputKg.toFixed(1)+' kg/sol':'Not yet operated']]:[])
+  ...(oxygenStatus?[['Oxygen production capacity',oxygenStatus.generatorCapacityKgPerSol.toFixed(1)+' kg/sol'],['Colony oxygen reserve',oxygenStatus.oxygenKg.toFixed(0)+' kg'],['Estimated oxygen runway',oxygenStatus.runwaySols===null?'No current net deficit':Math.floor(oxygenStatus.runwaySols)+' sols'],['Estimated net oxygen demand',oxygenStatus.netDemandKgPerSol.toFixed(1)+' kg/sol'],['Last oxygen output',Number.isFinite(rawAsset.lastOutputKg)?rawAsset.lastOutputKg.toFixed(1)+' kg/sol':'Not yet operated'],['Last water input',Number.isFinite(rawAsset.lastWaterInputKg)?rawAsset.lastWaterInputKg.toFixed(1)+' kg/sol':'Not yet operated'],['Last electricity use',Number.isFinite(rawAsset.lastElectricityKWh)?rawAsset.lastElectricityKWh.toFixed(1)+' kWh/sol':'Not yet operated']]:[])
  ];
  assetInspectorTitle.textContent=asset.name;
  assetInspectorBody.replaceChildren();
