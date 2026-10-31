@@ -21,6 +21,8 @@ export const METEOROID_TYPES = [
   {id:'cometary-dust',label:'Cometary dust and volatile grains',fraction:0.05,composition:{silicates:0.30,waterIce:0.28,carbonOrganics:0.18,carbonDioxideIce:0.08,otherVolatiles:0.10,otherMinerals:0.06},densityKgM3:900,note:'Porous volatile-rich dust; much of its ice may vaporise during atmospheric entry.'}
 ];
 
+export const FOOD_KG_PER_ECONOMY_UNIT=0.62*(88775.244/86400)/0.018;
+
 export function createMaterialInventories() {
   const marsAtmosphereKg=610*(4*Math.PI*3_389_500**2)/3.71;
   const types=Object.fromEntries(METEOROID_TYPES.map(t=>[t.id,{massKg:0,retainedKg:0,ablatedIntoAtmosphereKg:0}]));
