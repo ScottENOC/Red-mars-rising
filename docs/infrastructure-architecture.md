@@ -41,7 +41,7 @@ The first live service is oxygen generation. An operational electrolyser consume
 
 When a colony's projected oxygen runway falls below 300 sols, its sponsor can independently decide to dispatch a portable oxygen generator. The shipment travels through the existing `colonyTrade.shipments` pipeline with a 240-sol lead time. On arrival, the machine is installed as a normal infrastructure asset: the sponsor can own, fund, build, provide technology/software and retain technical control, while the colony operates it and can modify its software. A colony with sufficient installed generation does not receive duplicate relief equipment.
 
-This is not yet a general-purpose power/water/oxygen network solver. Power availability is still gated by the existing colony-wide capacity/shortfall model; electricity use is recorded in kWh, but generator loads are not yet fully allocated against individual local grids. Oxygen production is currently a water-electrolysis service, not a model of pressure, partial pressure, leaks, storage tanks or breathable-atmosphere quality. Those are deliberate next steps.
+This is not yet a general-purpose power/water/oxygen network solver. Power availability is gated by the existing colony-wide capacity/shortfall model. Oxygen generators share the remaining colony power headroom, with their kWh-per-sol demand converted to an average kW load; local grid topology and power routing are not yet modelled. Oxygen production is currently a water-electrolysis service, not a model of pressure, partial pressure, leaks, storage tanks or breathable-atmosphere quality. Those are deliberate next steps.
 
 ## Tick integration
 
