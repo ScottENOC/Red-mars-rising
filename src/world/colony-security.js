@@ -24,12 +24,12 @@ function assess(w,proposer,target,reason){
  const sovereignty=Number(p.ideologies?.sovereignty?.support??25);
  const salience=Number(p.ideologies?.sovereignty?.salience??50);
  const autonomy=Number(p.localAutonomy??20);
- const targetThreat=capability(w,target.id)?-12:8;
- const ownSecurity=capability(w,proposer.id)?12:-12;
- const retaliationRisk=(Number(target.population??0)>Number(proposer.population??0)*1.4?-12:0);
- const dependence=Number(p.sponsorDependence??50)>80?-8:0;
+ const targetThreat=capability(w,target.id)?-10:2;
+ const ownSecurity=capability(w,proposer.id)?8:0;
+ const retaliationRisk=(Number(target.population??0)>Number(proposer.population??0)*1.4?-8:0);
+ const dependence=Number(p.sponsorDependence??50)>80?-5:0;
  const justification=clamp(42+e.justification+(100-relation)*.18);
- const safety=clamp(38+ownSecurity+targetThreat+retaliationRisk+dependence+(stability-50)*.18);
+ const safety=clamp(58+ownSecurity+targetThreat+retaliationRisk+dependence+(stability-50)*.18);
  const playerRelation=Number(p.relations?.[w.settlements?.find(c=>c.kind==='primary-colony')?.id]??50);
  const politicalWill=clamp(18+sovereignty*.34+salience*.12+autonomy*.18+(stability-50)*.12+(playerRelation-50)*.22);
  const total=justification*.42+safety*.38+politicalWill*.20;
