@@ -100,11 +100,20 @@ export function getColonyOxygenStatus(w,colonyId){
   const settlement=(w.settlements??[]).find(item=>item.id===colonyId);
   const population=Math.max(0,Number(settlement?.population)||0);
   const oxygenKg=Math.max(0,Number(colony.gasesKg?.oxygen)||0);
-  // Approximate crew metabolic demand from the existing glucose-equivalent food model.
+  // Gross demand follows the same glucose-equivalent metabolism used by the world tick.
   const demandKgPerSol=population*0.62*(88775.244/86400)*0.9*O2_PER_GLUC;
   const generators=(w.infrastructure?.assets??[]).filter(asset=>asset.kind==='oxygen-generator'&&asset.status==='operational'&&(asset.operatorId??asset.ownerId)===colonyId);
   const capacityKgPerSol=generators.reduce((sum,asset)=>sum+Math.max(0,Number(asset.capacityOxygenKgPerSol)||0),0);
-  return {colonyId,population,oxygenKg,demandKgPerSol,runwaySols:demandKgPerSol>0?oxygenKg/demandKgPerSol:null,generatorCapacityKgPerSol:capacityKgPerSol,generators:generators.map(asset=>asset.id)};
+  // Credit the existing greenhouse process, but only at its currently feasible CO2/water-limited rate.
+  let greenhouseOutputKgPerSol=0;
+  if(settlement?.infrastructure?.includes('greenhouse')&&w.economy?.powerCapacity>=w.economy?.powerDemand){
+    const maxBiomass=population*0.25;
+    const byCO2=Math.max(0,Number(colony.gasesKg?.carbonDioxide)||0)/CO2_PER_GLUC;
+    const byWater=Math.max(0,Number(colony.waterKg?.tanks)||0)/WATER_PER_GLUC;
+    greenhouseOutputKgPerSol=Math.min(maxBiomass,byCO2,byWater)*O2_PER_GLUC;
+  }
+  const netDemandKgPerSol=Math.max(0,demandKgPerSol-greenhouseOutputKgPerSol-capacityKgPerSol);
+  return {colonyId,population,oxygenKg,demandKgPerSol,greenhouseOutputKgPerSol,generatorCapacityKgPerSol:capacityKgPerSol,netDemandKgPerSol,runwaySols:netDemandKgPerSol>0?oxygenKg/netDemandKgPerSol:null,generators:generators.map(asset=>asset.id)};
 }
 
 export function processNonPrimaryColonyMetabolism(w,sol,events=[]){
