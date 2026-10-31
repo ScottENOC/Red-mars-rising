@@ -41,7 +41,7 @@ export function createMaterialInventories() {
       mineralDepositsKg:{silicates:0,ironNickel:0,sulfides:0,carbonOrganics:0,otherMinerals:0,waterIceUnprocessed:0,carbonDioxideIce:0,otherVolatiles:0},
       externalWaterInputsKg:0,externalWaterOutputsKg:0
     },
-    colonies:{},ledger:[],energy:{electricityConsumedKWh:0,heatReleasedKWh:0,thermalHeatInputJ:0,thermalHeatLostJ:0,storedThermalEnergyJ:0},
+    colonies:{},inTransitFoodKg:0,ledger:[],energy:{electricityConsumedKWh:0,heatReleasedKWh:0,thermalHeatInputJ:0,thermalHeatLostJ:0,storedThermalEnergyJ:0},
     externalFlows:{importedWaterKg:0,exportedWaterKg:0,meteoroidMatterKg:0,colonyMatterImportsKg:0,colonyMatterExportsKg:0},
     diagnostics:{waterBalanceErrorKg:0,lastWaterBalanceCheckSol:0,hydrogenBalanceErrorKg:0,oxygenBalanceErrorKg:0,colonyMatterBalanceErrorKg:0,carbonBalanceErrorKg:0}
   };
@@ -50,7 +50,7 @@ export function createMaterialInventories() {
 export function ensureMaterialInventories(w) {
   w.materials??=createMaterialInventories();
   const m=w.materials;
-  m.colonies??={};m.siteDeposits??={};m.ledger??=[];m.energy??={electricityConsumedKWh:0,heatReleasedKWh:0};
+  m.colonies??={};m.inTransitFoodKg??=0;m.siteDeposits??={};m.ledger??=[];m.energy??={electricityConsumedKWh:0,heatReleasedKWh:0};
   for(const stock of Object.values(m.planetary.waterKg??{}))stock.compensation??=0;
   m.externalFlows??={importedWaterKg:0,exportedWaterKg:0,meteoroidMatterKg:0};
   m.externalFlowsCompensation??={importedWaterKg:0,exportedWaterKg:0};
@@ -65,7 +65,7 @@ export function ensureMaterialInventories(w) {
     const colony=m.colonies[settlement.id];
     if(!colony.physicalStocksVersion){
       const population=Math.max(0,Number(settlement.population??(isHome?w.colonists?.population:0))||0);
-      colony.foodKg=Math.max(1000,population*0.62*(88775.244/86400)*90);
+      colony.foodKg=Math.max(0,Number(settlement.initialLifeSupport?.foodKg??Math.max(1000,population*0.62*(88775.244/86400)*90)));
       colony.biomassKg=0;
       colony.solidWasteKg=0;
       colony.materialsKg={regolith:0,aggregate:0,metalConcentrate:0,tailings:0,constructionComponents:0,constructionInProgress:0,slag:0,nutrients:500,spareParts:250,polymers:100};
@@ -402,7 +402,7 @@ export function checkMaterialConservation(w){
     oxygenDeltaKg+=delta*WATER_O_MASS_FRACTION;
   }
   const colonyIds=new Set([...Object.keys(snapshot.colonies),...Object.keys(currentSnapshot.colonies)]);
-  let colonyMass=0;
+  let colonyMass=Math.max(0,Number(m.inTransitFoodKg)||0);
   for(const id of colonyIds){
     const now=currentSnapshot.colonies[id],before=snapshot.colonies[id];
     const waterKeys=new Set([...Object.keys(now?.waterKg??{}),...Object.keys(before?.waterKg??{})]);
