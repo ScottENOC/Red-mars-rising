@@ -10,6 +10,7 @@ import {
 import { createMaterialInventories, ensureMaterialInventories, checkMaterialConservation } from '../src/world/material-inventories.js';
 import { ensureSettlementInfrastructureAssets, installOxygenGenerator, processOxygenGenerators, processNonPrimaryColonyMetabolism, getColonyOxygenStatus, deliverInfrastructureEquipmentShipment } from '../src/world/infrastructure-services.js';
 import { processSponsorCommitments } from '../src/world/sponsor-commitments.js';
+import { processReliefOutpostAgriculture, FOOD_KG_PER_ECONOMY_UNIT } from '../src/world/relief-outpost-food.js';
 
 function world(){
   return {
@@ -284,10 +285,17 @@ test('hermit-crab outpost has a physical ration reserve and independent oxygen p
   const foodBefore=colony.foodKg;
   const economyFoodBefore=outpost.economy.inventory.food;
   const oxygenBefore=colony.gasesKg.oxygen;
+  const baseline=checkMaterialConservation(w);
   processOxygenGenerators(w,242,{powerAvailable:true,events});
   processNonPrimaryColonyMetabolism(w,242,events);
   assert.ok(colony.foodKg<foodBefore);
   assert.ok(outpost.economy.inventory.food<economyFoodBefore);
+  const agriculture=processReliefOutpostAgriculture(w,outpost,242);
+  assert.ok(agriculture.dryBiomassKg>0);
+  assert.ok(colony.foodKg>0);
   assert.ok(colony.gasesKg.oxygen>oxygenBefore);
-  assert.ok(Math.abs(colony.foodKg-outpost.economy.inventory.food*(0.62*(88775.244/86400)/0.018))<1e-5);
+  assert.ok(Math.abs(colony.foodKg-outpost.economy.inventory.food*FOOD_KG_PER_ECONOMY_UNIT)<1e-5);
+  const balance=checkMaterialConservation(w);
+  assert.ok(Math.abs(balance.colonyMatterBalanceErrorKg-baseline.colonyMatterBalanceErrorKg)<1e-5);
+  assert.ok(Math.abs(balance.carbonBalanceErrorKg)<1e-5);
 });
