@@ -1,5 +1,6 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js';
 import { createInitialWorldState } from './world/world-state.js';
+import { getInfrastructureAssetSummary } from './world/infrastructure-model.js';
 import { terrainHeight, terrainRadiusOffset, loadMolaTopography, updatePolarCaps, setTerrainWorldState } from './world/terrain.js';
 import { createColonyAndLogistics } from './world/colony-logistics.js';
 import { STARTING_LOCATIONS, SPONSORS, STRATEGIC_PROGRAMS, HABITAT_COMPONENT_CATALOGUE, ensureConstructionRecipeOptions, startCampaign } from './world/campaign-options.js';
@@ -683,7 +684,7 @@ function syncOrbitalThreats(){
 function orbitalColour(owner,id=''){return owner==='player'?0x8bd3c7:id.startsWith('captured-asteroid-')?0xe6c27a:0xe29a78;}
 function syncOrbitalMap(){
  const state=worldState.asteroidOperations;
- const assets=state?.orbitalAssets??[];
+ const assets=(worldState.infrastructure?.assets??[]).filter(a=>a.domain==='orbital'&&a.subsystem==='asteroid-operations');
  const wanted=assets.filter(a=>['operational','disabled','stable Mars orbit','assigned to deorbit mission'].includes(a.status));
  for(const [id,obj] of orbitalMapObjects){if(!wanted.some(a=>a.id===id)){orbitalMapGroup.remove(obj.group);obj.group.traverse(o=>{o.geometry?.dispose?.();if(o.material){if(Array.isArray(o.material))o.material.forEach(m=>m.dispose());else o.material.dispose();}});orbitalMapObjects.delete(id);}}
  wanted.forEach((asset,index)=>{
@@ -693,13 +694,14 @@ function syncOrbitalMap(){
    const isAsteroid=asset.id.startsWith('captured-asteroid-');
    const colour=asset.status==='disabled'?0x777777:orbitalColour(asset.owner,asset.id);
    const marker=new THREE.Mesh(new THREE.SphereGeometry(isAsteroid ? .018 : .012,12,10),new THREE.MeshBasicMaterial({color:colour}));
+   marker.userData={kind:'infrastructure-asset',assetId:asset.id};
    group.add(marker);
    const orbitRadius=isAsteroid?1.42:asset.owner==='player'?1.18:1.28+(index%4)*.035;
    const pts=[];for(let i=0;i<=180;i++){const a=i/180*Math.PI*2;pts.push(new THREE.Vector3(Math.cos(a)*orbitRadius,Math.sin(a)*orbitRadius*.22,Math.sin(a)*orbitRadius));}
    const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:colour,transparent:true,opacity:.28}));
    group.add(line);orbitalMapGroup.add(group);obj={group,marker,orbitRadius,phase:index*1.7,asset};orbitalMapObjects.set(asset.id,obj);
   }
-  obj.asset=asset;
+  obj.asset=asset;obj.marker.userData={kind:'infrastructure-asset',assetId:asset.id};
   const phase=obj.phase+Number(worldState.time?.sol??0)*.004;
   obj.marker.position.set(Math.cos(phase)*obj.orbitRadius,Math.sin(phase)*obj.orbitRadius*.22,Math.sin(phase)*obj.orbitRadius);
   obj.marker.material.color.set(asset.status==='disabled'?0x777777:orbitalColour(asset.owner));
@@ -808,7 +810,7 @@ function setZoom(v){
  }
  zoom=next;updateLod();
 }
-function notify(message){const t=document.querySelector('#toast');t.textContent=message;t.classList.add('show');clearTimeout(notify.timer);notify.timer=setTimeout(()=>t.classList.remove('show'),1800);}
+function notify(message,duration=1800){const t=document.querySelector('#toast');t.textContent=message;t.classList.add('show');clearTimeout(notify.timer);notify.timer=setTimeout(()=>t.classList.remove('show'),duration);}
 function setActivePlace(id){document.querySelectorAll('.place').forEach(el=>el.classList.toggle('active',el.dataset.place===id));}
 function resetView(announce=true){focusedMoon=null;focusedSurface=null;cameraFocus.set(0,0,0);for(const [id,m] of Object.entries(moonObjects)){m.focusedScale=false;m.body.scale.setScalar(moonSpecs[id].radius);}document.querySelectorAll('[data-moon]').forEach(el=>el.classList.remove('active'));targetRotation.setFromEuler(new THREE.Euler(THREE.MathUtils.degToRad(-8),THREE.MathUtils.degToRad(18),0,'YXZ'));setZoom(4.2);setActivePlace('global');if(announce)notify('Mars global view restored');}
 function focusPlace(id){if(id==='global'){resetView();return;}const p=locations[id];if(!p)return;focusedMoon=null;focusedSurface=id==='colony'?xyz(p.lat,p.lon,1+terrainRadiusOffset(p.lat,p.lon)+0.002):null;cameraFocus.set(0,0,0);for(const [mid,m] of Object.entries(moonObjects)){m.focusedScale=false;m.body.scale.setScalar(moonSpecs[mid].radius);}document.querySelectorAll('[data-moon]').forEach(el=>el.classList.remove('active'));const v=xyz(p.lat,p.lon,1);const yaw=Math.atan2(-v.x,v.z);const pitch=Math.asin(v.y);targetRotation.setFromEuler(new THREE.Euler(pitch,yaw,0,'YXZ'));setZoom(id==='colony'?0.12:p.zoom+0.45);setActivePlace(id);notify(p.name+' · '+p.description);}
@@ -835,7 +837,7 @@ space.addEventListener('pointerdown',e=>{space.setPointerCapture(e.pointerId);po
 space.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2){const a=[...pointers.values()];const dist=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);const angle=Math.atan2(a[1].y-a[0].y,a[1].x-a[0].x);if(pinchStart>0)setZoom(pinchZoom*pinchStart/dist);if(lastPinchAngle!==null){let twist=angle-lastPinchAngle;while(twist>Math.PI)twist-=Math.PI*2;while(twist< -Math.PI)twist+=Math.PI*2;if(Math.abs(twist)>.001){const axis=new THREE.Vector3(0,0,1);const rotation=new THREE.Quaternion().setFromAxisAngle(axis,twist);if(focusedMoon)targetViewRotation.premultiply(rotation).normalize();else targetRotation.premultiply(rotation).normalize();showGlobeCompass();}}lastPinchAngle=angle;dragged=true;return;}if(pointer===e.pointerId){const next=trackballPoint(e.clientX,e.clientY);if(lastTrackball){const delta=new THREE.Quaternion().setFromUnitVectors(lastTrackball,next);if(focusedMoon&&moonObjects[focusedMoon])targetViewRotation.premultiply(delta).normalize();else targetRotation.premultiply(delta).normalize();}lastTrackball=next;if(pointers.size===1)dragged=true;}});
 function endPointer(e){pointers.delete(e.pointerId);if(pointer===e.pointerId){pointer=null;lastTrackball=null;}if(pointers.size<2){pinchStart=0;lastPinchAngle=null;}if(!pointers.size)space.classList.remove('dragging');}
 space.addEventListener('pointerup',endPointer);space.addEventListener('pointercancel',endPointer);
-space.addEventListener('click',e=>{if(dragged)return;const rect=renderer.domElement.getBoundingClientRect();pointerNdc.x=((e.clientX-rect.left)/rect.width)*2-1;pointerNdc.y=-((e.clientY-rect.top)/rect.height)*2+1;raycaster.setFromCamera(pointerNdc,camera);const hits=raycaster.intersectObjects([...markerGroup.children,...Object.values(moonObjects).map(m=>m.marker),...(zoom>=1.6&&zoom<8.5?(colonyLogistics?.settlementPickTargets??[]):[]),...(zoom>=1.6?(colonyLogistics?.poiPickTargets??[]).filter(p=>p.visible):[]),...(zoom>11.5?(colonyLogistics?.shipPickTargets??[]):[])],false);if(hits.length){const hit=hits[0].object;if(hit.userData.kind==='supply-ship'){notify(hit.userData.cargo+' · inbound · about '+Math.ceil(hit.userData.etaSols??0)+' sols remaining');}else if(hit.userData.kind==='point-of-interest'||hit.userData.kind==='natural-impact-crater'){notify(hit.userData.name+' · '+hit.userData.status+' · '+hit.userData.description);}else if(hit.userData.kind==='settlement')focusPlace('colony');else if(hit.userData.id)focusPlace(hit.userData.id);else for(const [id,m] of Object.entries(moonObjects))if(hit===m.marker){focusMoon(id);break;}}});
+space.addEventListener('click',e=>{if(dragged)return;const rect=renderer.domElement.getBoundingClientRect();pointerNdc.x=((e.clientX-rect.left)/rect.width)*2-1;pointerNdc.y=-((e.clientY-rect.top)/rect.height)*2+1;raycaster.setFromCamera(pointerNdc,camera);const hits=raycaster.intersectObjects([...markerGroup.children,...Object.values(moonObjects).map(m=>m.marker),...(zoom>=1.6&&zoom<8.5?(colonyLogistics?.settlementPickTargets??[]):[]),...(zoom>=1.6?(colonyLogistics?.poiPickTargets??[]).filter(p=>p.visible):[]),...(zoom>3.5&&zoom<25?[...orbitalMapObjects.values()].map(o=>o.marker):[]),...(zoom>11.5?(colonyLogistics?.shipPickTargets??[]):[])],false);if(hits.length){const hit=hits[0].object;if(hit.userData.kind==='infrastructure-asset'){const a=getInfrastructureAssetSummary(worldState,hit.userData.assetId);if(a){const liveThreat=(worldState.asteroidOperations?.aiMissions??[]).filter(m=>m.status==='active'&&m.targetId===a.id);const liveMission=(worldState.asteroidOperations?.missions??[]).filter(m=>m.status==='active');const orbit=a.location?.kind==='orbit'?'Mars orbit':'Orbital trajectory not recorded';notify(a.name+' · '+a.status+' · Owner: '+a.owner+' · Operator: '+a.operator+' · '+orbit+' · '+(liveThreat.length?'Threat: active operation detected':liveMission.length?'Mission: '+liveMission[0].name:'No active threat or mission recorded'),6500);}}else if(hit.userData.kind==='supply-ship'){notify(hit.userData.cargo+' · inbound · about '+Math.ceil(hit.userData.etaSols??0)+' sols remaining');}else if(hit.userData.kind==='point-of-interest'||hit.userData.kind==='natural-impact-crater'){notify(hit.userData.name+' · '+hit.userData.status+' · '+hit.userData.description);}else if(hit.userData.kind==='settlement')focusPlace('colony');else if(hit.userData.id)focusPlace(hit.userData.id);else for(const [id,m] of Object.entries(moonObjects))if(hit===m.marker){focusMoon(id);break;}}});
 function resize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);}
 addEventListener('resize',resize);
 addEventListener('pagehide',()=>saveCampaign('pagehide'));
