@@ -706,7 +706,7 @@ function syncSurfaceInfrastructureMap(){
    }
    const colours={'oxygen-generator':0x7bd6e4,greenhouse:0x83c98c,'power-array':0xe6c27a,habitats:0xd7c6a7,'water-extractor':0x6fa9db,workshop:0xd9a078,laboratory:0xb69be0};
    const angle=index/Math.max(1,groupAssets.length)*Math.PI*2;
-   const offset=groupAssets.length>1?.035:0;
+   const offset=groupAssets.length > 1 ? 0.035 : 0;
    const lat=asset.location.lat+Math.sin(angle)*offset;
    const lon=asset.location.lon+Math.cos(angle)*offset;
    obj.marker.position.copy(xyz(lat,lon,1+terrainRadiusOffset(lat,lon)+.006));
