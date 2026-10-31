@@ -226,3 +226,15 @@ test('a different sponsor can independently send oxygen equipment to a rival col
   assert.equal(ship.equipment.operatorId,'small-colony');
   assert.ok(events.some(event=>event.type==='sponsor-oxygen-relief-launched'&&event.description.includes('Small Colony')));
 });
+
+test('oxygen generator output is capped by shared power headroom',()=>{
+  const w=campaignWorld();
+  w.economy.powerCapacity=90;
+  w.economy.powerDemand=88;
+  installOxygenGenerator(w,{colonyId:'first-colony',assetId:'power-limited-oxygen-unit',capacityOxygenKgPerSol:40});
+  const output=processOxygenGenerators(w,1,{powerAvailable:true,events:[]});
+  assert.equal(output.length,1);
+  assert.ok(output[0].oxygenKg>0);
+  assert.ok(output[0].oxygenKg<10);
+  assert.ok(getColonyOxygenStatus(w,'first-colony').generatorCapacityKgPerSol<10);
+});
