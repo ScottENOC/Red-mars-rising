@@ -199,8 +199,8 @@ function assessEmergencyAid(w,sol,events){
           const shipment=createShipment(w,donor.donor,recipient,good,amount,sol,'emergency-aid');
           if(!shipment)continue;
           shipment.requestId=request.id;
-          request.status='in-transit';request.shipmentId=shipment.id;request.donorId=donor.donor.id;request.amount=amount;request.arrivalSol=shipment.arrivalSol;
-          noteAid(w,{sol,kind:'aid-dispatched',shipmentId:shipment.id,requestId:request.id,fromId:donor.donor.id,toId:recipient.id,good,amount,description:donor.donor.name+' dispatched '+amount+' units of '+good+' to '+recipient.name+' as emergency humanitarian aid; estimated arrival in '+route.travelSols+' sols.'});
+          request.status='in-transit';request.shipmentId=shipment.id;request.donorId=donor.donor.id;request.amount=shipment.amount;request.arrivalSol=shipment.arrivalSol;
+          noteAid(w,{sol,kind:'aid-dispatched',shipmentId:shipment.id,requestId:request.id,fromId:donor.donor.id,toId:recipient.id,good,amount:shipment.amount,description:donor.donor.name+' dispatched '+shipment.amount+' units of '+good+' to '+recipient.name+' as emergency humanitarian aid; estimated arrival in '+route.travelSols+' sols.'});
           events.push({type:'colony-emergency-aid-dispatched',sol,description:donor.donor.name+' dispatched emergency '+good+' aid to '+recipient.name+'.'});
         }else if(sol-request.openedSol>=10){
           request.status='unreachable';
