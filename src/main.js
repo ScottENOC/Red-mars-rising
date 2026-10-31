@@ -822,6 +822,39 @@ labelsBtn.addEventListener('click',()=>{landmarksMenu.hidden=!landmarksMenu.hidd
 document.querySelector('#closeLandmarks').addEventListener('click',()=>{landmarksMenu.hidden=true;labelsBtn.classList.remove('active');labelsBtn.setAttribute('aria-expanded','false');});
 document.querySelector('#gridBtn').addEventListener('click',e=>{showGrid=!showGrid;gridGroup.visible=showGrid;e.currentTarget.classList.toggle('active',showGrid);});
 const dataMenu=document.querySelector('#dataMenu'),dataBtn=document.querySelector('#dataBtn');
+const assetInspector=document.querySelector('#assetInspector'),assetInspectorTitle=document.querySelector('#assetInspectorTitle'),assetInspectorBody=document.querySelector('#assetInspectorBody');
+document.querySelector('#closeAssetInspector').addEventListener('click',()=>{assetInspector.hidden=true;});
+function showInfrastructureAsset(assetId){
+ const asset=getInfrastructureAssetSummary(worldState,assetId);if(!asset)return;
+ const activeThreats=(worldState.asteroidOperations?.aiMissions??[]).filter(m=>m.status==='active'&&m.targetId===assetId);
+ const activeMissions=(worldState.asteroidOperations?.missions??[]).filter(m=>m.status==='active');
+ const location=asset.location?.kind==='orbit'?(asset.location.body??'Mars')+' orbit · detailed orbital elements not yet modelled':'Surface location or trajectory not recorded';
+ const integrity=asset.condition?.integrity;
+ const rows=[
+  ['Status',asset.status],
+  ['Legal owner',asset.owner],
+  ['Original funder',asset.funder],
+  ['Builder',asset.builder],
+  ['Operator',asset.operator],
+  ['Controller',asset.controller],
+  ['Occupants',asset.occupants],
+  ['Location / trajectory',location],
+  ['Threat status',activeThreats.length?'Active hostile operation detected':'No active hostile operation detected'],
+  ['Current activity',activeMissions.length?activeMissions.map(m=>m.name+' · '+m.remainingSols+' sols remaining').join('; '):'No active orbital mission'],
+  ['Condition',Number.isFinite(integrity)?Math.round(integrity*100)+'% integrity':'Not yet assessed'],
+  ['Dependencies',(asset.dependencies??[]).length?asset.dependencies.join(', '):'Not recorded'],
+  ['Services / outputs',(asset.outputs??[]).length?asset.outputs.join(', '):'Not recorded']
+ ];
+ assetInspectorTitle.textContent=asset.name;
+ assetInspectorBody.replaceChildren();
+ for(const [label,value] of rows){
+  const row=document.createElement('div');row.className='data-row';
+  const name=document.createElement('span');name.textContent=label;
+  const detail=document.createElement('strong');detail.textContent=String(value??'Not recorded');detail.style.whiteSpace='normal';detail.style.textAlign='right';detail.style.maxWidth='62%';
+  row.append(name,detail);assetInspectorBody.append(row);
+ }
+ dataMenu.hidden=true;assetInspector.hidden=false;
+}
 dataBtn.addEventListener('click',()=>{dataMenu.hidden=!dataMenu.hidden;dataBtn.classList.toggle('active',!dataMenu.hidden);});
 document.querySelector('#closeData').addEventListener('click',()=>{dataMenu.hidden=true;dataBtn.classList.remove('active');});
 space.addEventListener('wheel',e=>{e.preventDefault();setZoom(zoom*Math.exp(e.deltaY*.001));}, {passive:false});
@@ -837,7 +870,7 @@ space.addEventListener('pointerdown',e=>{space.setPointerCapture(e.pointerId);po
 space.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2){const a=[...pointers.values()];const dist=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);const angle=Math.atan2(a[1].y-a[0].y,a[1].x-a[0].x);if(pinchStart>0)setZoom(pinchZoom*pinchStart/dist);if(lastPinchAngle!==null){let twist=angle-lastPinchAngle;while(twist>Math.PI)twist-=Math.PI*2;while(twist< -Math.PI)twist+=Math.PI*2;if(Math.abs(twist)>.001){const axis=new THREE.Vector3(0,0,1);const rotation=new THREE.Quaternion().setFromAxisAngle(axis,twist);if(focusedMoon)targetViewRotation.premultiply(rotation).normalize();else targetRotation.premultiply(rotation).normalize();showGlobeCompass();}}lastPinchAngle=angle;dragged=true;return;}if(pointer===e.pointerId){const next=trackballPoint(e.clientX,e.clientY);if(lastTrackball){const delta=new THREE.Quaternion().setFromUnitVectors(lastTrackball,next);if(focusedMoon&&moonObjects[focusedMoon])targetViewRotation.premultiply(delta).normalize();else targetRotation.premultiply(delta).normalize();}lastTrackball=next;if(pointers.size===1)dragged=true;}});
 function endPointer(e){pointers.delete(e.pointerId);if(pointer===e.pointerId){pointer=null;lastTrackball=null;}if(pointers.size<2){pinchStart=0;lastPinchAngle=null;}if(!pointers.size)space.classList.remove('dragging');}
 space.addEventListener('pointerup',endPointer);space.addEventListener('pointercancel',endPointer);
-space.addEventListener('click',e=>{if(dragged)return;const rect=renderer.domElement.getBoundingClientRect();pointerNdc.x=((e.clientX-rect.left)/rect.width)*2-1;pointerNdc.y=-((e.clientY-rect.top)/rect.height)*2+1;raycaster.setFromCamera(pointerNdc,camera);const hits=raycaster.intersectObjects([...markerGroup.children,...Object.values(moonObjects).map(m=>m.marker),...(zoom>=1.6&&zoom<8.5?(colonyLogistics?.settlementPickTargets??[]):[]),...(zoom>=1.6?(colonyLogistics?.poiPickTargets??[]).filter(p=>p.visible):[]),...(zoom>3.5&&zoom<25?[...orbitalMapObjects.values()].map(o=>o.marker):[]),...(zoom>11.5?(colonyLogistics?.shipPickTargets??[]):[])],false);if(hits.length){const hit=hits[0].object;if(hit.userData.kind==='infrastructure-asset'){const a=getInfrastructureAssetSummary(worldState,hit.userData.assetId);if(a){const liveThreat=(worldState.asteroidOperations?.aiMissions??[]).filter(m=>m.status==='active'&&m.targetId===a.id);const liveMission=(worldState.asteroidOperations?.missions??[]).filter(m=>m.status==='active');const orbit=a.location?.kind==='orbit'?'Mars orbit':'Orbital trajectory not recorded';notify(a.name+' · '+a.status+' · Owner: '+a.owner+' · Operator: '+a.operator+' · '+orbit+' · '+(liveThreat.length?'Threat: active operation detected':liveMission.length?'Mission: '+liveMission[0].name:'No active threat or mission recorded'),6500);}}else if(hit.userData.kind==='supply-ship'){notify(hit.userData.cargo+' · inbound · about '+Math.ceil(hit.userData.etaSols??0)+' sols remaining');}else if(hit.userData.kind==='point-of-interest'||hit.userData.kind==='natural-impact-crater'){notify(hit.userData.name+' · '+hit.userData.status+' · '+hit.userData.description);}else if(hit.userData.kind==='settlement')focusPlace('colony');else if(hit.userData.id)focusPlace(hit.userData.id);else for(const [id,m] of Object.entries(moonObjects))if(hit===m.marker){focusMoon(id);break;}}});
+space.addEventListener('click',e=>{if(dragged)return;const rect=renderer.domElement.getBoundingClientRect();pointerNdc.x=((e.clientX-rect.left)/rect.width)*2-1;pointerNdc.y=-((e.clientY-rect.top)/rect.height)*2+1;raycaster.setFromCamera(pointerNdc,camera);const hits=raycaster.intersectObjects([...markerGroup.children,...Object.values(moonObjects).map(m=>m.marker),...(zoom>=1.6&&zoom<8.5?(colonyLogistics?.settlementPickTargets??[]):[]),...(zoom>=1.6?(colonyLogistics?.poiPickTargets??[]).filter(p=>p.visible):[]),...(zoom>3.5&&zoom<25?[...orbitalMapObjects.values()].map(o=>o.marker):[]),...(zoom>11.5?(colonyLogistics?.shipPickTargets??[]):[])],false);if(hits.length){const hit=hits[0].object;if(hit.userData.kind==='infrastructure-asset'){showInfrastructureAsset(hit.userData.assetId);}else if(hit.userData.kind==='supply-ship'){notify(hit.userData.cargo+' · inbound · about '+Math.ceil(hit.userData.etaSols??0)+' sols remaining');}else if(hit.userData.kind==='point-of-interest'||hit.userData.kind==='natural-impact-crater'){notify(hit.userData.name+' · '+hit.userData.status+' · '+hit.userData.description);}else if(hit.userData.kind==='settlement')focusPlace('colony');else if(hit.userData.id)focusPlace(hit.userData.id);else for(const [id,m] of Object.entries(moonObjects))if(hit===m.marker){focusMoon(id);break;}}});
 function resize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);}
 addEventListener('resize',resize);
 addEventListener('pagehide',()=>saveCampaign('pagehide'));
