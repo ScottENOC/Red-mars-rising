@@ -56,27 +56,44 @@ export function ensureMaterialInventories(w) {
   m.externalFlowsCompensation??={importedWaterKg:0,exportedWaterKg:0};
   m.diagnostics??={waterBalanceErrorKg:0,lastWaterBalanceCheckSol:0,hydrogenBalanceErrorKg:0,oxygenBalanceErrorKg:0};
   const home=w.settlements?.find(s=>s.kind==='primary-colony');
-  if(home&&!m.colonies[home.id]){
-    const waterKg=Math.max(0,Number(w.economy?.water??0))*1000;
-    m.colonies[home.id]={waterKg:{tanks:waterKg,processWater:0,habitatHumidity:0,wastewater:0},gasesKg:{hydrogen:0,oxygen:0,carbonDioxide:0,nitrogen:0,argon:0,carbonMonoxide:0},energy:{storedKWh:0},foodKg:0,biomassKg:0,note:'Legacy economy water bridged at 1,000 kg per unit.'};
-  }
-  if(home){
-    const colony=m.colonies[home.id];
+  for(const settlement of (w.settlements??[])){
+    const isHome=settlement.kind==='primary-colony';
+    if(!m.colonies[settlement.id]){
+      const waterKg=isHome?Math.max(0,Number(w.economy?.water??0))*1000:Math.max(0,Number(settlement.initialLifeSupport?.waterKg??15000));
+      m.colonies[settlement.id]={waterKg:{tanks:waterKg,processWater:0,habitatHumidity:0,wastewater:0},gasesKg:{hydrogen:0,oxygen:0,carbonDioxide:0,nitrogen:0,argon:0,carbonMonoxide:0},energy:{storedKWh:0},foodKg:0,biomassKg:0,note:isHome?'Legacy economy water bridged at 1,000 kg per unit.':'Initial settlement life-support stores.'};
+    }
+    const colony=m.colonies[settlement.id];
     if(!colony.physicalStocksVersion){
-      colony.foodKg=Math.max(1000,Math.max(0,Number(home.population??10))*0.62*(88775.244/86400)*90);
+      const population=Math.max(0,Number(settlement.population??(isHome?w.colonists?.population:0))||0);
+      colony.foodKg=Math.max(1000,population*0.62*(88775.244/86400)*90);
       colony.biomassKg=0;
       colony.solidWasteKg=0;
       colony.materialsKg={regolith:0,aggregate:0,metalConcentrate:0,tailings:0,constructionComponents:0,constructionInProgress:0,slag:0,nutrients:500,spareParts:250,polymers:100};
-      colony.gasesKg.oxygen=(colony.gasesKg.oxygen??0)+5000;
+      colony.gasesKg.oxygen=(colony.gasesKg.oxygen??0)+(isHome?5000:Math.max(0,Number(settlement.initialLifeSupport?.oxygenKg??10000)));
       colony.thermal??={storedEnergyJ:0,capacityJPerK:2e9,referenceTemperatureC:20,temperatureC:20,heatInputCumulativeJ:0,heatLossCumulativeJ:0};
       colony.physicalStocksVersion=1;
-      // Older prototype saves predate the physical food/gas manifest. Rebaseline once after migration.
-      m.diagnostics.initialTotalWaterKg=undefined;
-      m.diagnostics.initialHydrogenEquivalentKg=undefined;
-      m.diagnostics.initialOxygenEquivalentKg=undefined;
-      m.diagnostics.initialColonyMatterMassKg=undefined;
-      m.diagnostics.initialCarbonKg=undefined;
-      m.diagnostics.initialTrackedStocks=undefined;
+      if(isHome){
+        // Older prototype saves predate the physical food/gas manifest. Rebaseline once after migration.
+        m.diagnostics.initialTotalWaterKg=undefined;
+        m.diagnostics.initialHydrogenEquivalentKg=undefined;
+        m.diagnostics.initialOxygenEquivalentKg=undefined;
+        m.diagnostics.initialColonyMatterMassKg=undefined;
+        m.diagnostics.initialCarbonKg=undefined;
+        m.diagnostics.initialTrackedStocks=undefined;
+      }else if(m.diagnostics.initialTrackedStocks){
+        // A newly founded colony enters the tracked system boundary with its arrival manifest.
+        // Add that manifest to the baseline so it is not misreported as unexplained matter creation.
+        const snapshot=m.diagnostics.initialTrackedStocks;
+        const c=colony;
+        snapshot.colonies??={};
+        snapshot.colonies[settlement.id]={
+          waterKg:Object.fromEntries(Object.entries(c.waterKg).map(([key,value])=>[key,value-(c.waterCompensation?.[key]??0)])),
+          gasesKg:{...c.gasesKg},foodKg:c.foodKg??0,biomassKg:c.biomassKg??0,solidWasteKg:c.solidWasteKg??0,
+          materialsKg:{...(c.materialsKg??{})}
+        };
+        const initialMass=Object.values(c.waterKg).reduce((sum,value)=>sum+value,0)+Object.values(c.gasesKg).reduce((sum,value)=>sum+(Number(value)||0),0)+(c.foodKg??0)+(c.biomassKg??0)+(c.solidWasteKg??0)+Object.values(c.materialsKg??{}).reduce((sum,value)=>sum+(Number(value)||0),0);
+        m.diagnostics.initialColonyMatterMassKg=(m.diagnostics.initialColonyMatterMassKg??0)+initialMass;
+      }
     }
     colony.gasesKg.carbonDioxide??=0;
     colony.gasesKg.carbonMonoxide??=0;
