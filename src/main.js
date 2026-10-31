@@ -661,6 +661,25 @@ function xyz(lat,lon,r=1.009){const a=THREE.MathUtils.degToRad(lat),b=THREE.Math
 markerGroup=new THREE.Group();root.add(markerGroup);
 const orbitalMapGroup=new THREE.Group();scene.add(orbitalMapGroup);
 const orbitalMapObjects=new Map();
+const orbitalThreatObjects=new Map();
+function syncOrbitalThreats(){
+ const missions=(worldState.asteroidOperations?.aiMissions??[]).filter(m=>m.status==='active');
+ for(const [id,obj] of orbitalThreatObjects){if(!missions.some(m=>m.id===id)){orbitalMapGroup.remove(obj.group);obj.group.traverse(o=>{o.geometry?.dispose?.();o.material?.dispose?.();});orbitalThreatObjects.delete(id);}}
+ missions.forEach(m=>{
+  let obj=orbitalThreatObjects.get(m.id);
+  if(!obj){
+   const group=new THREE.Group();
+   const marker=new THREE.Mesh(new THREE.SphereGeometry(.022,12,10),new THREE.MeshBasicMaterial({color:0xff554f}));
+   const points=[new THREE.Vector3(0,0,1.62),new THREE.Vector3(0,0,1.18)];
+   const track=new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),new THREE.LineBasicMaterial({color:0xff554f,transparent:true,opacity:.72}));
+   group.add(track,marker);orbitalMapGroup.add(group);obj={group,marker};orbitalThreatObjects.set(m.id,obj);
+  }
+  const progress=THREE.MathUtils.clamp(1-(Number(m.remainingSols??90)/90),0,1);
+  const radius=1.62-(.44*progress),phase=(Number(m.launchedSol??0)*.013)% (Math.PI*2);
+  obj.marker.position.set(Math.cos(phase)*radius,Math.sin(phase)*radius*.2,Math.sin(phase)*radius);
+ });
+}
+
 function orbitalColour(owner,id=''){return owner==='player'?0x8bd3c7:id.startsWith('captured-asteroid-')?0xe6c27a:0xe29a78;}
 function syncOrbitalMap(){
  const state=worldState.asteroidOperations;
@@ -685,7 +704,8 @@ function syncOrbitalMap(){
   obj.marker.position.set(Math.cos(phase)*obj.orbitRadius,Math.sin(phase)*obj.orbitRadius*.22,Math.sin(phase)*obj.orbitRadius);
   obj.marker.material.color.set(asset.status==='disabled'?0x777777:orbitalColour(asset.owner));
  });
- orbitalMapGroup.visible=zoom>3.5&&zoom<25&&wanted.length>0;
+ syncOrbitalThreats();
+ orbitalMapGroup.visible=zoom>3.5&&zoom<25&&(wanted.length>0||orbitalThreatObjects.size>0);
 }
 
 const markerMeshes={};
