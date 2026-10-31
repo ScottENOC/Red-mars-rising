@@ -138,7 +138,7 @@ function priorityFor(w,settlement){
   const primary=(w.settlements??[]).find(s=>s.kind==='primary-colony');
   return primary&&settlement.id!==primary.id&&w.campaign.colonyTradePolicy?.[settlement.id]==='prioritise'?1:0;
 }
-function aidReserve(good){return {food:35,components:12,machinery:8,electronics:6,aggregate:18}[good]??10;}
+function aidReserve(good,settlement=null){if(good==='food'&&settlement?.settlementType==='relief-outpost')return 55;return {food:35,components:12,machinery:8,electronics:6,aggregate:18}[good]??10;}
 function emergencyThreshold(good){return {food:12,components:1,machinery:0.5,electronics:0.25,aggregate:1}[good]??1;}
 function emergencyNeed(colony,good){return Number(colony?.economy?.inventory?.[good]??0)<emergencyThreshold(good);}
 function aidPolicy(w,recipient){return w.campaign.emergencyAidPolicy?.[recipient.id]??'automatic';}
@@ -175,7 +175,7 @@ function assessEmergencyAid(w,sol,events){
       }
       if(request.status!=='open')continue;
       request.attempts++;
-      const donors=alive.filter(d=>d.id!==recipient.id&&Number(d.economy.inventory[good]??0)>aidReserve(good));
+      const donors=alive.filter(d=>d.id!==recipient.id&&Number(d.economy.inventory[good]??0)>aidReserve(good,d));
       const ranked=donors.map(d=>({donor:d,rel:relationship(d,recipient),distance:routeDistanceKm(d,recipient)})).sort((a,b)=>b.rel-a.rel||a.distance-b.distance);
       const primary=(w.settlements??[]).find(s=>s.kind==='primary-colony');
       const primaryPolicy=primary&&recipient.id!==primary.id?aidPolicy(w,recipient):'automatic';
@@ -188,7 +188,7 @@ function assessEmergencyAid(w,sol,events){
       const donor=ranked.find(x=>x.donor.id!==primary?.id||primaryPolicy!=='protect-reserves');
       if(donor){
         const baseAid=good==='food'?25:good==='components'?5:good==='machinery'?4:good==='electronics'?3:8;
-        const amount=Math.min(baseAid*(donor.donor.id===primary?.id&&aidPolicy(w,recipient)==='prioritise'?1.5:1),donor.donor.economy.inventory[good]-aidReserve(good));
+        const amount=Math.min(baseAid*(donor.donor.id===primary?.id&&aidPolicy(w,recipient)==='prioritise'?1.5:1),donor.donor.economy.inventory[good]-aidReserve(good,donor.donor));
         const route=routeTravel(w,donor.donor,recipient,donor.distance);
         const arrivesInTime=good!=='food'||route.travelSols<=Math.max(0,foodRunway);
         if(arrivesInTime){
@@ -214,11 +214,14 @@ function createShipment(w,from,to,good,amount,sol,kind='trade'){
   const travelSols=route.travelSols;
   const shipment={id:'colony-haul-'+w.colonyTrade.nextShipmentId++,kind,fromId:from.id,toId:to.id,good,amount:round3(amount),departSol:sol,arrivalSol:sol+travelSols,travelSols,distanceKm:Math.round(distanceKm),terrainProfile:route.profile?{reliefM:Math.round(route.profile.relief),ascentM:Math.round(route.profile.ascent),maxGradePct:Math.round(route.profile.maxGrade*100)}:null,roadUsed:route.road,navigationBeacons:route.beacons,effectiveSpeedKmPerSol:route.effectiveSpeed,status:'in-transit'};
   from.economy.inventory[good]=round3(Math.max(0,from.economy.inventory[good]-amount));
-  if(good==='food'&&w.materials?.colonies?.[from.id]){
-    const foodMassKg=Math.min(Number(w.materials.colonies[from.id].foodKg)||0,shipment.amount*FOOD_KG_PER_UNIT);
-    w.materials.colonies[from.id].foodKg-=foodMassKg;
-    w.materials.inTransitFoodKg=(Number(w.materials.inTransitFoodKg)||0)+foodMassKg;
+  if(good==='food'&&w.materials?.colonies?.[from.id]&&(from.settlementType==='relief-outpost'||to.settlementType==='relief-outpost')){
+    const foodMassKg=shipment.amount*FOOD_KG_PER_UNIT;
     shipment.foodMassKg=foodMassKg;
+    if(from.settlementType==='relief-outpost'){
+      w.materials.colonies[from.id].foodKg=Math.max(0,w.materials.colonies[from.id].foodKg-foodMassKg);
+      w.materials.inTransitFoodKg=(Number(w.materials.inTransitFoodKg)||0)+foodMassKg;
+      shipment.foodMassInTransit=true;
+    }else shipment.foodMassExternal=true;
   }
   w.colonyTrade.shipments.push(shipment);
   addTradeLog(w,{sol,kind:'departed',shipmentId:shipment.id,fromId:from.id,toId:to.id,good,amount:shipment.amount,description:amount+' units of '+good+' departed '+from.name+' for '+to.name+' ('+Math.round(distanceKm)+' km, about '+travelSols+' sols; '+route.effectiveSpeed+' km/sol'+(route.road?', established road':'')+(route.beacons?', '+route.beacons+' navigation beacon(s)':'')+(route.profile?', sampled relief '+Math.round(route.profile.relief)+' m':'')+').'});
@@ -229,7 +232,7 @@ function deliverShipments(w,sol,events){
     if(ship.status!=='in-transit'||sol<ship.arrivalSol)continue;
     const destination=w.settlements.find(s=>s.id===ship.toId);
     if(!destination||destination.status==='failed'||destination.status==='abandoned'){
-      if(ship.foodMassKg>0){w.materials.inTransitFoodKg=Math.max(0,(w.materials.inTransitFoodKg||0)-ship.foodMassKg);w.materials.externalFlows.colonyMatterExportsKg=(w.materials.externalFlows.colonyMatterExportsKg||0)+ship.foodMassKg;}
+      if(ship.foodMassKg>0&&ship.foodMassInTransit){w.materials.inTransitFoodKg=Math.max(0,(w.materials.inTransitFoodKg||0)-ship.foodMassKg);w.materials.externalFlows.colonyMatterExportsKg=(w.materials.externalFlows.colonyMatterExportsKg||0)+ship.foodMassKg;}
       ship.status='lost';
       addTradeLog(w,{sol,kind:'lost',shipmentId:ship.id,description:'A shipment was lost because its destination is no longer operational.'});
       continue;
@@ -237,9 +240,9 @@ function deliverShipments(w,sol,events){
     if(deliverInfrastructureEquipmentShipment(w,ship,destination,sol,events))continue;
     destination.economy.inventory[ship.good]=round3((destination.economy.inventory[ship.good]??0)+ship.amount);
     if(ship.good==='food'){
-      const foodMassKg=Number(ship.foodMassKg??(ship.kind==='earth-import'?ship.amount*FOOD_KG_PER_UNIT:0));
+      const foodMassKg=Number(ship.foodMassKg??(ship.kind==='earth-import'&&destination.settlementType==='relief-outpost'?ship.amount*FOOD_KG_PER_UNIT:0));
       if(foodMassKg>0){
-        if(ship.foodMassKg>0)w.materials.inTransitFoodKg=Math.max(0,(w.materials.inTransitFoodKg||0)-foodMassKg);
+        if(ship.foodMassInTransit)w.materials.inTransitFoodKg=Math.max(0,(w.materials.inTransitFoodKg||0)-foodMassKg);
         else w.materials.externalFlows.colonyMatterImportsKg=(w.materials.externalFlows.colonyMatterImportsKg||0)+foodMassKg;
         w.materials.colonies[destination.id].foodKg+=foodMassKg;
         w.materials.ledger.push({sol,process:'food-cargo-delivery',substance:'food',massKg:foodMassKg,from:ship.fromId,to:'colony:'+destination.id+':food',note:'Food shipment converted from the existing economy cargo unit into physical glucose-equivalent food mass.'});
@@ -355,14 +358,15 @@ function dispatchIntercolonyTrade(w,sol){
   const alive=(w.settlements??[]).filter(s=>!['failed','abandoned'].includes(s.status));
   for(const from of alive){
     for(const good of GOODS){
-      if(from.economy.inventory[good]<=(good==='food'?45:good==='components'?18:good==='machinery'?12:good==='electronics'?10:25))continue;
+      const exportReserve=good==='food'&&from.settlementType==='relief-outpost'?55:(good==='food'?45:good==='components'?18:good==='machinery'?12:good==='electronics'?10:25);
+      if(from.economy.inventory[good]<=exportReserve)continue;
       if(w.colonyTrade.shipments.some(x=>x.status==='in-transit'&&x.fromId===from.id&&x.good===good))continue;
       const needThreshold={food:25,components:10,machinery:6,electronics:5,aggregate:12}[good];
       const to=alive.filter(s=>s.id!==from.id&&relationship(from,s)>=50&&routineExchangeAllowed(w,from,s)&&s.economy.inventory[good]<needThreshold&&!w.colonyTrade.shipments.some(x=>x.status==='in-transit'&&x.kind==='trade'&&x.toId===s.id&&x.good===good))
         .sort((a,b)=>priorityFor(w,b)-priorityFor(w,a)||a.economy.inventory[good]-b.economy.inventory[good])[0];
       if(!to)continue;
       if(!routineExchangeAllowed(w,from,to))continue;
-      const reserve={food:35,components:12,machinery:8,electronics:6,aggregate:18}[good];
+      const reserve=good==='food'&&from.settlementType==='relief-outpost'?55:{food:35,components:12,machinery:8,electronics:6,aggregate:18}[good];
       const targetStock={food:55,components:18,machinery:12,electronics:10,aggregate:25}[good];
       const amount=Math.min(good==='food'?30:good==='components'?12:good==='machinery'?8:good==='electronics'?6:18,from.economy.inventory[good]-reserve,targetStock-to.economy.inventory[good]);
       if(amount<=0)continue;
