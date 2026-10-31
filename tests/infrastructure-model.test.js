@@ -174,15 +174,19 @@ test('sponsor independently dispatches oxygen equipment before reserves are exha
 
 test('legacy version-one oxygen reserves migrate once and preserve their conservation baseline',()=>{
   const w=campaignWorld();
+  checkMaterialConservation(w);
   const c=w.materials.colonies['first-colony'];
   c.gasesKg.oxygen=5000;
   c.physicalStocksVersion=1;
-  checkMaterialConservation(w);
-  const baseline=w.materials.diagnostics.initialTrackedStocks.colonies['first-colony'].gasesKg.oxygen;
+  const baseline=w.materials.diagnostics.initialTrackedStocks.colonies['first-colony'];
+  baseline.gasesKg.oxygen=5000;
+  w.materials.diagnostics.initialColonyMatterMassKg-=15000;
+  w.materials.diagnostics.initialTotalWaterKg-=15000;
+  w.materials.diagnostics.initialOxygenEquivalentKg-=15000;
   ensureMaterialInventories(w);
   assert.equal(c.gasesKg.oxygen,20000);
   assert.equal(c.physicalStocksVersion,2);
-  assert.equal(w.materials.diagnostics.initialTrackedStocks.colonies['first-colony'].gasesKg.oxygen,baseline+15000);
+  assert.equal(w.materials.diagnostics.initialTrackedStocks.colonies['first-colony'].gasesKg.oxygen,20000);
   const result=checkMaterialConservation(w);
   assert.ok(Math.abs(result.colonyMatterBalanceErrorKg)<1e-5);
 });
