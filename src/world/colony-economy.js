@@ -216,19 +216,22 @@ function createShipment(w,from,to,good,amount,sol,kind='trade'){
   const distanceKm=routeDistanceKm(from,to);
   const route=routeTravel(w,from,to,distanceKm);
   const travelSols=route.travelSols;
-  const shipment={id:'colony-haul-'+w.colonyTrade.nextShipmentId++,kind,fromId:from.id,toId:to.id,good,amount:round3(amount),departSol:sol,arrivalSol:sol+travelSols,travelSols,distanceKm:Math.round(distanceKm),terrainProfile:route.profile?{reliefM:Math.round(route.profile.relief),ascentM:Math.round(route.profile.ascent),maxGradePct:Math.round(route.profile.maxGrade*100)}:null,roadUsed:route.road,navigationBeacons:route.beacons,effectiveSpeedKmPerSol:route.effectiveSpeed,status:'in-transit'};
-  from.economy.inventory[good]=round3(Math.max(0,from.economy.inventory[good]-amount));
-  if(good==='food'&&w.materials?.colonies?.[from.id]&&(from.settlementType==='relief-outpost'||to.settlementType==='relief-outpost')){
+  let shippedAmount=Number(amount)||0;
+  if(good==='food'&&w.materials?.colonies?.[from.id]){
+    shippedAmount=Math.min(shippedAmount,Math.max(0,Number(w.materials.colonies[from.id].foodKg)||0)/FOOD_KG_PER_UNIT);
+  }
+  if(shippedAmount<=0)return null;
+  const shipment={id:'colony-haul-'+w.colonyTrade.nextShipmentId++,kind,fromId:from.id,toId:to.id,good,amount:round3(shippedAmount),departSol:sol,arrivalSol:sol+travelSols,travelSols,distanceKm:Math.round(distanceKm),terrainProfile:route.profile?{reliefM:Math.round(route.profile.relief),ascentM:Math.round(route.profile.ascent),maxGradePct:Math.round(route.profile.maxGrade*100)}:null,roadUsed:route.road,navigationBeacons:route.beacons,effectiveSpeedKmPerSol:route.effectiveSpeed,status:'in-transit'};
+  from.economy.inventory[good]=round3(Math.max(0,from.economy.inventory[good]-shipment.amount));
+  if(good==='food'&&w.materials?.colonies?.[from.id]){
     const foodMassKg=shipment.amount*FOOD_KG_PER_UNIT;
+    w.materials.colonies[from.id].foodKg=Math.max(0,w.materials.colonies[from.id].foodKg-foodMassKg);
+    w.materials.inTransitFoodKg=(Number(w.materials.inTransitFoodKg)||0)+foodMassKg;
     shipment.foodMassKg=foodMassKg;
-    if(from.settlementType==='relief-outpost'){
-      w.materials.colonies[from.id].foodKg=Math.max(0,w.materials.colonies[from.id].foodKg-foodMassKg);
-      w.materials.inTransitFoodKg=(Number(w.materials.inTransitFoodKg)||0)+foodMassKg;
-      shipment.foodMassInTransit=true;
-    }else shipment.foodMassExternal=true;
+    shipment.foodMassInTransit=true;
   }
   w.colonyTrade.shipments.push(shipment);
-  addTradeLog(w,{sol,kind:'departed',shipmentId:shipment.id,fromId:from.id,toId:to.id,good,amount:shipment.amount,description:amount+' units of '+good+' departed '+from.name+' for '+to.name+' ('+Math.round(distanceKm)+' km, about '+travelSols+' sols; '+route.effectiveSpeed+' km/sol'+(route.road?', established road':'')+(route.beacons?', '+route.beacons+' navigation beacon(s)':'')+(route.profile?', sampled relief '+Math.round(route.profile.relief)+' m':'')+').'});
+  addTradeLog(w,{sol,kind:'departed',shipmentId:shipment.id,fromId:from.id,toId:to.id,good,amount:shipment.amount,description:shipment.amount+' units of '+good+' departed '+from.name+' for '+to.name+' ('+Math.round(distanceKm)+' km, about '+travelSols+' sols; '+route.effectiveSpeed+' km/sol'+(route.road?', established road':'')+(route.beacons?', '+route.beacons+' navigation beacon(s)':'')+(route.profile?', sampled relief '+Math.round(route.profile.relief)+' m':'')+').'});
   return shipment;
 }
 function deliverShipments(w,sol,events){
