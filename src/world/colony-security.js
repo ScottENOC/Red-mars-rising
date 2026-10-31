@@ -30,7 +30,8 @@ function assess(w,proposer,target,reason){
  const dependence=Number(p.sponsorDependence??50)>80?-8:0;
  const justification=clamp(42+e.justification+(100-relation)*.18);
  const safety=clamp(38+ownSecurity+targetThreat+retaliationRisk+dependence+(stability-50)*.18);
- const politicalWill=clamp(18+sovereignty*.34+salience*.12+autonomy*.18+(stability-50)*.12);
+ const playerRelation=Number(p.relations?.[w.settlements?.find(c=>c.kind==='primary-colony')?.id]??50);
+ const politicalWill=clamp(18+sovereignty*.34+salience*.12+autonomy*.18+(stability-50)*.12+(playerRelation-50)*.22);
  const total=justification*.42+safety*.38+politicalWill*.20;
  return {justification:Math.round(justification),safety:Math.round(safety),politicalWill:Math.round(politicalWill),score:Math.round(total),reason:e.description,relation:Math.round(relation),ownSecurity:capability(w,proposer.id),targetSecurity:capability(w,target.id)};
 }
