@@ -73,7 +73,9 @@ export function processColonySecurity(w,sol,events=[]){
   proposal.mission.remainingSols=Math.max(0,proposal.mission.remainingSols-1);
   if(proposal.mission.remainingSols===0){
    proposal.mission.status='complete';proposal.completedSol=sol;
-   const relay=w.asteroidOperations?.orbitalAssets?.find(a=>a.id==='rival-relay-'+proposal.targetId);
+   const targetColony=w.settlements.find(c=>c.id===proposal.targetId);
+   const relayId=targetColony?.kind==='primary-colony'?'player-relay':'rival-relay-'+proposal.targetId;
+   const relay=w.asteroidOperations?.orbitalAssets?.find(a=>a.id===relayId);
    if(relay)relay.status='disabled';
    proposal.outcome=relay?'Target communications relay disabled':'Operation completed; no operational relay was available at arrival.';
    s.history.push({sol,description:w.settlements.find(c=>c.id===proposal.proposerId)?.name+' completed an independently authorised counter-space operation.'});
