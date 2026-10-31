@@ -314,7 +314,23 @@ function operateColonies(w,sol,events){
       }
       e.shortages[good]=e.inventory[good]< (good==='food'?12:good==='components'?3:good==='machinery'?2:good==='electronics'?1.5:3);
     }
-    if(s.settlementType==='relief-outpost')e.inventory.food=round3(Math.max(0,w.materials.colonies[s.id].foodKg/FOOD_KG_PER_UNIT));
+    if(s.settlementType==='relief-outpost'){
+      const colony=w.materials.colonies[s.id];
+      const maxDryBiomassKg=pop*0.25;
+      const byCO2=Math.max(0,Number(colony.gasesKg.carbonDioxide)||0)/CO2_PER_GLUC;
+      const byWater=Math.max(0,Number(colony.waterKg.tanks)||0)/WATER_PER_GLUC;
+      const dryBiomassKg=Math.min(maxDryBiomassKg,byCO2,byWater);
+      if(dryBiomassKg>0){
+        const co2UsedKg=dryBiomassKg*CO2_PER_GLUC,waterUsedKg=dryBiomassKg*WATER_PER_GLUC;
+        consumeColonyWaterForReaction(w,{colonyId:s.id,massKg:waterUsedKg,sol,process:'relief-outpost-photosynthesis',note:'The outpost greenhouse uses the same glucose-equivalent photosynthesis chemistry as the primary colony.'});
+        colony.gasesKg.carbonDioxide=Math.max(0,colony.gasesKg.carbonDioxide-co2UsedKg);
+        colony.gasesKg.oxygen+=dryBiomassKg*O2_PER_GLUC;
+        colony.foodKg+=dryBiomassKg*0.70;
+        colony.biomassKg=(colony.biomassKg??0)+dryBiomassKg*0.30;
+        w.materials.ledger.push({sol,process:'relief-outpost-photosynthesis',substance:'dry glucose-equivalent biomass',massKg:dryBiomassKg,co2ConsumedKg:co2UsedKg,waterConsumedKg:waterUsedKg,oxygenProducedKg:dryBiomassKg*O2_PER_GLUC,edibleFoodKg:dryBiomassKg*0.70,inedibleBiomassKg:dryBiomassKg*0.30,note:'Outpost greenhouse food production is limited by population, available CO2 and tank water.'});
+      }
+      e.inventory.food=round3(Math.max(0,colony.foodKg/FOOD_KG_PER_UNIT));
+    }
     const food=e.inventory.food;
     if(food<5){
       e.stability=clamp(e.stability-0.15);
