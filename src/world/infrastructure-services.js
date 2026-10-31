@@ -106,13 +106,26 @@ export function getColonyOxygenStatus(w,colonyId){
   // Gross demand follows the same glucose-equivalent metabolism used by the world tick.
   const demandKgPerSol=population*0.62*(88775.244/86400)*0.9*O2_PER_GLUC;
   const generators=(w.infrastructure?.assets??[]).filter(asset=>asset.kind==='oxygen-generator'&&asset.status==='operational'&&(asset.operatorId??asset.ownerId)===colonyId);
-  const capacityKgPerSol=generators.reduce((sum,asset)=>sum+Math.max(0,Number(asset.capacityOxygenKgPerSol)||0),0);
+  let capacityKgPerSol=0;
+  let remainingWaterKg=Math.max(0,Number(colony.waterKg?.tanks)||0);
+  let availablePowerKw=Math.max(0,(Number(w.economy?.powerCapacity)||0)-(Number(w.economy?.powerDemand)||0));
+  for(const asset of generators){
+    const capacity=Math.max(0,Number(asset.capacityOxygenKgPerSol)||0);
+    const electricityBudget=Math.max(0,Number(asset.maxElectricityKWhPerSol)||capacity*ELECTRICITY_KWH_PER_KG_OXYGEN);
+    const byWater=remainingWaterKg*OXYGEN_PER_WATER;
+    const byPower=electricityBudget/ELECTRICITY_KWH_PER_KG_OXYGEN;
+    const byGrid=availablePowerKw*88775.244/3600/ELECTRICITY_KWH_PER_KG_OXYGEN;
+    const output=Math.min(capacity,byWater,byPower,byGrid);
+    capacityKgPerSol+=output;
+    remainingWaterKg=Math.max(0,remainingWaterKg-output/OXYGEN_PER_WATER);
+    availablePowerKw=Math.max(0,availablePowerKw-output*ELECTRICITY_KWH_PER_KG_OXYGEN*3600/88775.244);
+  }
   // Credit the existing greenhouse process, but only at its currently feasible CO2/water-limited rate.
   let greenhouseOutputKgPerSol=0;
   if(settlement?.infrastructure?.includes('greenhouse')&&w.economy?.powerCapacity>=w.economy?.powerDemand){
     const maxBiomass=population*0.25;
     const byCO2=Math.max(0,Number(colony.gasesKg?.carbonDioxide)||0)/CO2_PER_GLUC;
-    const byWater=Math.max(0,Number(colony.waterKg?.tanks)||0)/WATER_PER_GLUC;
+    const byWater=remainingWaterKg/WATER_PER_GLUC;
     greenhouseOutputKgPerSol=Math.min(maxBiomass,byCO2,byWater)*O2_PER_GLUC;
   }
   const netDemandKgPerSol=Math.max(0,demandKgPerSol-greenhouseOutputKgPerSol-capacityKgPerSol);
