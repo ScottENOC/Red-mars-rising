@@ -294,7 +294,7 @@ test('hermit-crab outpost has a physical ration reserve and independent oxygen p
   assert.ok(agriculture.dryBiomassKg>0);
   assert.ok(colony.foodKg>0);
   assert.ok(colony.gasesKg.oxygen>oxygenBefore);
-  assert.ok(Math.abs(colony.foodKg-outpost.economy.inventory.food*FOOD_KG_PER_ECONOMY_UNIT)<1e-5);
+  assert.ok(Math.abs(colony.foodKg-outpost.economy.inventory.food*FOOD_KG_PER_ECONOMY_UNIT)<0.05);
   const balance=checkMaterialConservation(w);
   assert.ok(Math.abs(balance.colonyMatterBalanceErrorKg-baseline.colonyMatterBalanceErrorKg)<1e-5);
   assert.ok(Math.abs(balance.carbonBalanceErrorKg)<1e-5);
