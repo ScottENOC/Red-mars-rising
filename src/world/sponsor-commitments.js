@@ -233,5 +233,5 @@ export function processSponsorCommitments(w,sol,events=[]){
 export function getSponsorCommitmentSummary(w){
  const state=ensureSponsorCommitments(w);
  if(!state)return null;
- return {survivalGuaranteeActive:state.survivalGuaranteeActive,commitments:state.commitments.map(c=>({...c,goods:{...c.goods}})),requests:state.requests.slice(-10).reverse(),history:state.history.slice(-8).reverse(),externalAppeals:state.externalAppeals.slice(-8).reverse(),availableProjects:Object.entries(PROJECTS).map(([id,p])=>({id,...p}))};
+ return {survivalGuaranteeActive:state.survivalGuaranteeActive,commitments:state.commitments.map(c=>({...c,goods:{...c.goods}})),requests:state.requests.slice(-10).reverse(),history:state.history.slice(-8).reverse(),externalAppeals:state.externalAppeals.slice(-8).reverse(),reliefOutposts:(w.sponsorReliefOutposts??[]).slice(-10).reverse().map(item=>({...item})),availableProjects:Object.entries(PROJECTS).map(([id,p])=>({id,...p}))};
 }
