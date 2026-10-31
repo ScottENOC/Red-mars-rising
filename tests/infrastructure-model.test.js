@@ -249,7 +249,8 @@ test('hermit-crab outpost establishes and transfers its spare oxygen generator',
   processSponsorCommitments(w,241,events);
   const outpost=w.settlements.find(item=>item.id===plan.outpostId);
   assert.ok(outpost);
-  assert.equal(outpost.kind,'relief-outpost');
+  assert.equal(outpost.kind,'rival-colony');
+  assert.equal(outpost.settlementType,'relief-outpost');
   assert.equal(outpost.population,8);
   const spare=w.infrastructure.assets.find(item=>item.id===plan.equipmentAssetId);
   assert.equal(spare.status,'stored');
