@@ -203,7 +203,10 @@ function createShipment(w,from,to,good,amount,sol,kind='trade'){
   const distanceKm=routeDistanceKm(from,to);
   const route=routeTravel(w,from,to,distanceKm);
   const travelSols=route.travelSols;
-  const shippedAmount=Number(amount)||0;
+  let shippedAmount=Number(amount)||0;
+  if(good==='food'&&w.materials?.colonies?.[from.id]){
+    shippedAmount=Math.min(shippedAmount,Math.max(0,Number(w.materials.colonies[from.id].foodKg)||0)/FOOD_KG_PER_UNIT);
+  }
   if(shippedAmount<=0)return null;
   const shipment={id:'colony-haul-'+w.colonyTrade.nextShipmentId++,kind,fromId:from.id,toId:to.id,good,amount:round3(shippedAmount),departSol:sol,arrivalSol:sol+travelSols,travelSols,distanceKm:Math.round(distanceKm),terrainProfile:route.profile?{reliefM:Math.round(route.profile.relief),ascentM:Math.round(route.profile.ascent),maxGradePct:Math.round(route.profile.maxGrade*100)}:null,roadUsed:route.road,navigationBeacons:route.beacons,effectiveSpeedKmPerSol:route.effectiveSpeed,status:'in-transit'};
   from.economy.inventory[good]=round3(Math.max(0,from.economy.inventory[good]-shipment.amount));
