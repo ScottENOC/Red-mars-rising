@@ -4,6 +4,7 @@ import { SHORTLISTED_SITES, ensureConstructionRecipeOptions } from './campaign-o
 import { ensureColonyPoliticalState, processColonyPolitics } from './colony-politics.js';
 import { ensureColonyEconomies, processColonyEconomies } from './colony-economy.js';
 import { ensureColonySecurity, processColonySecurity } from './colony-security.js';
+import { ensureSettlementInfrastructureAssets, processOxygenGenerators, processNonPrimaryColonyMetabolism } from './infrastructure-services.js';
 
 const MARS_RADIUS_M = 3_389_500;
 const MARS_SURFACE_AREA_M2 = 4 * Math.PI * MARS_RADIUS_M ** 2;
@@ -24,6 +25,7 @@ export function processWorldTick(w) {
   const sol = ++w.time.sol;
   const events = [];
   ensureMaterialInventories(w);
+  ensureSettlementInfrastructureAssets(w);
   ensureColonyPoliticalState(w);
   ensureColonyEconomies(w);
   ensureAsteroidOperations(w);
@@ -42,6 +44,8 @@ export function processWorldTick(w) {
 
 
   const powerShortfall = w.economy.powerCapacity < w.economy.powerDemand;
+  processOxygenGenerators(w,sol,{powerAvailable:!powerShortfall,events});
+  processNonPrimaryColonyMetabolism(w,sol,events);
   w.colonists.morale = Math.max(0, Math.min(100, w.colonists.morale + (powerShortfall ? -.15 : .015)));
   w.colonists.health = Math.max(0, Math.min(100, w.colonists.health + (powerShortfall ? -.04 : .006)));
   const homeColony = w.settlements.find(s => s.kind === 'primary-colony');
