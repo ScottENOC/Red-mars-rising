@@ -159,6 +159,16 @@ test('non-primary colonies consume oxygen through the existing food metabolism m
   assert.ok(getColonyOxygenStatus(w,'relief-colony').runwaySols>0);
 });
 
+test('oxygen distress does not create a separate relief settlement',()=>{
+  const w=campaignWorld();
+  w.materials.colonies['first-colony'].gasesKg.oxygen=100;
+  const events=[];
+  processSponsorCommitments(w,1,events);
+  assert.equal(w.settlements.length,1);
+  assert.equal(w.sponsorReliefOutposts,undefined);
+  assert.equal(events.some(event=>String(event.type).includes('relief-outpost')),false);
+});
+
 test('legacy version-one oxygen reserves migrate once and preserve their conservation baseline',()=>{
   const w=campaignWorld();
   checkMaterialConservation(w);
