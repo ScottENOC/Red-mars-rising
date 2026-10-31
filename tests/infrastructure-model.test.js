@@ -257,8 +257,9 @@ test('hermit-crab outpost establishes and transfers its spare oxygen generator',
   const shipment=w.colonyTrade.shipments.find(item=>item.id===plan.equipmentShipmentId);
   assert.equal(shipment.fromId,outpost.id);
   assert.equal(shipment.toId,'first-colony');
-  assert.equal(shipment.arrivalSol,253);
-  assert.equal(deliverInfrastructureEquipmentShipment(w,shipment,w.settlements[0],253,events),true);
+  assert.equal(shipment.arrivalSol,241+shipment.travelSols);
+  assert.equal(shipment.travelSols,Math.max(2,Math.ceil(shipment.distanceKm/300)));
+  assert.equal(deliverInfrastructureEquipmentShipment(w,shipment,w.settlements[0],shipment.arrivalSol,events),true);
   assert.equal(spare.status,'transferred');
   assert.equal(plan.status,'delivered');
   const installed=w.infrastructure.assets.find(item=>item.id===shipment.equipment.assetId);
