@@ -159,17 +159,17 @@ test('non-primary colonies consume oxygen through the existing food metabolism m
   assert.ok(getColonyOxygenStatus(w,'relief-colony').runwaySols>0);
 });
 
-test('sponsor independently dispatches oxygen equipment before reserves are exhausted',()=>{
+test('sponsor launches a hermit-crab relief outpost before oxygen reserves are exhausted',()=>{
   const w=campaignWorld();
   w.materials.colonies['first-colony'].gasesKg.oxygen=100;
   const events=[];
   processSponsorCommitments(w,1,events);
-  const ship=w.colonyTrade.shipments.find(item=>item.kind==='infrastructure-equipment');
-  assert.ok(ship);
-  assert.equal(ship.equipment.kind,'oxygen-generator');
-  assert.equal(ship.toId,'first-colony');
-  assert.equal(ship.arrivalSol,241);
-  assert.ok(events.some(event=>event.type==='sponsor-oxygen-relief-launched'));
+  const plan=w.sponsorReliefOutposts?.[0];
+  assert.ok(plan);
+  assert.equal(plan.targetColonyId,'first-colony');
+  assert.equal(plan.arrivalSol,241);
+  assert.equal(plan.status,'in-transit');
+  assert.ok(events.some(event=>event.type==='sponsor-relief-outpost-launched'));
 });
 
 test('legacy version-one oxygen reserves migrate once and preserve their conservation baseline',()=>{
