@@ -1,4 +1,4 @@
-import { getColonyOxygenStatus } from './infrastructure-services.js';
+import { getColonyOxygenStatus, installOxygenGenerator } from './infrastructure-services.js';
 import { registerInfrastructureAsset } from './infrastructure-model.js';
 import { SHORTLISTED_SITES } from './campaign-options.js';
 
@@ -122,6 +122,7 @@ function processSponsorReliefOutposts(w,sol,events){
   const outpostId='relief-outpost-'+plan.id;
   const outpost={...site,id:outpostId,locationId:site.id,name:plan.sponsorName+' Relief Outpost',kind:'rival-colony',settlementType:'relief-outpost',population:8,status:'established',sponsorId:plan.sponsorId,infrastructure:['habitats','power-array'],health:82,morale:65,reliefMissionId:plan.id,initialLifeSupport:{foodKg:55*FOOD_KG_PER_ECONOMY_UNIT,waterKg:15000,oxygenKg:10000},economy:{specialisation:'agriculture',inventory:{food:55}}};
   w.settlements.push(outpost);
+  installOxygenGenerator(w,{colonyId:outpostId,assetId:'outpost-life-support-oxygen-'+plan.id,name:'Relief outpost life-support electrolyser',ownerId:plan.sponsorId,funderId:plan.sponsorId,builderId:plan.sponsorId,operatorId:outpostId,controllerId:plan.sponsorId,technologyProviderId:plan.sponsorId,softwareProviderId:plan.sponsorId,softwareControllerId:outpostId,capacityOxygenKgPerSol:10,source:'hermit-crab-relief-outpost-life-support'});
   const equipmentId='stored-relief-generator-'+plan.id;
   registerInfrastructureAsset(w,{
    id:equipmentId,name:'Portable oxygen generator (relief reserve)',domain:'surface',kind:'oxygen-generator',status:'stored',
