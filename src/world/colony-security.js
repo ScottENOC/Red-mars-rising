@@ -16,6 +16,13 @@ function capability(w,colonyId){
  const a=w.asteroidOperations?.aiCapabilities?.[colonyId];
  return a?.status==='operational';
 }
+function corroborated(w,proposer,target,reason){
+ const ops=w.asteroidOperations;
+ if(reason==='imminent-threat')return (ops?.aiMissions??[]).some(m=>m.owner===target.id&&m.targetId==='rival-relay-'+proposer.id&&m.status==='active')||(w.colonySecurity?.proposals??[]).some(p=>p.proposerId===target.id&&p.targetId===proposer.id&&['approved','under-review'].includes(p.status));
+ if(reason==='repeated-interference')return (w.colonySecurity?.history??[]).some(h=>h.actorId===target.id&&h.targetId===proposer.id&&w.time.sol-h.sol<=120);
+ if(reason==='debris-danger')return (w.events??[]).some(e=>e.type==='orbital-debris-threat'&&e.colonyId===proposer.id&&w.time.sol-(e.sol??0)<=30);
+ return false;
+}
 function assess(w,proposer,target,reason){
  const e=evidence[reason]??evidence['political-dispute'];
  const p=proposer.politics??{},t=target.politics??{};
@@ -28,12 +35,14 @@ function assess(w,proposer,target,reason){
  const ownSecurity=capability(w,proposer.id)?8:0;
  const retaliationRisk=(Number(target.population??0)>Number(proposer.population??0)*1.4?-8:0);
  const dependence=Number(p.sponsorDependence??50)>80?-5:0;
- const justification=clamp(42+e.justification+(100-relation)*.18);
- const safety=clamp(58+ownSecurity+targetThreat+retaliationRisk+dependence+(stability-50)*.18);
+ const evidenceVerified=corroborated(w,proposer,target,reason);
+ const evidencePenalty=evidenceVerified?0:25;
+ const justification=clamp(42+e.justification+(100-relation)*.18-evidencePenalty);
+ const safety=clamp(58+ownSecurity+targetThreat+retaliationRisk+dependence+(stability-50)*.18-(evidenceVerified?0:8));
  const playerRelation=Number(p.relations?.[w.settlements?.find(c=>c.kind==='primary-colony')?.id]??50);
  const politicalWill=clamp(18+sovereignty*.34+salience*.12+autonomy*.18+(stability-50)*.12+(playerRelation-50)*.22);
  const total=justification*.42+safety*.38+politicalWill*.20;
- return {justification:Math.round(justification),safety:Math.round(safety),politicalWill:Math.round(politicalWill),score:Math.round(total),reason:e.description,relation:Math.round(relation),ownSecurity:capability(w,proposer.id),targetSecurity:capability(w,target.id)};
+ return {justification:Math.round(justification),safety:Math.round(safety),politicalWill:Math.round(politicalWill),score:Math.round(total),reason:e.description,evidenceVerified,relation:Math.round(relation),ownSecurity:capability(w,proposer.id),targetSecurity:capability(w,target.id)};
 }
 export function proposeColonyAttack(w,proposerId,targetId,reason='imminent-threat'){
  const s=ensureColonySecurity(w);if(!s)return {ok:false,reason:'No active campaign.'};
@@ -48,7 +57,7 @@ export function proposeColonyAttack(w,proposerId,targetId,reason='imminent-threa
  const assessment=assess(w,proposer,target,reason);
  const proposal={id:'colony-security-'+s.nextId++,proposerId:proposer.id,targetId:target.id,reason,createdSol:w.time.sol,decisionSol:w.time.sol+30,status:'under-review',assessment,playerBacked:true};
  s.proposals.push(proposal);
- s.history.push({sol:w.time.sol,description:'You urged '+proposer.name+' to consider an operation against '+target.name+'. Its council will review the justification and its own exposure.'});
+ s.history.push({sol:w.time.sol,actorId:proposer.id,targetId:target.id,description:'You urged '+proposer.name+' to consider an operation against '+target.name+'. Its council will review the justification and its own exposure.'});
  return {ok:true,reason:proposer.name+' has agreed to review the proposal, not to carry it out. A decision is expected after 30 sols.'};
 }
 export function processColonySecurity(w,sol,events=[]){
@@ -63,7 +72,7 @@ export function processColonySecurity(w,sol,events=[]){
   const accepted=a.score>=62&&a.justification>=55&&a.safety>=52&&a.politicalWill>=42;
   proposal.status=accepted?'approved':'rejected';proposal.decidedSol=sol;
   proposal.decision=accepted?'Council authorised a limited counter-space operation.':'Council rejected the proposal: justification, political will or self-protection was insufficient.';
-  s.history.push({sol,description:proposer.name+' '+(accepted?'authorised':'rejected')+' an operation against '+target.name+'. '+proposal.decision});
+  s.history.push({sol,actorId:proposer.id,targetId:target.id,description:proposer.name+' '+(accepted?'authorised':'rejected')+' an operation against '+target.name+'. '+proposal.decision});
   if(accepted){
    proposal.mission={status:'active',launchedSol:sol,remainingSols:90};
    events.push({type:'colony-operation-authorised',sol,description:proposer.name+' has independently authorised a counter-space operation against '+target.name+'.'});
@@ -79,7 +88,7 @@ export function processColonySecurity(w,sol,events=[]){
    const relay=w.asteroidOperations?.orbitalAssets?.find(a=>a.id===relayId);
    if(relay)relay.status='disabled';
    proposal.outcome=relay?'Target communications relay disabled':'Operation completed; no operational relay was available at arrival.';
-   s.history.push({sol,description:w.settlements.find(c=>c.id===proposal.proposerId)?.name+' completed an independently authorised counter-space operation.'});
+   s.history.push({sol,actorId:proposal.proposerId,targetId:proposal.targetId,description:w.settlements.find(c=>c.id===proposal.proposerId)?.name+' completed an independently authorised counter-space operation.'});
    events.push({type:'colony-counterspace-attack',sol,description:w.settlements.find(c=>c.id===proposal.proposerId)?.name+' completed a counter-space operation against '+w.settlements.find(c=>c.id===proposal.targetId)?.name+'.'});
   }
  }
