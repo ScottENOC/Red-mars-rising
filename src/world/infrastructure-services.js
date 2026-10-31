@@ -1,5 +1,6 @@
 import { ensureInfrastructureModel, registerInfrastructureAsset, recordInfrastructureActivity } from './infrastructure-model.js';
 import { ensureMaterialInventories, electrolyseWater, addColonyWaterFromReaction } from './material-inventories.js';
+import { FOOD_KG_PER_ECONOMY_UNIT } from './relief-outpost-food.js';
 
 const OXYGEN_PER_WATER=0.5*31.9988/18.01528;
 const ELECTRICITY_KWH_PER_KG_OXYGEN=4.5/OXYGEN_PER_WATER;
@@ -7,7 +8,6 @@ const GLUCOSE_MOLAR_G=6*12.011+12*1.00794+6*15.9994;
 const O2_PER_GLUC=6*31.9988/GLUCOSE_MOLAR_G;
 const CO2_PER_GLUC=6*(12.011+2*15.9994)/GLUCOSE_MOLAR_G;
 const WATER_PER_GLUC=6*18.01528/GLUCOSE_MOLAR_G;
-const FOOD_KG_PER_ECONOMY_UNIT=0.62*(88775.244/86400)/0.018;
 
 const TAG_OUTPUTS={
   greenhouse:['food','oxygen'],
