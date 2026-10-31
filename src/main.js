@@ -661,7 +661,7 @@ function xyz(lat,lon,r=1.009){const a=THREE.MathUtils.degToRad(lat),b=THREE.Math
 markerGroup=new THREE.Group();root.add(markerGroup);
 const orbitalMapGroup=new THREE.Group();scene.add(orbitalMapGroup);
 const orbitalMapObjects=new Map();
-function orbitalColour(owner){return owner==='player'?0x8bd3c7:0xe29a78;}
+function orbitalColour(owner,id=''){return owner==='player'?0x8bd3c7:id.startsWith('captured-asteroid-')?0xe6c27a:0xe29a78;}
 function syncOrbitalMap(){
  const state=worldState.asteroidOperations;
  const assets=state?.orbitalAssets??[];
@@ -672,7 +672,7 @@ function syncOrbitalMap(){
   if(!obj){
    const group=new THREE.Group();
    const isAsteroid=asset.id.startsWith('captured-asteroid-');
-   const colour=asset.status==='disabled'?0x777777:orbitalColour(asset.owner);
+   const colour=asset.status==='disabled'?0x777777:orbitalColour(asset.owner,asset.id);
    const marker=new THREE.Mesh(new THREE.SphereGeometry(isAsteroid ? .018 : .012,12,10),new THREE.MeshBasicMaterial({color:colour}));
    group.add(marker);
    const orbitRadius=isAsteroid?1.42:asset.owner==='player'?1.18:1.28+(index%4)*.035;
@@ -685,7 +685,7 @@ function syncOrbitalMap(){
   obj.marker.position.set(Math.cos(phase)*obj.orbitRadius,Math.sin(phase)*obj.orbitRadius*.22,Math.sin(phase)*obj.orbitRadius);
   obj.marker.material.color.set(asset.status==='disabled'?0x777777:orbitalColour(asset.owner));
  });
- orbitalMapGroup.visible=zoom>5.5&&zoom<25&&wanted.length>0;
+ orbitalMapGroup.visible=zoom>3.5&&zoom<25&&wanted.length>0;
 }
 
 const markerMeshes={};
