@@ -67,21 +67,24 @@ export function processOxygenGenerators(w,sol,{powerAvailable=true,events=[]}={}
   ensureMaterialInventories(w);
   ensureSettlementInfrastructureAssets(w);
   const results=[];
+  let availablePowerKw=Math.max(0,(Number(w.economy?.powerCapacity)||0)-(Number(w.economy?.powerDemand)||0));
   for(const asset of (w.infrastructure.assets??[])){
     if(asset.kind!=='oxygen-generator'||asset.domain!=='surface'||asset.status!=='operational')continue;
     const operatorId=asset.operatorId??asset.ownerId;
     const colony=w.materials.colonies[operatorId];
     if(!colony?.waterKg||!colony.gasesKg)continue;
     if(!powerAvailable){asset.lastPausedReason='Power shortfall';continue;}
-    delete asset.lastPausedReason;
     const capacity=Math.max(0,Number(asset.capacityOxygenKgPerSol)||0);
     const electricityBudget=Math.max(0,Number(asset.maxElectricityKWhPerSol)||capacity*ELECTRICITY_KWH_PER_KG_OXYGEN);
     const byWater=Math.max(0,colony.waterKg.tanks)*OXYGEN_PER_WATER;
     const byPower=electricityBudget/ELECTRICITY_KWH_PER_KG_OXYGEN;
-    const oxygenKg=Math.min(capacity,byWater,byPower);
-    if(oxygenKg<=1e-9){asset.lastOutputKg=0;continue;}
+    const byGrid=availablePowerKw*88775.244/3600/ELECTRICITY_KWH_PER_KG_OXYGEN;
+    const oxygenKg=Math.min(capacity,byWater,byPower,byGrid);
+    if(oxygenKg<=1e-9){asset.lastOutputKg=0;asset.lastPausedReason='Insufficient available power or water';continue;}
+    delete asset.lastPausedReason;
     const waterKg=oxygenKg/OXYGEN_PER_WATER;
     const result=electrolyseWater(w,{colonyId:operatorId,massKg:waterKg,sol});
+    availablePowerKw=Math.max(0,availablePowerKw-result.electricityKWh*3600/88775.244);
     asset.lastOutputKg=result.oxygenKg;
     asset.lastWaterInputKg=result.waterKg;
     asset.lastElectricityKWh=result.electricityKWh;
