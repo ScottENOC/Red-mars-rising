@@ -10,6 +10,7 @@ const WATER_PER_GLUC=6*18.01528/GLUCOSE_MOLAR_G;
 
 const TAG_OUTPUTS={
   greenhouse:['food','oxygen'],
+  'oxygen-generator':['oxygen'],
   'power-array':['electricity'],
   habitats:['habitable-volume','life-support'],
   'water-extractor':['water'],
@@ -24,13 +25,15 @@ export function ensureSettlementInfrastructureAssets(w){
     for(const tag of (settlement.infrastructure??[])){
       const id='asset-'+settlement.id+'-'+tag;
       if(w.infrastructure.assets.some(asset=>asset.id===id))continue;
+      const condition=settlement.infrastructureCondition?.[tag]??{};
       registerInfrastructureAsset(w,{
         id,name:settlement.name+' · '+tag.replaceAll('-',' '),domain:'surface',kind:tag,sourceTag:tag,
-        status:settlement.status==='failed'?'inactive':'operational',
+        status:condition.status??(settlement.status==='failed'?'inactive':'operational'),
         location:{kind:'surface',lat:settlement.lat??null,lon:settlement.lon??null,siteId:settlement.locationId??null},
         ownerId:settlement.id,operatorId:settlement.id,funderId:settlement.sponsorId??null,
         dependencies:tag==='greenhouse'?['electricity','water','carbon dioxide']:tag==='water-extractor'?['electricity']:[],
-        outputs:[...(TAG_OUTPUTS[tag]??[])],condition:{integrity:1}
+        outputs:[...(TAG_OUTPUTS[tag]??[])],condition:{integrity:Number.isFinite(condition.integrity)?condition.integrity:1,note:condition.note??null},
+        ...(Number.isFinite(condition.capacityOxygenKgPerSol)?{capacityOxygenKgPerSol:condition.capacityOxygenKgPerSol,maxElectricityKWhPerSol:condition.capacityOxygenKgPerSol*ELECTRICITY_KWH_PER_KG_OXYGEN}:{})
       });
     }
   }
