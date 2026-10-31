@@ -864,8 +864,8 @@ function showInfrastructureAsset(assetId){
  const asset=getInfrastructureAssetSummary(worldState,assetId);if(!asset)return;
  const rawAsset=worldState.infrastructure.assets.find(item=>item.id===assetId);
  const activeThreats=(worldState.asteroidOperations?.aiMissions??[]).filter(m=>m.status==='active'&&m.targetId===assetId);
- const activeMissions=asset.domain==='orbital'?(worldState.asteroidOperations?.missions??[]).filter(m=>m.status==='active'):(worldState.infrastructure.activities??[]).filter(a=>a.assetId===assetId&&a.status==='active');
- const location=asset.location?.kind==='orbit'?(asset.location.body??'Mars')+' orbit · detailed orbital elements not yet modelled':asset.location?.kind==='surface'?(asset.location.siteId??'Mars surface')+' · '+(Number.isFinite(asset.location.lat)?asset.location.lat.toFixed(2)+'°, ':'')+(Number.isFinite(asset.location.lon)?asset.location.lon.toFixed(2)+'°':'coordinates not recorded'):'Location not recorded';
+ const activeMissions=asset.domain==='orbital'?(worldState.asteroidOperations?.missions??[]).filter(m=>m.status==='active'&&(m.assetId===assetId||m.targetId===assetId)):(worldState.infrastructure.activities??[]).filter(a=>a.assetId===assetId&&a.status==='active');
+ const location=asset.location?.kind==='orbit'?(asset.location.body??'Mars')+' orbit'+(Number.isFinite(asset.location.orbitPhase)?' · phase '+asset.location.orbitPhase.toFixed(3):' · trajectory not recorded')+' · orbital period not modelled':asset.location?.kind==='surface'?(asset.location.siteId??'Mars surface')+' · '+(Number.isFinite(asset.location.lat)?asset.location.lat.toFixed(2)+'°, ':'')+(Number.isFinite(asset.location.lon)?asset.location.lon.toFixed(2)+'°':'coordinates not recorded'):'Location not recorded';
  const oxygenStatus=rawAsset?.kind==='oxygen-generator'?getColonyOxygenStatus(worldState,rawAsset.operatorId??rawAsset.ownerId):null;
  const integrity=asset.condition?.integrity;
  const rows=[
