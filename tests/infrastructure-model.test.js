@@ -8,9 +8,8 @@ import {
   ensureInfrastructureRelationship
 } from '../src/world/infrastructure-model.js';
 import { createMaterialInventories, ensureMaterialInventories, checkMaterialConservation } from '../src/world/material-inventories.js';
-import { ensureSettlementInfrastructureAssets, installOxygenGenerator, processOxygenGenerators, processNonPrimaryColonyMetabolism, getColonyOxygenStatus } from '../src/world/infrastructure-services.js';
+import { ensureSettlementInfrastructureAssets, installOxygenGenerator, processOxygenGenerators, processNonPrimaryColonyMetabolism, getColonyOxygenStatus, deliverInfrastructureEquipmentShipment } from '../src/world/infrastructure-services.js';
 import { processSponsorCommitments } from '../src/world/sponsor-commitments.js';
-import { processColonyEconomies } from '../src/world/colony-economy.js';
 
 function world(){
   return {
@@ -196,7 +195,8 @@ test('sponsor oxygen cargo is installed on arrival with sponsor ownership and co
     equipment:{kind:'oxygen-generator',assetId:'delivered-oxygen-unit',name:'Portable oxygen unit',colonyId:'first-colony',ownerId:'nasa',funderId:'nasa',builderId:'nasa',operatorId:'first-colony',controllerId:'nasa',technologyProviderId:'nasa',softwareProviderId:'nasa',softwareControllerId:'first-colony',softwareModifiedByIds:['first-colony'],capacityOxygenKgPerSol:40}
   }],nextShipmentId:2,tradeLog:[]};
   const events=[];
-  processColonyEconomies(w,241,events);
+  const destination=w.settlements[0];
+  assert.equal(deliverInfrastructureEquipmentShipment(w,w.colonyTrade.shipments[0],destination,241,events),true);
   const asset=w.infrastructure.assets.find(item=>item.id==='delivered-oxygen-unit');
   assert.ok(asset);
   assert.equal(asset.ownerId,'nasa');
