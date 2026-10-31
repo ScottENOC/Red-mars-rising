@@ -15,16 +15,16 @@ function ensureActor(w,id,data={}){
 function relationshipId(type,fromId,toType,toId){
   return [type,fromId,toType,toId].join('|');
 }
-export function ensureInfrastructureRelationship(w,{type,fromId,toId,toType='asset',status='active',metadata=null,createdSol=null}){
+export function ensureInfrastructureRelationship(w,{type,fromId,toId,toType='asset',status=null,metadata=null,createdSol=null}){
   if(!fromId||!toId||!type)return null;
   const relationships=w.infrastructure.relationships;
   const id=relationshipId(type,fromId,toType,toId);
   let relation=relationships.find(item=>item.id===id);
   if(!relation){
-    relation={id,type,fromId,toId,toType,status,createdSol:createdSol??w.time?.sol??0,metadata:metadata?{...metadata}:{}};
+    relation={id,type,fromId,toId,toType,status:status??'active',createdSol:createdSol??w.time?.sol??0,metadata:metadata?{...metadata}:{}};
     relationships.push(relation);
   }else{
-    relation.status=status;
+    if(status!==null&&status!==undefined)relation.status=status;
     if(metadata)relation.metadata={...(relation.metadata??{}),...metadata};
   }
   return relation;
