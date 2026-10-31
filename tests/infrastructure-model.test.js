@@ -194,7 +194,7 @@ test('legacy version-one oxygen reserves migrate once and preserve their conserv
 test('sponsor oxygen cargo is installed on arrival with sponsor ownership and colony software control',()=>{
   const w=campaignWorld();
   w.colonyTrade={shipments:[{
-    id:'relief-flight',kind:'relief-outpost-mission',fromId:'earth:nasa',toId:'first-colony',
+    id:'relief-flight',kind:'infrastructure-equipment',fromId:'earth:nasa',toId:'first-colony',
     good:'oxygen-generator',amount:1,departSol:1,arrivalSol:241,status:'in-transit',
     equipment:{kind:'oxygen-generator',assetId:'delivered-oxygen-unit',name:'Portable oxygen unit',colonyId:'first-colony',ownerId:'nasa',funderId:'nasa',builderId:'nasa',operatorId:'first-colony',controllerId:'nasa',technologyProviderId:'nasa',softwareProviderId:'nasa',softwareControllerId:'first-colony',softwareModifiedByIds:['first-colony'],capacityOxygenKgPerSol:40}
   }],nextShipmentId:2,tradeLog:[]};
@@ -220,11 +220,10 @@ test('a different sponsor can independently send oxygen equipment to a rival col
   w.materials.colonies['small-colony'].gasesKg.oxygen=1000;
   const events=[];
   processSponsorCommitments(w,1,events);
-  const ship=w.colonyTrade.shipments.find(item=>item.toId==='small-colony'&&item.kind==='infrastructure-equipment');
-  assert.ok(ship);
-  assert.equal(ship.equipment.ownerId,'esa');
-  assert.equal(ship.equipment.operatorId,'small-colony');
-  assert.ok(events.some(event=>event.type==='sponsor-oxygen-relief-launched'&&event.description.includes('Small Colony')));
+  const plan=w.sponsorReliefOutposts?.find(item=>item.targetColonyId==='small-colony');
+  assert.ok(plan);
+  assert.equal(plan.sponsorId,'esa');
+  assert.ok(events.some(event=>event.type==='sponsor-relief-outpost-launched'&&event.description.includes('Small Colony')));
 });
 
 test('oxygen generator output is capped by shared power headroom',()=>{
