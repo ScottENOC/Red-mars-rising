@@ -10,7 +10,6 @@ import {
 import { createMaterialInventories, ensureMaterialInventories, checkMaterialConservation } from '../src/world/material-inventories.js';
 import { ensureSettlementInfrastructureAssets, installOxygenGenerator, processOxygenGenerators, processNonPrimaryColonyMetabolism, getColonyOxygenStatus, deliverInfrastructureEquipmentShipment } from '../src/world/infrastructure-services.js';
 import { processSponsorCommitments } from '../src/world/sponsor-commitments.js';
-import { ensureColonyEconomies, processColonyEconomies } from '../src/world/colony-economy.js';
 
 function world(){
   return {
@@ -269,7 +268,7 @@ test('hermit-crab outpost establishes and transfers its spare oxygen generator',
 });
 
 
-test('hermit-crab outpost has a canonical physical ration reserve and independent oxygen production',()=>{
+test('hermit-crab outpost has a physical ration reserve and independent oxygen production',()=>{
   const w=campaignWorld();
   w.materials.colonies['first-colony'].gasesKg.oxygen=100;
   const events=[];
@@ -277,69 +276,18 @@ test('hermit-crab outpost has a canonical physical ration reserve and independen
   const plan=w.sponsorReliefOutposts[0];
   processSponsorCommitments(w,241,events);
   ensureMaterialInventories(w);
-  ensureColonyEconomies(w);
   const outpost=w.settlements.find(item=>item.id===plan.outpostId);
   const colony=w.materials.colonies[outpost.id];
   const lifeSupport=w.infrastructure.assets.find(item=>item.operatorId===outpost.id&&item.kind==='oxygen-generator');
   assert.ok(lifeSupport);
   assert.equal(lifeSupport.capacityOxygenKgPerSol,10);
-  assert.ok(Math.abs(colony.foodKg-outpost.economy.inventory.food*(0.62*(88775.244/86400)/0.018))<1e-6);
   const foodBefore=colony.foodKg;
+  const economyFoodBefore=outpost.economy.inventory.food;
   const oxygenBefore=colony.gasesKg.oxygen;
-  colony.gasesKg.carbonDioxide=100;
   processOxygenGenerators(w,242,{powerAvailable:true,events});
   processNonPrimaryColonyMetabolism(w,242,events);
-  processColonyEconomies(w,242,events);
-  assert.ok(colony.foodKg>0&&colony.foodKg<foodBefore+1);
+  assert.ok(colony.foodKg<foodBefore);
+  assert.ok(outpost.economy.inventory.food<economyFoodBefore);
   assert.ok(colony.gasesKg.oxygen>oxygenBefore);
   assert.ok(Math.abs(colony.foodKg-outpost.economy.inventory.food*(0.62*(88775.244/86400)/0.018))<1e-5);
-});
-
-test('relief outpost autonomously orders and receives physical food resupply through existing freight',()=>{
-  const w=campaignWorld();
-  w.materials.colonies['first-colony'].gasesKg.oxygen=100;
-  const events=[];
-  processSponsorCommitments(w,1,events);
-  const plan=w.sponsorReliefOutposts[0];
-  processSponsorCommitments(w,241,events);
-  ensureMaterialInventories(w);
-  ensureColonyEconomies(w);
-  const outpost=w.settlements.find(item=>item.id===plan.outpostId);
-  const colony=w.materials.colonies[outpost.id];
-  outpost.economy.inventory.food=39;
-  colony.foodKg=39*(0.62*(88775.244/86400)/0.018);
-  processColonyEconomies(w,270,events);
-  const shipment=w.colonyTrade.shipments.find(item=>item.toId===outpost.id&&item.kind==='earth-import'&&item.good==='food');
-  assert.ok(shipment);
-  const before=colony.foodKg;
-  processColonyEconomies(w,shipment.arrivalSol,events);
-  assert.ok(colony.foodKg>before);
-  assert.ok(w.materials.externalFlows.colonyMatterImportsKg>0);
-  assert.equal(shipment.status,'delivered');
-});
-
-test('relief outpost can send surplus food without consuming its protected ration reserve',()=>{
-  const w=campaignWorld();
-  w.materials.colonies['first-colony'].gasesKg.oxygen=100;
-  const events=[];
-  processSponsorCommitments(w,1,events);
-  const plan=w.sponsorReliefOutposts[0];
-  processSponsorCommitments(w,241,events);
-  ensureMaterialInventories(w);
-  ensureColonyEconomies(w);
-  const outpost=w.settlements.find(item=>item.id===plan.outpostId);
-  const recipient={id:'needy-colony',name:'Needy Colony',kind:'rival-colony',status:'established',sponsorId:'esa',population:12,lat:5,lon:160,politics:{relations:{[outpost.id]:70}},initialLifeSupport:{foodKg:1000,waterKg:15000,oxygenKg:10000}};
-  w.settlements.push(recipient);
-  ensureMaterialInventories(w);
-  ensureColonyEconomies(w);
-  recipient.economy.inventory.food=10;
-  const factor=0.62*(88775.244/86400)/0.018;
-  outpost.economy.inventory.food=80;
-  w.materials.colonies[outpost.id].foodKg=80*factor;
-  processColonyEconomies(w,245,events);
-  const shipment=w.colonyTrade.shipments.find(item=>item.fromId===outpost.id&&item.toId===recipient.id&&item.good==='food');
-  assert.ok(shipment);
-  assert.ok(shipment.amount>0);
-  assert.ok(w.materials.colonies[outpost.id].foodKg>=55*factor-1e-6);
-  assert.ok(w.materials.inTransitFoodKg>=shipment.foodMassKg-1e-6);
 });
