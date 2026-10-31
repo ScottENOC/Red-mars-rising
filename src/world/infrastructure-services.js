@@ -147,3 +147,15 @@ export function processNonPrimaryColonyMetabolism(w,sol,events=[]){
     }
   }
 }
+
+export function deliverInfrastructureEquipmentShipment(w,ship,destination,sol,events=[]){
+  if(ship?.kind!=='infrastructure-equipment'||ship.equipment?.kind!=='oxygen-generator')return false;
+  installOxygenGenerator(w,ship.equipment);
+  ship.status='delivered';
+  events.push({type:'sponsor-oxygen-equipment-arrived',sol,description:'A sponsor-supplied oxygen generator has arrived and been installed at '+destination.name+'.'});
+  w.colonyTrade??={shipments:[],nextShipmentId:1,tradeLog:[]};
+  w.colonyTrade.tradeLog??=[];
+  w.colonyTrade.tradeLog.push({sol,kind:'equipment-installed',shipmentId:ship.id,toId:destination.id,good:ship.good,description:'Sponsor-supplied oxygen generator installed at '+destination.name+'.'});
+  if(w.colonyTrade.tradeLog.length>100)w.colonyTrade.tradeLog.shift();
+  return true;
+}
