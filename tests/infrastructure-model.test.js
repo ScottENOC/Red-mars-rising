@@ -119,7 +119,7 @@ test('electrolyser produces oxygen from water and electricity without creating f
   assert.ok(Math.abs(output[0].waterKg*OXYGEN_TEST_RATIO-40)<1e-5);
 });
 
-const OXYGEN_TEST_RATIO=18.01528/(0.5*31.9988);
+const OXYGEN_TEST_RATIO=0.5*31.9988/18.01528;
 
 test('oxygen generation pauses during a colony power shortfall',()=>{
   const w=campaignWorld();
