@@ -3,6 +3,7 @@ import { ensureMaterialInventories, processNaturalMeteoroidFlux, processWaterCli
 import { SHORTLISTED_SITES, ensureConstructionRecipeOptions } from './campaign-options.js';
 import { ensureColonyPoliticalState, processColonyPolitics } from './colony-politics.js';
 import { ensureColonyEconomies, processColonyEconomies } from './colony-economy.js';
+import { ensureColonySecurity, processColonySecurity } from './colony-security.js';
 
 const MARS_RADIUS_M = 3_389_500;
 const MARS_SURFACE_AREA_M2 = 4 * Math.PI * MARS_RADIUS_M ** 2;
@@ -26,6 +27,7 @@ export function processWorldTick(w) {
   ensureColonyPoliticalState(w);
   ensureColonyEconomies(w);
   ensureAsteroidOperations(w);
+  ensureColonySecurity(w);
   checkMaterialConservation(w); // Establish the baseline before any external inputs or transfers this sol.
   processNaturalMeteoroidFlux(w, sol);
   processWaterClimate(w, sol);
@@ -260,6 +262,7 @@ export function processWorldTick(w) {
   }
   processColonyEconomies(w, sol, events);
   processAsteroidOperations(w, sol, events);
+  processColonySecurity(w, sol, events);
   processColonyPolitics(w, sol, events);
   recycleColonyWater(w, sol);
 
