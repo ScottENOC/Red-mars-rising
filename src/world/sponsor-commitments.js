@@ -158,7 +158,7 @@ function processSponsorOxygenRelief(w,sol,state,events){
   const score=35+(Number(sponsor.support)||50)*.18+(Number(sponsor.patience)||50)*.08+relation*.18-(Number(sponsor.pressure)||50)*.12+(sponsor.type==='multilateral'?5:0);
   if(score<45)continue;
   const occupied=(w.settlements??[]).map(item=>item.id);
-  const available=(w.shortlistedSites??SHORTLISTED_SITES).filter(site=>!occupied.includes(site.id)&&!(w.sponsorReliefOutposts??[]).some(plan=>plan.siteId===site.id&&['in-transit','outpost-established','equipment-in-transit'].includes(plan.status)));
+  const available=(w.shortlistedSites??SHORTLISTED_SITES).filter(site=>!occupied.includes(site.id)&&!(w.settlements??[]).some(item=>reliefDistanceKm(item,site)<350)&&!(w.sponsorReliefOutposts??[]).some(plan=>plan.siteId===site.id&&['in-transit','outpost-established','equipment-in-transit'].includes(plan.status)));
   const site=available.map(item=>({item,distance:reliefDistanceKm(item,settlement)})).filter(entry=>entry.distance>=350).sort((a,b)=>a.distance-b.distance)[0]?.item;
   if(!site)continue;
   const id='hermit-crab-'+settlement.id+'-'+sponsor.id+'-'+sol;
