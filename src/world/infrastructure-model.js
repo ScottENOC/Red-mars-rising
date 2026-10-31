@@ -109,9 +109,11 @@ export function ensureInfrastructureModel(w){
         ensureInfrastructureRelationship(w,{type:role.type,fromId:actorId,toId:asset.id,metadata:{origin:'asset-'+role.type}});
       }
     }
-    for(const actorId of [...new Set([...(asset.occupantIds??[]),...(asset.softwareModifiedByIds??[])])]){
-      if(!infra.actors.some(item=>item.id===actorId))ensureActor(w,actorId,{type:'organisation',name:actorId});
-      ensureInfrastructureRelationship(w,{type:(asset.softwareModifiedByIds??[]).includes(actorId)?'modified-software':'occupies',fromId:actorId,toId:asset.id});
+    for(const [ids,type] of [[asset.occupantIds??[],'occupies'],[asset.softwareModifiedByIds??[],'modified-software']]){
+      for(const actorId of new Set(ids)){
+        if(!infra.actors.some(item=>item.id===actorId))ensureActor(w,actorId,{type:'organisation',name:actorId});
+        ensureInfrastructureRelationship(w,{type,fromId:actorId,toId:asset.id});
+      }
     }
   }
   return infra;
