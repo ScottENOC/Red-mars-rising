@@ -1,11 +1,15 @@
 import { ensureSponsorCommitments, processSponsorCommitments } from './sponsor-commitments.js';
 import { terrainElevationMeters } from './terrain.js';
 import { deliverInfrastructureEquipmentShipment } from './infrastructure-services.js';
-import { ensureMaterialInventories } from './material-inventories.js';
+import { ensureMaterialInventories, consumeColonyWaterForReaction } from './material-inventories.js';
 const GOODS = ['food','components','machinery','electronics','aggregate'];
 const clamp = (v,min=0,max=100)=>Math.max(min,Math.min(max,Number(v)||0));
 const round3 = v=>Math.round(v*1000)/1000;
 const FOOD_KG_PER_UNIT = 0.62*(88775.244/86400)/0.018;
+const GLUCOSE_MOLAR_G=6*12.011+12*1.00794+6*15.9994;
+const CO2_PER_GLUC=6*(12.011+2*15.9994)/GLUCOSE_MOLAR_G;
+const WATER_PER_GLUC=6*18.01528/GLUCOSE_MOLAR_G;
+const O2_PER_GLUC=6*31.9988/GLUCOSE_MOLAR_G;
 const SPECIALISATIONS = {
   agriculture: {label:'Agriculture',produces:{food:0.35},description:'Greenhouse and biological production'},
   fabrication: {label:'Fabrication',produces:{components:0.34,aggregate:0.12},description:'Construction components and processed local feedstock'},
