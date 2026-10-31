@@ -303,7 +303,7 @@ function operateColonies(w,sol,events){
       const produced=((spec.produces[good]??0)*(Math.max(0.25,pop/45)))+baselineFood;
       const reliefOutpost=s.settlementType==='relief-outpost';
       const consumed=good==='food'?(reliefOutpost?0:pop*0.018):good==='components'?0.035:good==='machinery'?0.018:good==='electronics'?0.012:0.025;
-      e.inventory[good]=round3(Math.max(0,e.inventory[good]+produced-consumed));
+      e.inventory[good]=round3(Math.max(0,e.inventory[good]+(reliefOutpost&&good==='food'?0:produced)-consumed));
       if(good==='food'&&reliefOutpost){
         const producedMassKg=produced*FOOD_KG_PER_UNIT;
         if(producedMassKg>0){
