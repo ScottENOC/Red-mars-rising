@@ -34,20 +34,21 @@ function assess(w,proposer,target,reason){
  const total=justification*.42+safety*.38+politicalWill*.20;
  return {justification:Math.round(justification),safety:Math.round(safety),politicalWill:Math.round(politicalWill),score:Math.round(total),reason:e.description,relation:Math.round(relation),ownSecurity:capability(w,proposer.id),targetSecurity:capability(w,target.id)};
 }
-export function proposeColonyAttack(w,targetId,reason='imminent-threat'){
+export function proposeColonyAttack(w,proposerId,targetId,reason='imminent-threat'){
  const s=ensureColonySecurity(w);if(!s)return {ok:false,reason:'No active campaign.'};
  const home=w.settlements?.find(c=>c.kind==='primary-colony');
- const target=w.settlements?.find(c=>c.id===targetId&&c.kind==='rival-colony'&&live(c));
- if(!home||!target)return {ok:false,reason:'That colony is not an available political actor.'};
+ const proposer=w.settlements?.find(c=>c.id===proposerId&&c.kind==='rival-colony'&&live(c));
+ const target=w.settlements?.find(c=>c.id===targetId&&live(c));
+ if(!home||!proposer||!target||proposer.id===target.id)return {ok:false,reason:'Choose two different operating colonies.'};
  if(!evidence[reason])return {ok:false,reason:'Choose a recognised justification.'};
- if(s.proposals.some(p=>p.proposerId===targetId&&p.status==='under-review'))return {ok:false,reason:'That colony is already considering an operation.'};
+ if(s.proposals.some(p=>p.proposerId===proposerId&&p.targetId===targetId&&p.status==='under-review'))return {ok:false,reason:'That colony is already considering an operation.'};
  if(Number(w.economy?.funds??0)<12)return {ok:false,reason:'12 funds are needed for diplomatic engagement and evidence-sharing.'};
  w.economy.funds-=12;
- const assessment=assess(w,target,home,reason);
- const proposal={id:'colony-security-'+s.nextId++,proposerId:target.id,targetId:home.id,reason,createdSol:w.time.sol,decisionSol:w.time.sol+30,status:'under-review',assessment,playerBacked:true};
+ const assessment=assess(w,proposer,target,reason);
+ const proposal={id:'colony-security-'+s.nextId++,proposerId:proposer.id,targetId:target.id,reason,createdSol:w.time.sol,decisionSol:w.time.sol+30,status:'under-review',assessment,playerBacked:true};
  s.proposals.push(proposal);
- s.history.push({sol:w.time.sol,description:'You urged '+target.name+' to consider an operation against '+home.name+'. Its council will review the justification and its own exposure.'});
- return {ok:true,reason:target.name+' has agreed to review the proposal, not to carry it out. A decision is expected after 30 sols.'};
+ s.history.push({sol:w.time.sol,description:'You urged '+proposer.name+' to consider an operation against '+target.name+'. Its council will review the justification and its own exposure.'});
+ return {ok:true,reason:proposer.name+' has agreed to review the proposal, not to carry it out. A decision is expected after 30 sols.'};
 }
 export function processColonySecurity(w,sol,events=[]){
  const s=ensureColonySecurity(w);if(!s)return events;
