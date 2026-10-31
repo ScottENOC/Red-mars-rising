@@ -194,7 +194,7 @@ test('legacy version-one oxygen reserves migrate once and preserve their conserv
 test('sponsor oxygen cargo is installed on arrival with sponsor ownership and colony software control',()=>{
   const w=campaignWorld();
   w.colonyTrade={shipments:[{
-    id:'relief-flight',kind:'infrastructure-equipment',fromId:'earth:nasa',toId:'first-colony',
+    id:'relief-flight',kind:'relief-outpost-mission',fromId:'earth:nasa',toId:'first-colony',
     good:'oxygen-generator',amount:1,departSol:1,arrivalSol:241,status:'in-transit',
     equipment:{kind:'oxygen-generator',assetId:'delivered-oxygen-unit',name:'Portable oxygen unit',colonyId:'first-colony',ownerId:'nasa',funderId:'nasa',builderId:'nasa',operatorId:'first-colony',controllerId:'nasa',technologyProviderId:'nasa',softwareProviderId:'nasa',softwareControllerId:'first-colony',softwareModifiedByIds:['first-colony'],capacityOxygenKgPerSol:40}
   }],nextShipmentId:2,tradeLog:[]};
