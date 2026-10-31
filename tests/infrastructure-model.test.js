@@ -10,6 +10,7 @@ import {
 import { createMaterialInventories, ensureMaterialInventories, checkMaterialConservation } from '../src/world/material-inventories.js';
 import { ensureSettlementInfrastructureAssets, installOxygenGenerator, processOxygenGenerators, processNonPrimaryColonyMetabolism, getColonyOxygenStatus } from '../src/world/infrastructure-services.js';
 import { processSponsorCommitments } from '../src/world/sponsor-commitments.js';
+import { processColonyEconomies } from '../src/world/colony-economy.js';
 
 function world(){
   return {
@@ -170,4 +171,39 @@ test('sponsor independently dispatches oxygen equipment before reserves are exha
   assert.equal(ship.toId,'first-colony');
   assert.equal(ship.arrivalSol,241);
   assert.ok(events.some(event=>event.type==='sponsor-oxygen-relief-launched'));
+});
+
+test('legacy version-one oxygen reserves migrate once and preserve their conservation baseline',()=>{
+  const w=campaignWorld();
+  const c=w.materials.colonies['first-colony'];
+  c.gasesKg.oxygen=5000;
+  c.physicalStocksVersion=1;
+  checkMaterialConservation(w);
+  const baseline=w.materials.diagnostics.initialTrackedStocks.colonies['first-colony'].gasesKg.oxygen;
+  ensureMaterialInventories(w);
+  assert.equal(c.gasesKg.oxygen,20000);
+  assert.equal(c.physicalStocksVersion,2);
+  assert.equal(w.materials.diagnostics.initialTrackedStocks.colonies['first-colony'].gasesKg.oxygen,baseline+15000);
+  const result=checkMaterialConservation(w);
+  assert.ok(Math.abs(result.colonyMatterBalanceErrorKg)<1e-5);
+});
+
+test('sponsor oxygen cargo is installed on arrival with sponsor ownership and colony software control',()=>{
+  const w=campaignWorld();
+  w.colonyTrade={shipments:[{
+    id:'relief-flight',kind:'infrastructure-equipment',fromId:'earth:nasa',toId:'first-colony',
+    good:'oxygen-generator',amount:1,departSol:1,arrivalSol:241,status:'in-transit',
+    equipment:{kind:'oxygen-generator',assetId:'delivered-oxygen-unit',name:'Portable oxygen unit',colonyId:'first-colony',ownerId:'nasa',funderId:'nasa',builderId:'nasa',operatorId:'first-colony',controllerId:'nasa',technologyProviderId:'nasa',softwareProviderId:'nasa',softwareControllerId:'first-colony',softwareModifiedByIds:['first-colony'],capacityOxygenKgPerSol:40}
+  }],nextShipmentId:2,tradeLog:[]};
+  const events=[];
+  processColonyEconomies(w,241,events);
+  const asset=w.infrastructure.assets.find(item=>item.id==='delivered-oxygen-unit');
+  assert.ok(asset);
+  assert.equal(asset.ownerId,'nasa');
+  assert.equal(asset.operatorId,'first-colony');
+  assert.equal(asset.softwareProviderId,'nasa');
+  assert.equal(asset.softwareControllerId,'first-colony');
+  assert.ok(w.infrastructure.relationships.some(item=>item.type==='modified-software'&&item.fromId==='first-colony'&&item.toId===asset.id));
+  assert.equal(w.colonyTrade.shipments[0].status,'delivered');
+  assert.ok(events.some(event=>event.type==='sponsor-oxygen-equipment-arrived'));
 });
