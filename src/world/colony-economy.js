@@ -1,15 +1,11 @@
 import { ensureSponsorCommitments, processSponsorCommitments } from './sponsor-commitments.js';
 import { terrainElevationMeters } from './terrain.js';
 import { deliverInfrastructureEquipmentShipment } from './infrastructure-services.js';
-import { ensureMaterialInventories, consumeColonyWaterForReaction } from './material-inventories.js';
+import { ensureMaterialInventories } from './material-inventories.js';
+import { FOOD_KG_PER_ECONOMY_UNIT as FOOD_KG_PER_UNIT, ensureReliefOutpostFoodBridge, processReliefOutpostAgriculture } from './relief-outpost-food.js';
 const GOODS = ['food','components','machinery','electronics','aggregate'];
 const clamp = (v,min=0,max=100)=>Math.max(min,Math.min(max,Number(v)||0));
 const round3 = v=>Math.round(v*1000)/1000;
-const FOOD_KG_PER_UNIT = 0.62*(88775.244/86400)/0.018;
-const GLUCOSE_MOLAR_G=6*12.011+12*1.00794+6*15.9994;
-const CO2_PER_GLUC=6*(12.011+2*15.9994)/GLUCOSE_MOLAR_G;
-const WATER_PER_GLUC=6*18.01528/GLUCOSE_MOLAR_G;
-const O2_PER_GLUC=6*31.9988/GLUCOSE_MOLAR_G;
 const SPECIALISATIONS = {
   agriculture: {label:'Agriculture',produces:{food:0.35},description:'Greenhouse and biological production'},
   fabrication: {label:'Fabrication',produces:{components:0.34,aggregate:0.12},description:'Construction components and processed local feedstock'},
@@ -68,15 +64,7 @@ export function ensureColonyEconomies(w){
     e.lastTradeSol ??= -10000;
     e.stability ??=70;
     e.specialisationLabel ??=SPECIALISATIONS[e.specialisation]?.label??'General settlement';
-    if(s.settlementType==='relief-outpost'&&e.physicalFoodBridgeVersion!==1){
-      const colony=w.materials.colonies[s.id];
-      const desiredFoodKg=Math.max(0,Number(e.inventory.food)||0)*FOOD_KG_PER_UNIT;
-      const delta=desiredFoodKg-(Number(colony.foodKg)||0);
-      colony.foodKg=desiredFoodKg;
-      const baseline=w.materials.diagnostics.initialTrackedStocks?.colonies?.[s.id];
-      if(baseline){baseline.foodKg=(Number(baseline.foodKg)||0)+delta;w.materials.diagnostics.initialColonyMatterMassKg=(Number(w.materials.diagnostics.initialColonyMatterMassKg)||0)+delta;}
-      e.physicalFoodBridgeVersion=1;
-    }
+    ensureReliefOutpostFoodBridge(w,s);
   }
   return w.colonyTrade;
 }
@@ -310,23 +298,7 @@ function operateColonies(w,sol,events){
       e.inventory[good]=round3(Math.max(0,e.inventory[good]+(reliefOutpost&&good==='food'?0:produced)-consumed));
       e.shortages[good]=e.inventory[good]< (good==='food'?12:good==='components'?3:good==='machinery'?2:good==='electronics'?1.5:3);
     }
-    if(s.settlementType==='relief-outpost'){
-      const colony=w.materials.colonies[s.id];
-      const maxDryBiomassKg=pop*0.25;
-      const byCO2=Math.max(0,Number(colony.gasesKg.carbonDioxide)||0)/CO2_PER_GLUC;
-      const byWater=Math.max(0,Number(colony.waterKg.tanks)||0)/WATER_PER_GLUC;
-      const dryBiomassKg=Math.min(maxDryBiomassKg,byCO2,byWater);
-      if(dryBiomassKg>0){
-        const co2UsedKg=dryBiomassKg*CO2_PER_GLUC,waterUsedKg=dryBiomassKg*WATER_PER_GLUC;
-        consumeColonyWaterForReaction(w,{colonyId:s.id,massKg:waterUsedKg,sol,process:'relief-outpost-photosynthesis',note:'The outpost greenhouse uses the same glucose-equivalent photosynthesis chemistry as the primary colony.'});
-        colony.gasesKg.carbonDioxide=Math.max(0,colony.gasesKg.carbonDioxide-co2UsedKg);
-        colony.gasesKg.oxygen+=dryBiomassKg*O2_PER_GLUC;
-        colony.foodKg+=dryBiomassKg*0.70;
-        colony.biomassKg=(colony.biomassKg??0)+dryBiomassKg*0.30;
-        w.materials.ledger.push({sol,process:'relief-outpost-photosynthesis',substance:'dry glucose-equivalent biomass',massKg:dryBiomassKg,co2ConsumedKg:co2UsedKg,waterConsumedKg:waterUsedKg,oxygenProducedKg:dryBiomassKg*O2_PER_GLUC,edibleFoodKg:dryBiomassKg*0.70,inedibleBiomassKg:dryBiomassKg*0.30,note:'Outpost greenhouse food production is limited by population, available CO2 and tank water.'});
-      }
-      e.inventory.food=round3(Math.max(0,colony.foodKg/FOOD_KG_PER_UNIT));
-    }
+    if(s.settlementType==='relief-outpost')processReliefOutpostAgriculture(w,s,sol);
     const food=e.inventory.food;
     if(food<5){
       e.stability=clamp(e.stability-0.15);
