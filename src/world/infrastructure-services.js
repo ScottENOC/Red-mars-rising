@@ -150,6 +150,7 @@ export function processNonPrimaryColonyMetabolism(w,sol,events=[]){
     const metabolicWaterKg=metabolisedFoodKg*WATER_PER_GLUC;
     if(foodEatenKg>0){
       colony.foodKg-=foodEatenKg;
+      if(settlement.settlementType==='relief-outpost'&&settlement.economy){settlement.economy.inventory.food=Math.max(0,(Number(settlement.economy.inventory.food)||0)-foodEatenKg/FOOD_KG_PER_ECONOMY_UNIT);}
       colony.solidWasteKg=(colony.solidWasteKg??0)+foodEatenKg*wasteFraction;
       colony.gasesKg.oxygen=Math.max(0,colony.gasesKg.oxygen-oxygenUsedKg);
       colony.gasesKg.carbonDioxide=(colony.gasesKg.carbonDioxide??0)+co2ProducedKg;
