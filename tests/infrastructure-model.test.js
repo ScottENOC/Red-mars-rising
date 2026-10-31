@@ -10,6 +10,8 @@ import {
 import { createMaterialInventories, ensureMaterialInventories, checkMaterialConservation } from '../src/world/material-inventories.js';
 import { ensureSettlementInfrastructureAssets, installOxygenGenerator, processOxygenGenerators, processNonPrimaryColonyMetabolism, getColonyOxygenStatus, deliverInfrastructureEquipmentShipment } from '../src/world/infrastructure-services.js';
 import { processSponsorCommitments } from '../src/world/sponsor-commitments.js';
+import { createInitialWorldState } from '../src/world/world-state.js';
+import { startCampaign, STARTING_LOCATIONS, SPONSORS } from '../src/world/campaign-options.js';
 
 function world(){
   return {
@@ -94,6 +96,30 @@ function campaignWorld(){
   ensureMaterialInventories(w);
   return w;
 }
+
+test('campaign begins by reoccupying an abandoned settlement with a small crew and degraded inherited assets',()=>{
+  const w=createInitialWorldState();
+  startCampaign(w,STARTING_LOCATIONS[2].id,SPONSORS[0].id,{majorIdeology:'sovereignty',minorIdeology:'communitarian',background:'scientist'});
+  const home=w.settlements.find(s=>s.kind==='primary-colony');
+  assert.equal(w.settlements.length,1);
+  assert.equal(home.scenarioRole,'reoccupied-settlement');
+  assert.equal(home.population,12);
+  assert.equal(w.colonists.population,12);
+  assert.equal(home.abandonment.cause,'unknown');
+  assert.equal(w.materials.colonies[home.id].foodKg,500);
+  assert.equal(w.materials.colonies[home.id].waterKg.tanks,12000);
+  assert.equal(w.materials.colonies[home.id].gasesKg.oxygen,900);
+  const assets=new Map(w.infrastructure.assets.map(asset=>[asset.kind,asset]));
+  assert.equal(assets.get('habitats').status,'operational');
+  assert.equal(assets.get('power-array').status,'degraded');
+  assert.equal(assets.get('greenhouse').status,'disabled');
+  assert.equal(assets.get('oxygen-generator').status,'disabled');
+  assert.equal(assets.get('oxygen-generator').capacityOxygenKgPerSol,10);
+  assert.equal(assets.get('laboratory').status,'abandoned');
+  assert.equal(assets.get('workshop').status,'damaged');
+  assert.equal(assets.get('rovers').status,'disabled');
+  assert.ok(w.events.some(event=>event.type==='settlement-reoccupation'));
+});
 
 test('existing settlement infrastructure tags migrate to one shared asset each',()=>{
   const w=campaignWorld();
