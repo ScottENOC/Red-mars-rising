@@ -116,7 +116,7 @@ function processSponsorReliefOutposts(w,sol,events){
   if(plan.status!=='in-transit'||sol<plan.arrivalSol)continue;
   const target=(w.settlements??[]).find(item=>item.id===plan.targetColonyId);
   if(!target||['failed','abandoned'].includes(target.status)){plan.status='cancelled';plan.cancelledSol=sol;continue;}
-  const site=(w.shortlistedSites??SHORTLISTED_SITES).find(item=>item.id===plan.siteId&&!w.settlements.some(s=>s.id===item.id||reliefDistanceKm(s,item)<350));
+  const site=(w.shortlistedSites??SHORTLISTED_SITES).find(item=>item.id===plan.siteId&&!w.settlements.some(s=>s.id===item.id||reliefDistanceKm(s,item)<350)&&!(w.sponsors??[]).some(sponsor=>sponsor.rivalPlan?.siteId===item.id&&sponsor.rivalPlan?.status!=='established'));
   if(!site){plan.status='site-unavailable';plan.lastCheckedSol=sol;continue;}
   const outpostId='relief-outpost-'+plan.id;
   const outpost={...site,id:outpostId,locationId:site.id,name:plan.sponsorName+' Relief Outpost',kind:'rival-colony',settlementType:'relief-outpost',population:8,status:'established',sponsorId:plan.sponsorId,infrastructure:['habitats','power-array'],health:82,morale:65,reliefMissionId:plan.id};
@@ -133,9 +133,11 @@ function processSponsorReliefOutposts(w,sol,events){
   plan.outpostId=outpostId;plan.equipmentAssetId=equipmentId;plan.establishedSol=sol;plan.status='outpost-established';
   // The outpost dispatches its spare machine over the surface freight network.
   // It is not installed at the distressed colony until the cargo actually arrives.
-  const shipment={id:'colony-haul-'+(w.colonyTrade.nextShipmentId++),kind:'infrastructure-equipment',fromId:outpostId,toId:target.id,good:'oxygen-generator',amount:1,departSol:sol,arrivalSol:sol+12,travelSols:12,distanceKm:Math.round(reliefDistanceKm(outpost,target)),status:'in-transit',equipment:{kind:'oxygen-generator',assetId:'relief-oxygen-generator-'+target.id+'-'+plan.sponsorId,name:'Hermit-crab relief oxygen generator',colonyId:target.id,ownerId:plan.sponsorId,funderId:plan.sponsorId,builderId:plan.sponsorId,operatorId:target.id,controllerId:plan.sponsorId,technologyProviderId:plan.sponsorId,softwareProviderId:plan.sponsorId,softwareControllerId:target.id,softwareModifiedByIds:[target.id],capacityOxygenKgPerSol:40,source:'hermit-crab-relief-outpost',sourceAssetId:equipmentId},reliefPlanId:plan.id};
+  const surfaceDistanceKm=reliefDistanceKm(outpost,target);
+  const surfaceTravelSols=Math.max(2,Math.ceil(surfaceDistanceKm/300));
+  const shipment={id:'colony-haul-'+(w.colonyTrade.nextShipmentId++),kind:'infrastructure-equipment',fromId:outpostId,toId:target.id,good:'oxygen-generator',amount:1,departSol:sol,arrivalSol:sol+surfaceTravelSols,travelSols:surfaceTravelSols,distanceKm:Math.round(surfaceDistanceKm),status:'in-transit',equipment:{kind:'oxygen-generator',assetId:'relief-oxygen-generator-'+target.id+'-'+plan.sponsorId,name:'Hermit-crab relief oxygen generator',colonyId:target.id,ownerId:plan.sponsorId,funderId:plan.sponsorId,builderId:plan.sponsorId,operatorId:target.id,controllerId:plan.sponsorId,technologyProviderId:plan.sponsorId,softwareProviderId:plan.sponsorId,softwareControllerId:target.id,softwareModifiedByIds:[target.id],capacityOxygenKgPerSol:40,source:'hermit-crab-relief-outpost',sourceAssetId:equipmentId},reliefPlanId:plan.id};
   w.colonyTrade.shipments.push(shipment);
-  w.colonyTrade.tradeLog.push({sol,kind:'relief-outpost-equipment-dispatched',shipmentId:shipment.id,fromId:outpostId,toId:target.id,good:'oxygen-generator',amount:1,description:outpost.name+' dispatched its spare oxygen generator to '+target.name+'; estimated surface delivery in 12 sols.'});
+  w.colonyTrade.tradeLog.push({sol,kind:'relief-outpost-equipment-dispatched',shipmentId:shipment.id,fromId:outpostId,toId:target.id,good:'oxygen-generator',amount:1,description:outpost.name+' dispatched its spare oxygen generator to '+target.name+'; estimated surface delivery in '+surfaceTravelSols+' sols.'});
   plan.equipmentShipmentId=shipment.id;plan.status='equipment-in-transit';
   const description=outpost.name+' has established an eight-person relief outpost and dispatched its spare oxygen generator to '+target.name+'.';
   record(w,{sol,kind:'relief-outpost-established',outpostId,targetColonyId:target.id,sponsorId:plan.sponsorId,description});
@@ -158,7 +160,7 @@ function processSponsorOxygenRelief(w,sol,state,events){
   const score=35+(Number(sponsor.support)||50)*.18+(Number(sponsor.patience)||50)*.08+relation*.18-(Number(sponsor.pressure)||50)*.12+(sponsor.type==='multilateral'?5:0);
   if(score<45)continue;
   const occupied=(w.settlements??[]).map(item=>item.id);
-  const available=(w.shortlistedSites??SHORTLISTED_SITES).filter(site=>!occupied.includes(site.id)&&!(w.settlements??[]).some(item=>reliefDistanceKm(item,site)<350)&&!(w.sponsorReliefOutposts??[]).some(plan=>plan.siteId===site.id&&['in-transit','outpost-established','equipment-in-transit'].includes(plan.status)));
+  const available=(w.shortlistedSites??SHORTLISTED_SITES).filter(site=>!occupied.includes(site.id)&&!(w.settlements??[]).some(item=>reliefDistanceKm(item,site)<350)&&!(w.sponsors??[]).some(item=>item.rivalPlan?.siteId===site.id&&item.rivalPlan?.status!=='established')&&!(w.sponsorReliefOutposts??[]).some(plan=>plan.siteId===site.id&&['in-transit','outpost-established','equipment-in-transit'].includes(plan.status)));
   const site=available.map(item=>({item,distance:reliefDistanceKm(item,settlement)})).filter(entry=>entry.distance>=350).sort((a,b)=>a.distance-b.distance)[0]?.item;
   if(!site)continue;
   const id='hermit-crab-'+settlement.id+'-'+sponsor.id+'-'+sol;
