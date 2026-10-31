@@ -2,6 +2,7 @@ import { getColonyOxygenStatus } from './infrastructure-services.js';
 import { registerInfrastructureAsset } from './infrastructure-model.js';
 import { SHORTLISTED_SITES } from './campaign-options.js';
 
+const FOOD_KG_PER_ECONOMY_UNIT=0.62*(88775.244/86400)/0.018;
 const clamp=(v,min=0,max=100)=>Math.max(min,Math.min(max,Number(v)||0));
 const PROJECTS={
  'space-elevator':{name:'Space elevator',category:'strategic infrastructure',operatingGrant:8,description:'A major transport link with continuing power, machinery, electronics and specialist-maintenance needs.',goods:{components:8,machinery:5,electronics:3},mode:'machinery',autonomyCost:18,baseScore:48},
@@ -119,7 +120,7 @@ function processSponsorReliefOutposts(w,sol,events){
   const site=(w.shortlistedSites??SHORTLISTED_SITES).find(item=>item.id===plan.siteId&&!w.settlements.some(s=>s.id===item.id||reliefDistanceKm(s,item)<350)&&!(w.sponsors??[]).some(sponsor=>sponsor.rivalPlan?.siteId===item.id&&sponsor.rivalPlan?.status!=='established'));
   if(!site){plan.status='site-unavailable';plan.lastCheckedSol=sol;continue;}
   const outpostId='relief-outpost-'+plan.id;
-  const outpost={...site,id:outpostId,locationId:site.id,name:plan.sponsorName+' Relief Outpost',kind:'rival-colony',settlementType:'relief-outpost',population:8,status:'established',sponsorId:plan.sponsorId,infrastructure:['habitats','power-array'],health:82,morale:65,reliefMissionId:plan.id};
+  const outpost={...site,id:outpostId,locationId:site.id,name:plan.sponsorName+' Relief Outpost',kind:'rival-colony',settlementType:'relief-outpost',population:8,status:'established',sponsorId:plan.sponsorId,infrastructure:['habitats','power-array','greenhouse'],health:82,morale:65,reliefMissionId:plan.id,initialLifeSupport:{foodKg:55*FOOD_KG_PER_ECONOMY_UNIT,waterKg:15000,oxygenKg:10000},economy:{specialisation:'agriculture',inventory:{food:55}}};
   w.settlements.push(outpost);
   const equipmentId='stored-relief-generator-'+plan.id;
   registerInfrastructureAsset(w,{
