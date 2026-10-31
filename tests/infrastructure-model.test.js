@@ -42,16 +42,20 @@ test('funding, construction, operation, control, occupancy and ownership remain 
   const w=world();
   registerInfrastructureAsset(w,{
     id:'shared-oxygen-plant',name:'Shared oxygen plant',domain:'surface',kind:'oxygen-generator',
-    ownerId:'nasa',funderId:'sponsor-x',builderId:'colony-a',operatorId:'colony-b',
-    controllerId:'colony-c',maintainerId:'colony-a',occupantIds:['colony-a','colony-b'],
+    ownerId:'nasa',ownerIds:['colony-a'],funderId:'sponsor-x',builderId:'colony-a',operatorId:'colony-b',
+    controllerId:'colony-c',maintainerId:'colony-a',technologyProviderIds:['nasa'],softwareProviderId:'nasa',softwareControllerId:'colony-c',softwareModifiedByIds:['colony-a'],occupantIds:['colony-a','colony-b'],
     dependencies:['electricity','filters'],outputs:['oxygen'],status:'operational'
   });
   const summary=getInfrastructureAssetSummary(w,'shared-oxygen-plant');
-  assert.equal(summary.owner,'NASA');
+  assert.equal(summary.owner,'NASA, Colony A');
   assert.equal(summary.funder,'sponsor-x');
   assert.equal(summary.builder,'Colony A');
   assert.equal(summary.operator,'colony-b');
   assert.equal(summary.controller,'colony-c');
+  assert.equal(summary.technologyProviders,'NASA');
+  assert.equal(summary.softwareProviders,'NASA');
+  assert.equal(summary.softwareControllers,'colony-c');
+  assert.equal(summary.softwareModifiers,'Colony A');
   assert.equal(summary.occupants,'Colony A, colony-b');
   assert.deepEqual(summary.dependencies,['electricity','filters']);
   assert.deepEqual(summary.outputs,['oxygen']);
