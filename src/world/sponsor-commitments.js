@@ -22,7 +22,7 @@ export function ensureSponsorCommitments(w){
  const s=w.sponsorCommitments;
  s.requests??=[];s.commitments??=[];s.history??=[];s.externalAppeals??=[];
  s.nextId=Math.max(1,Number(s.nextId)||1);
- // The founding survival obligation is a default commitment, not a project the player has to request.
+ // The sponsor's reoccupation support obligation is a default commitment, not a project the player has to request.
  s.survivalGuaranteeActive=w.campaign.survivalGuaranteeSuspended===true?false:(s.survivalGuaranteeActive!==false);
  return s;
 }
@@ -105,11 +105,11 @@ export function processSponsorCommitments(w,sol,events=[]){
  state.survivalGuaranteeActive=!guaranteeSuspended;
  if(guaranteeSuspended&&!state.survivalBreachRecorded){
   state.survivalBreachRecorded=true;
-  record(w,{sol,kind:'survival-guarantee-suspended',description:sponsor.name+' suspended its founding survival guarantee following the Earth conflict. The colony must seek alternative aid.'});
+  record(w,{sol,kind:'survival-guarantee-suspended',description:sponsor.name+' suspended its reoccupation support guarantee following the Earth conflict. The settlement must seek alternative aid.'});
  }
  if(!guaranteeSuspended&&state.survivalBreachRecorded){
   state.survivalBreachRecorded=false;
-  record(w,{sol,kind:'survival-guarantee-restored',description:sponsor.name+' restored the founding survival guarantee.'});
+  record(w,{sol,kind:'survival-guarantee-restored',description:sponsor.name+' restored the reoccupation support guarantee.'});
  }
  for(const c of state.commitments){
   if(c.status!=='active')continue;
@@ -139,7 +139,7 @@ export function processSponsorCommitments(w,sol,events=[]){
    const sourceId=alternative?'earth:'+alternative.id:'earth:international-relief';
    const appeal={id:'external-appeal-'+state.nextId++,openedSol:sol,good,status:'in-transit',source:sourceName,sourceSponsorId:alternative?.id??null,amount:good==='food'?45:good==='components'?8:good==='machinery'?5:4,arrivalSol:sol+240};
    state.externalAppeals.push(appeal);
-   const ship=createSponsorShipment(w,home,good,appeal.amount,sol,'external-humanitarian-aid',sourceId,sourceName+' dispatched '+appeal.amount+' units of '+good+' after the founding sponsor guarantee was suspended; estimated arrival in 240 sols.');
+   const ship=createSponsorShipment(w,home,good,appeal.amount,sol,'external-humanitarian-aid',sourceId,sourceName+' dispatched '+appeal.amount+' units of '+good+' after the reoccupation sponsor guarantee was suspended; estimated arrival in 240 sols.');
    if(ship){ship.kind='external-humanitarian-aid';ship.externalAppealId=appeal.id;events.push({type:'external-aid-appeal',sol,description:'The colony appealed to '+sourceName+' for emergency '+good+' supplies; estimated arrival in 240 sols.'});}
   }
  }
