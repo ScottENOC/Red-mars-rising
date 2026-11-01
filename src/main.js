@@ -54,7 +54,16 @@ let lastIceSolarLongitude = -1;
 
 // Mission timeline: the first crew leaves Earth in late 2026 and arrives in July 2027.
 const MISSION_ARRIVAL_UTC = Date.UTC(2027, 6, 22, 0);
-const ARRIVAL_LOCAL_SOL_SECONDS = 9 * 3600;
+const EARLY_MORNING_SOL_SECONDS = 7.5 * 3600;
+let ARRIVAL_LOCAL_SOL_SECONDS = EARLY_MORNING_SOL_SECONDS;
+let selectedColonyLongitude = 0;
+function setArrivalSolarTimeForSite(site) {
+ if (!site || !Number.isFinite(site.lon)) return;
+ selectedColonyLongitude = site.lon;
+ // Keep the selected landing site at 07:30 LMST while the lighting model
+ // continues to use the Mars prime-meridian solar time.
+ ARRIVAL_LOCAL_SOL_SECONDS = ((EARLY_MORNING_SOL_SECONDS - site.lon / 360 * MARS_SOL_SECONDS) % MARS_SOL_SECONDS + MARS_SOL_SECONDS) % MARS_SOL_SECONDS;
+}
 const MARS_SOL_SECONDS = 88775.244;
 let elapsedGameSeconds = Math.max(0, Number(window.__RMR_LOADED_SAVE?.elapsedGameSeconds) || 0);
 let clockRunning = false;
@@ -161,9 +170,21 @@ function refreshCharacterDetails(){
 [majorSelect,minorSelect,backgroundSelect,expertiseSelect].forEach(el=>el.addEventListener('change',refreshCharacterDetails));refreshCharacterDetails();
 const campaignPanel=document.createElement('section');campaignPanel.id='campaignPanel';campaignPanel.hidden=true;document.querySelector('#app').appendChild(campaignPanel);
 const managementNav=document.querySelector('#managementNav');
-document.querySelector('#navColony').addEventListener('click',()=>{campaignPanel.hidden=!campaignPanel.hidden;document.querySelector('#navColony').classList.toggle('active',!campaignPanel.hidden);});
-document.querySelector('#navExplore').addEventListener('click',()=>{landmarksMenu.hidden=!landmarksMenu.hidden;document.querySelector('#navExplore').classList.toggle('active',!landmarksMenu.hidden);});
-document.querySelector('#navEnvironment').addEventListener('click',()=>{dataMenu.hidden=!dataMenu.hidden;document.querySelector('#navEnvironment').classList.toggle('active',!dataMenu.hidden);});
+const colonyNavButton=document.querySelector('#navColony');
+const mapToolbar=document.querySelector('.toolbar');
+colonyNavButton.className='tool';
+colonyNavButton.innerHTML='<span class="sym">⌂</span>Colony';
+colonyNavButton.hidden=!worldState.campaign.started;
+mapToolbar.insertBefore(colonyNavButton,document.querySelector('#labelsBtn'));
+managementNav.hidden=true;
+document.querySelector('#navExplore').remove();
+document.querySelector('#navEnvironment').remove();
+mapToolbar.insertAdjacentHTML('beforeend','');
+const labelsButton=document.querySelector('#labelsBtn');
+const dataButton=document.querySelector('#dataBtn');
+function setCampaignMapLabels(){labelsButton.innerHTML='<span class="sym">⌖</span>Explore';dataButton.innerHTML='<span class="sym">ⓘ</span>World data';}
+if(worldState.campaign.started)setCampaignMapLabels();
+colonyNavButton.addEventListener('click',()=>{campaignPanel.hidden=!campaignPanel.hidden;colonyNavButton.classList.toggle('active',!campaignPanel.hidden);});
 function buildHabitatComponentReport(){
  const project=worldState.infrastructure.projects.find(p=>p.id==='buried-habitat');
  if(!project)return '';
@@ -350,11 +371,13 @@ function beginSelectedCampaign(){
  if(worldState.campaign.started)return;
  if(majorSelect.value===minorSelect.value){notify('Choose two different ideological traditions.');return;}
  const playerOptions={majorIdeology:majorSelect.value,minorIdeology:minorSelect.value,background:backgroundSelect.value,secondaryExpertise:expertiseSelect.value||null};
- const {site,sponsor}=startCampaign(worldState,siteSelect.value,sponsorSelect.value,playerOptions);
+ const selectedSite=STARTING_LOCATIONS.find(item=>item.id===siteSelect.value);
+  setArrivalSolarTimeForSite(selectedSite);
+  const {site,sponsor}=startCampaign(worldState,siteSelect.value,sponsorSelect.value,playerOptions);
  locations.colony={name:worldState.settlements[0].name,lat:site.lat,lon:site.lon,zoom:.15,description:'The first settlement at '+site.name+'. Five years of expedition supplies are committed to this site.'};
  const colonyNav=document.querySelector('[data-place="colony"] .place-name');if(colonyNav)colonyNav.textContent=worldState.settlements[0].name+' · First colony';
  const jezeroNav=document.querySelector('[data-place="jezero"]');if(jezeroNav&&site.id==='jezero')jezeroNav.querySelector('.place-name').textContent='Jezero Crater · First colony';
- campaignStart.hidden=true;campaignPanel.hidden=true;managementNav.hidden=false;
+ campaignStart.hidden=true;campaignPanel.hidden=true;managementNav.hidden=true;colonyNavButton.hidden=false;setCampaignMapLabels();
  clockRunning=true;document.querySelector('#mcPlay').textContent='Ⅱ PAUSE';
  if(terrainReady&&!colonyLogistics)colonyLogistics=createColonyAndLogistics(THREE,{root,scene,worldState,terrainRadiusOffset,notify});
  if(site.id==='elysium'||site.id==='arcadia')notify('Expedition landed at '+site.name+' · '+sponsor.name+' sponsorship');
@@ -433,7 +456,7 @@ function updateMissionClock(deltaSeconds) {
     document.querySelector('#meanTemp').textContent=(temp<0?'−':'')+Math.abs(temp).toFixed(12)+'°C';
   }
   const missionDate = new Date(MISSION_ARRIVAL_UTC + elapsedGameSeconds * 1000);
-  const localSolTime = ((ARRIVAL_LOCAL_SOL_SECONDS + elapsedGameSeconds) % MARS_SOL_SECONDS + MARS_SOL_SECONDS) % MARS_SOL_SECONDS;
+  const localSolTime = ((ARRIVAL_LOCAL_SOL_SECONDS + selectedColonyLongitude / 360 * MARS_SOL_SECONDS + elapsedGameSeconds) % MARS_SOL_SECONDS + MARS_SOL_SECONDS) % MARS_SOL_SECONDS;
   const hour = Math.floor(localSolTime / 3600);
   const minute = Math.floor((localSolTime % 3600) / 60);
   const solNumber = Math.floor(elapsedGameSeconds / MARS_SOL_SECONDS) + 1;
