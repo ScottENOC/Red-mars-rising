@@ -265,6 +265,7 @@ function renderCampaignPanel(){
  const majorIdeology=IDEOLOGIES.find(x=>x.id===player.majorIdeology);
  const minorIdeology=IDEOLOGIES.find(x=>x.id===player.minorIdeology);
  const homePolitics=getColonyPoliticalSummary(worldState,home);
+ const orbitalSummary=getAsteroidOperationsSummary(worldState);
  const tempAnomaly=worldState.climate.energyBalance.temperatureAnomalyC??0;
  const materials=worldState.materials;
  const colonyStock=materials?.colonies?.[home.id];
