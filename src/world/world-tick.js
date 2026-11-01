@@ -6,6 +6,7 @@ import { ensureColonyEconomies, processColonyEconomies } from './colony-economy.
 import { ensureColonySecurity, processColonySecurity } from './colony-security.js';
 import { ensureSettlementInfrastructureAssets, processOxygenGenerators, processNonPrimaryColonyMetabolism } from './infrastructure-services.js';
 import { ensureSettlementLifecycle, updateSettlementLifecycleFromPopulation } from './settlement-lifecycle.js';
+import { processSettlementWelfare } from './settlement-welfare.js';
 
 const MARS_RADIUS_M = 3_389_500;
 const MARS_SURFACE_AREA_M2 = 4 * Math.PI * MARS_RADIUS_M ** 2;
@@ -271,6 +272,7 @@ export function processWorldTick(w) {
   processColonySecurity(w, sol, events);
   processColonyPolitics(w, sol, events);
   recycleColonyWater(w, sol);
+  processSettlementWelfare(w, sol, events);
 
   // Heat is an energy stock in joules relative to the colony's 20 °C reference state.
   // Metabolic and equipment waste heat charge the store; leakage removes energy from it.
