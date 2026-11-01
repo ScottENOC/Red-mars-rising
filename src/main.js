@@ -184,7 +184,7 @@ const labelsButton=document.querySelector('#labelsBtn');
 const dataButton=document.querySelector('#dataBtn');
 function setCampaignMapLabels(){labelsButton.innerHTML='<span class="sym">⌖</span>Explore';dataButton.innerHTML='<span class="sym">ⓘ</span>World data';}
 if(worldState.campaign.started)setCampaignMapLabels();
-colonyNavButton.addEventListener('click',()=>{campaignPanel.hidden=!campaignPanel.hidden;colonyNavButton.classList.toggle('active',!campaignPanel.hidden);});
+colonyNavButton.addEventListener('click',()=>{campaignPanel.hidden=!campaignPanel.hidden;if(!campaignPanel.hidden){landmarksMenu.hidden=true;dataMenu.hidden=true;assetInspector.hidden=true;labelsButton.classList.remove('active');dataButton.classList.remove('active');labelsButton.setAttribute('aria-expanded','false');}colonyNavButton.classList.toggle('active',!campaignPanel.hidden);});
 function buildHabitatComponentReport(){
  const project=worldState.infrastructure.projects.find(p=>p.id==='buried-habitat');
  if(!project)return '';
@@ -877,7 +877,7 @@ siteSelect.addEventListener('change',()=>{if(terrainReady)focusPlace(siteSelect.
 document.querySelectorAll('[data-place]').forEach(el=>el.addEventListener('click',()=>{focusPlace(el.dataset.place);landmarksMenu.hidden=true;labelsBtn.setAttribute('aria-expanded','false');}));
 document.querySelectorAll('[data-moon]').forEach(el=>el.addEventListener('click',()=>{focusMoon(el.dataset.moon);landmarksMenu.hidden=true;labelsBtn.setAttribute('aria-expanded','false');}));
 const landmarksMenu=document.querySelector('#landmarksMenu'),labelsBtn=document.querySelector('#labelsBtn');
-labelsBtn.addEventListener('click',()=>{landmarksMenu.hidden=!landmarksMenu.hidden;labelsBtn.classList.toggle('active',!landmarksMenu.hidden);labelsBtn.setAttribute('aria-expanded',String(!landmarksMenu.hidden));});
+labelsBtn.addEventListener('click',()=>{landmarksMenu.hidden=!landmarksMenu.hidden;if(!landmarksMenu.hidden){campaignPanel.hidden=true;dataMenu.hidden=true;assetInspector.hidden=true;colonyNavButton.classList.remove('active');dataBtn.classList.remove('active');}colonyNavButton.classList.toggle('active',false);labelsBtn.classList.toggle('active',!landmarksMenu.hidden);labelsBtn.setAttribute('aria-expanded',String(!landmarksMenu.hidden));});
 document.querySelector('#closeLandmarks').addEventListener('click',()=>{landmarksMenu.hidden=true;labelsBtn.classList.remove('active');labelsBtn.setAttribute('aria-expanded','false');});
 document.querySelector('#gridBtn').addEventListener('click',e=>{showGrid=!showGrid;gridGroup.visible=showGrid;e.currentTarget.classList.toggle('active',showGrid);});
 const dataMenu=document.querySelector('#dataMenu'),dataBtn=document.querySelector('#dataBtn');
@@ -922,7 +922,7 @@ function showInfrastructureAsset(assetId){
  }
  dataMenu.hidden=true;assetInspector.hidden=false;
 }
-dataBtn.addEventListener('click',()=>{dataMenu.hidden=!dataMenu.hidden;dataBtn.classList.toggle('active',!dataMenu.hidden);});
+dataBtn.addEventListener('click',()=>{dataMenu.hidden=!dataMenu.hidden;if(!dataMenu.hidden){campaignPanel.hidden=true;landmarksMenu.hidden=true;assetInspector.hidden=true;colonyNavButton.classList.remove('active');labelsBtn.classList.remove('active');labelsBtn.setAttribute('aria-expanded','false');}dataBtn.classList.toggle('active',!dataMenu.hidden);});
 document.querySelector('#closeData').addEventListener('click',()=>{dataMenu.hidden=true;dataBtn.classList.remove('active');});
 space.addEventListener('wheel',e=>{e.preventDefault();setZoom(zoom*Math.exp(e.deltaY*.001));}, {passive:false});
 function trackballPoint(clientX,clientY){
