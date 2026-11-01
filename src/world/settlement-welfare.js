@@ -42,8 +42,11 @@ export function processSettlementWelfare(w, sol, events = []) {
     const population = Math.max(0, Number(source.population) || 0);
     if (!population || ['abandoned', 'evacuated'].includes(source.lifecycle?.phase)) continue;
     const runway = resourceRunways(w, source);
-    const worstRunway = Math.min(runway.food, runway.oxygen, runway.water);
+    let worstRunway = Math.min(runway.food, runway.oxygen, runway.water);
     source.welfare ??= {};
+    const powerShortfall = source.kind === 'primary-colony' && Number(w.economy?.powerCapacity) < Number(w.economy?.powerDemand);
+    source.welfare.powerShortfallSols = powerShortfall ? (Number(source.welfare.powerShortfallSols) || 0) + 1 : 0;
+    if (source.welfare.powerShortfallSols >= 10) worstRunway = 0;
     source.welfare.runwaySols = {
       food: Number.isFinite(runway.food) ? Math.round(runway.food) : null,
       oxygen: Number.isFinite(runway.oxygen) ? Math.round(runway.oxygen) : null,
