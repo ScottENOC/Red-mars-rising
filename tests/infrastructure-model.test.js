@@ -278,3 +278,47 @@ test('abandonment cannot be declared while people remain',()=>{
  ensureSettlementLifecycle(w);
  assert.throws(()=>transitionSettlementLifecycle(w,'base','abandoned'),/population remains/);
 });
+
+
+import { processSettlementWelfare } from '../src/world/settlement-welfare.js';
+
+function welfareWorld({relation=70,hostPolicy='consider'}={}) {
+ const source={id:'source',name:'Source Colony',kind:'rival-colony',sponsorId:'esa',population:100,status:'operational',politics:{relations:{host:relation}}};
+ const host={id:'host',name:'Receiving Colony',kind:'rival-colony',sponsorId:'nasa',population:40,status:'operational',health:80,morale:75,refugeePolicy:hostPolicy,politics:{relations:{source:relation}}};
+ const w={time:{sol:10},events:[],settlements:[source,host],colonists:{population:100}};
+ w.materials={colonies:{
+  source:{foodKg:0,gasesKg:{oxygen:10000},waterKg:{tanks:15000}},
+  host:{foodKg:10000,gasesKg:{oxygen:10000},waterKg:{tanks:15000}}
+ }};
+ ensureSettlementLifecycle(w);
+ return w;
+}
+
+test('resource shortages create distress and willing, capable colonies receive refugees',()=>{
+ const w=welfareWorld();
+ const events=[];
+ processSettlementWelfare(w,10,events);
+ assert.equal(w.settlements[0].lifecycle.phase,'distressed');
+ assert.equal(w.settlements[0].population,95);
+ assert.equal(w.settlements[1].population,45);
+ assert.equal(w.settlements[1].welfare.refugeesReceived,5);
+ assert.ok(events.some(event=>event.type==='refugees-relocated'&&event.population===5));
+});
+
+test('colonies do not receive refugees when their relationship is not welcoming',()=>{
+ const w=welfareWorld({relation:50});
+ const events=[];
+ processSettlementWelfare(w,10,events);
+ assert.equal(w.settlements[0].population,100);
+ assert.equal(w.settlements[1].population,40);
+ assert.equal(events.some(event=>event.type==='refugees-relocated'),false);
+});
+
+test('a colony can recover from distress when physical life-support runway improves',()=>{
+ const w=welfareWorld();
+ processSettlementWelfare(w,10,[]);
+ assert.equal(w.settlements[0].lifecycle.phase,'distressed');
+ w.materials.colonies.source.foodKg=10000;
+ processSettlementWelfare(w,11,[]);
+ assert.equal(w.settlements[0].lifecycle.phase,'active');
+});
