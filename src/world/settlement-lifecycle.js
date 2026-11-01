@@ -22,7 +22,7 @@ export function ensureSettlementLifecycle(w){
  }
  return w.settlements;
 }
-export function transitionSettlementLifecycle(w,id,nextPhase,{reason='Conditions changed.',actorId=null,sol=solNow(w)}={}){
+export function transitionSettlementLifecycle(w,id,nextPhase,{reason='Conditions changed.',actorId=null,sol=solNow(w),population=null,sponsorId=null}={}){
  if(!PHASES.has(nextPhase))throw new Error('Unknown settlement lifecycle phase: '+nextPhase);
  ensureSettlementLifecycle(w);
  const s=(w.settlements??[]).find(x=>x.id===id);
@@ -31,10 +31,13 @@ export function transitionSettlementLifecycle(w,id,nextPhase,{reason='Conditions
  if(previous===nextPhase)return {ok:true,changed:false,settlement:s};
  if(!TRANSITIONS[previous]?.has(nextPhase))throw new Error('Invalid settlement lifecycle transition: '+previous+' -> '+nextPhase);
  if(nextPhase==='abandoned'&&Number(s.population)>0)throw new Error('A settlement cannot be abandoned while its population remains.');
+ const isReoccupation=nextPhase==='active'&&['abandoned','evacuated'].includes(previous);
+ if(isReoccupation&&!(Number(population)>0))throw new Error('Reoccupation requires a positive arriving population.');
+ if(isReoccupation){s.population=Math.floor(Number(population));if(sponsorId)s.sponsorId=sponsorId;}
  if(nextPhase==='evacuated')s.population=0;
  state.phase=nextPhase;state.sinceSol=sol;state.lastReason=reason;
  if(['abandoned','evacuated'].includes(nextPhase)){const occupation=state.occupations.at(-1);if(occupation&&occupation.endSol==null){occupation.endSol=sol;occupation.status=nextPhase;}}
- if(nextPhase==='active'&&['abandoned','evacuated'].includes(previous))state.occupations.push({sponsorId:s.sponsorId??null,startSol:sol,endSol:null,status:'active',reoccupation:true});
+ if(isReoccupation)state.occupations.push({sponsorId:s.sponsorId??null,startSol:sol,endSol:null,status:'active',reoccupation:true,population:s.population});
  s.status=STATUS[nextPhase];
  if(s.kind==='primary-colony'&&['abandoned','evacuated'].includes(nextPhase)&&w.colonists)w.colonists.population=0;
  addHistory(state,{phase:nextPhase,previousPhase:previous,sol,reason,actorId});

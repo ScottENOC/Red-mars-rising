@@ -258,10 +258,19 @@ test('evacuation remains distinct from population-loss abandonment and later occ
  transitionSettlementLifecycle(w,'base','evacuated',{reason:'The crew was evacuated.'});
  assert.equal(w.settlements[0].lifecycle.phase,'evacuated');
  assert.equal(w.settlements[0].lifecycle.occupations[0].status,'evacuated');
- transitionSettlementLifecycle(w,'base','active',{reason:'A later expedition has reoccupied the site.',sol:400});
+ transitionSettlementLifecycle(w,'base','active',{reason:'A later expedition has reoccupied the site.',sol:400,population:24,sponsorId:'esa'});
  assert.equal(w.settlements[0].lifecycle.phase,'active');
  assert.equal(w.settlements[0].lifecycle.occupations.length,2);
+ assert.equal(w.settlements[0].population,24);
+ assert.equal(w.settlements[0].sponsorId,'esa');
+ assert.equal(w.settlements[0].lifecycle.occupations[1].sponsorId,'esa');
  assert.equal(w.infrastructure.assets[0].status,'operational');
+});
+
+test('reoccupation requires an arriving population',()=>{
+ const w={time:{sol:1},settlements:[{id:'base',population:0,status:'abandoned'}]};
+ ensureSettlementLifecycle(w);
+ assert.throws(()=>transitionSettlementLifecycle(w,'base','active'),/positive arriving population/);
 });
 
 test('abandonment cannot be declared while people remain',()=>{
