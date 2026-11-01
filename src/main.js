@@ -179,7 +179,6 @@ mapToolbar.insertBefore(colonyNavButton,document.querySelector('#labelsBtn'));
 managementNav.hidden=true;
 document.querySelector('#navExplore').remove();
 document.querySelector('#navEnvironment').remove();
-mapToolbar.insertAdjacentHTML('beforeend','');
 const labelsButton=document.querySelector('#labelsBtn');
 const dataButton=document.querySelector('#dataBtn');
 function setCampaignMapLabels(){labelsButton.innerHTML='<span class="sym">⌖</span>Explore';dataButton.innerHTML='<span class="sym">ⓘ</span>World data';}
