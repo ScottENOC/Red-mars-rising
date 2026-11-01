@@ -101,7 +101,7 @@ campaignStyle.textContent=`
 .cs-note{max-width:470px;color:#8f979c;font-size:11px;line-height:1.5}
 #csStart{border:1px solid #d87957;background:#3a2119;padding:13px 18px;color:#ffe6d8;font-size:11px;letter-spacing:.13em;text-transform:uppercase;white-space:nowrap}
 #csStart:disabled{opacity:.45}
-#campaignPanel{position:absolute;z-index:4;left:clamp(14px,3vw,38px);top:clamp(150px,22vh,220px);width:min(300px,calc(100vw - 28px));max-height:52vh;overflow:auto;background:#0b1018ed;border:1px solid #ffffff24;backdrop-filter:blur(16px);padding:14px;box-shadow:0 14px 42px #0006}
+#campaignPanel{position:absolute;z-index:9;left:clamp(14px,3vw,38px);top:clamp(150px,22vh,220px);width:min(300px,calc(100vw - 28px));min-height:180px;max-height:52vh;overflow:auto;background:#0b1018ed;border:1px solid #ffffff24;backdrop-filter:blur(16px);padding:14px;box-shadow:0 14px 42px #0006}
 #campaignPanel[hidden]{display:none}
 .cp-heading{display:flex;justify-content:space-between;gap:8px;color:#d9c2b3;font-size:10px;letter-spacing:.16em;text-transform:uppercase;margin-bottom:8px}
 .cp-metrics{font-size:11px;line-height:1.65;color:#aeb4b7;border-bottom:1px solid #ffffff18;padding-bottom:9px;margin-bottom:8px}
@@ -258,6 +258,7 @@ function buildColonyEconomyReport(){
 }
 function renderCampaignPanel(){
  if(!worldState.campaign.started)return;
+ try {
  const sponsor=worldState.sponsors.find(x=>x.id===worldState.campaign.startingSponsorId);
  const home=worldState.settlements.find(x=>x.kind==='primary-colony');
  const player=worldState.campaign.playerCharacter??createPlayerCharacter();
@@ -307,7 +308,22 @@ function renderCampaignPanel(){
  '<div class="cp-project"><strong>Campaign save</strong><small id="saveStatusText">'+saveStatus+'</small><button data-save-now="1">Save now</button></div>';
  saveStatusElement=campaignPanel.querySelector('#saveStatusText');
 }
-campaignPanel.addEventListener('change',event=>{
+ } catch(error) {
+  console.error('Colony management panel failed to render',error);
+  campaignPanel.replaceChildren();
+  const heading=document.createElement('div');
+  heading.className='cp-heading';
+  heading.textContent='Colony operations · panel error';
+  const message=document.createElement('p');
+  message.style.cssText='font-size:12px;line-height:1.5;color:#e0b49e;overflow-wrap:anywhere';
+  message.textContent='The management data could not be displayed. '+(error?.message??String(error));
+  const detail=document.createElement('p');
+  detail.style.cssText='font-size:10px;line-height:1.5;color:#aeb4b7';
+  detail.textContent='The campaign is still in memory. Please send this error text so the underlying save-data or rendering issue can be fixed.';
+  campaignPanel.append(heading,message,detail);
+ }
+ }
+ campaignPanel.addEventListener('change',event=>{
  const recipeSelect=event.target.closest('[data-project-recipe]');
  if(!recipeSelect)return;
  const project=worldState.infrastructure.projects.find(p=>p.id===recipeSelect.dataset.projectRecipe);
