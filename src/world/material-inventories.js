@@ -49,9 +49,23 @@ export function createMaterialInventories() {
   };
 }
 
+function cloneInventoryDefault(value){
+  if(Array.isArray(value))return value.map(cloneInventoryDefault);
+  if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).map(([key,item])=>[key,cloneInventoryDefault(item)]));
+  return value;
+}
+function fillMissingInventoryFields(target,defaults){
+  for(const [key,value] of Object.entries(defaults)){
+    if(target[key]===undefined||target[key]===null)target[key]=cloneInventoryDefault(value);
+    else if(value&&typeof value==='object'&&!Array.isArray(value)&&target[key]&&typeof target[key]==='object'&&!Array.isArray(target[key]))fillMissingInventoryFields(target[key],value);
+  }
+}
 export function ensureMaterialInventories(w) {
   w.materials??=createMaterialInventories();
   const m=w.materials;
+  // Saves from earlier prototypes may contain a partial material schema. Merge
+  // missing nested fields without overwriting any stocks already recorded.
+  fillMissingInventoryFields(m,createMaterialInventories());
   m.colonies??={};m.inTransitFoodKg??=0;m.siteDeposits??={};m.ledger??=[];m.energy??={electricityConsumedKWh:0,heatReleasedKWh:0};
   for(const stock of Object.values(m.planetary.waterKg??{}))stock.compensation??=0;
   m.externalFlows??={importedWaterKg:0,exportedWaterKg:0,meteoroidMatterKg:0};
