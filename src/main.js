@@ -173,7 +173,9 @@ const managementNav=document.querySelector('#managementNav');
 const colonyNavButton=document.querySelector('#navColony');
 const mapToolbar=document.querySelector('.toolbar');
 colonyNavButton.className='tool';
-colonyNavButton.innerHTML='<span class="sym">⌂</span>Colony';
+colonyNavButton.innerHTML='<span class="sym" aria-hidden="true">⌂</span><span class="tool-label">Colony</span>';
+colonyNavButton.setAttribute('aria-label','Colony management');
+colonyNavButton.title='Colony management';
 colonyNavButton.hidden=!worldState.campaign.started;
 mapToolbar.insertBefore(colonyNavButton,document.querySelector('#labelsBtn'));
 managementNav.hidden=true;
@@ -181,7 +183,7 @@ document.querySelector('#navExplore').remove();
 document.querySelector('#navEnvironment').remove();
 const labelsButton=document.querySelector('#labelsBtn');
 const dataButton=document.querySelector('#dataBtn');
-function setCampaignMapLabels(){labelsButton.innerHTML='<span class="sym">⌖</span>Explore';dataButton.innerHTML='<span class="sym">ⓘ</span>World data';}
+function setCampaignMapLabels(){labelsButton.innerHTML='<span class="sym" aria-hidden="true">⌖</span><span class="tool-label">Explore</span>';labelsButton.setAttribute('aria-label','Explore landmarks');labelsButton.title='Explore landmarks';dataButton.innerHTML='<span class="sym" aria-hidden="true">ⓘ</span><span class="tool-label">Data</span>';dataButton.setAttribute('aria-label','World data');dataButton.title='World data';}
 if(worldState.campaign.started)setCampaignMapLabels();
 colonyNavButton.addEventListener('click',()=>{campaignPanel.hidden=!campaignPanel.hidden;if(!campaignPanel.hidden){landmarksMenu.hidden=true;dataMenu.hidden=true;assetInspector.hidden=true;labelsButton.classList.remove('active');dataButton.classList.remove('active');labelsButton.setAttribute('aria-expanded','false');}colonyNavButton.classList.toggle('active',!campaignPanel.hidden);});
 function buildHabitatComponentReport(){
