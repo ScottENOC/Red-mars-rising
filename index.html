@@ -16,7 +16,7 @@
 
 #managementNav{position:absolute;z-index:7;left:50%;bottom:calc(12px + env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;gap:4px;padding:5px;background:#0b1018e8;border:1px solid #ffffff25;backdrop-filter:blur(16px);box-shadow:0 12px 40px #0007}#managementNav[hidden]{display:none}.ground-mode #managementNav{display:none!important}#managementNav button{min-width:76px;border:1px solid transparent;background:transparent;color:#c9c4be;padding:8px 10px;font-size:16px}#managementNav button span{display:block;font-size:8px;letter-spacing:.1em;text-transform:uppercase;margin-top:3px}#managementNav button:active,#managementNav button.active{background:#d0a0841a;border-color:#c78b6d5c;color:#f0c1a5}@media(max-width:390px){#managementNav{width:calc(100% - 20px);justify-content:space-around}#managementNav button{min-width:0;flex:1;padding:7px 4px}}
 #globeCompass[hidden]{display:none}#globeCompass{position:absolute;z-index:5;top:calc(82px + env(safe-area-inset-top));left:18px;width:64px;height:64px;border:1px solid #ffffff40;border-radius:50%;background:#0b1018a8;backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:1;transition:opacity .35s}#globeCompass[hidden]{display:none}#globeCompass .gc-label{position:absolute;top:5px;font:12px Georgia,serif;color:#f2c3a8}#globeCompass .gc-needle{width:2px;height:23px;background:linear-gradient(to bottom,#f1b08d 0 50%,#d8d1c8 50% 100%);transform-origin:50% 50%;clip-path:polygon(50% 0,100% 50%,58% 50%,58% 100%,42% 100%,42% 50%,0 50%)}#globeCompass .gc-caption{position:absolute;top:68px;white-space:nowrap;font-size:7px;letter-spacing:.12em;color:#d1c8be}@media(max-width:500px){#globeCompass{top:calc(70px + env(safe-area-inset-top));left:12px;transform:scale(.88);transform-origin:top left}}.ground-mode #globeCompass{display:none!important}@media(min-width:761px){.toolbar #navColony{min-width:0;padding:10px 13px}.toolbar #navColony span{display:inline;font-size:14px;margin:0 7px 0 0}}@media(max-width:760px){.toolbar #navColony{min-width:0;padding:10px 9px}.toolbar #navColony span{display:inline;font-size:14px;margin:0 4px 0 0}}
-@media(max-width:760px){.toolbar{overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}.toolbar::-webkit-scrollbar{display:none}.toolbar .tool{flex:0 0 auto}}
+@media(max-width:760px){.toolbar{overflow:visible;width:max-content;max-width:calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right));justify-content:center;gap:3px;left:50%;right:auto;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom));padding:4px}.toolbar .tool{flex:0 0 42px;width:42px;min-width:42px;height:42px;padding:0;display:flex;align-items:center;justify-content:center;font-size:0;letter-spacing:0}.toolbar .tool .sym{display:block;margin:0;font-size:19px;line-height:1}.toolbar .tool-label{display:none}}@media(max-width:360px){.toolbar{gap:1px;padding:3px}.toolbar .tool{flex-basis:40px;width:40px;min-width:40px;height:40px}}
 </style>
 </head>
 <body>
@@ -51,10 +51,10 @@
   </section>
 
   <nav class="toolbar" aria-label="Globe controls">
-    <button class="tool" id="labelsBtn" aria-expanded="false" aria-controls="landmarksMenu"><span class="sym">⌖</span>Landmarks</button>
-    <button class="tool" id="gridBtn"><span class="sym">⊞</span>Grid</button>
-    <button class="tool" id="dataBtn"><span class="sym">ⓘ</span>Data</button>
-    <button class="tool" id="groundViewBtn">Ground view</button>
+    <button class="tool" id="labelsBtn" title="Explore landmarks" aria-label="Explore landmarks" aria-expanded="false" aria-controls="landmarksMenu"><span class="sym" aria-hidden="true">⌖</span><span class="tool-label">Explore</span></button>
+    <button class="tool" id="gridBtn" title="Toggle map grid" aria-label="Toggle map grid"><span class="sym" aria-hidden="true">⊞</span><span class="tool-label">Grid</span></button>
+    <button class="tool" id="dataBtn" title="World data" aria-label="World data"><span class="sym" aria-hidden="true">ⓘ</span><span class="tool-label">Data</span></button>
+    <button class="tool" id="groundViewBtn" title="Enter ground view" aria-label="Enter ground view"><span class="sym" aria-hidden="true">◉</span><span class="tool-label">Ground view</span></button>
   </nav>
   <div class="map-note" id="mapScaleLabel" style="top:125px">PLANETARY VIEW</div>
   <section id="groundHud" aria-live="polite">
