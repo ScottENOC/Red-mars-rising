@@ -5,6 +5,7 @@ import { ensureColonyPoliticalState, processColonyPolitics } from './colony-poli
 import { ensureColonyEconomies, processColonyEconomies } from './colony-economy.js';
 import { ensureColonySecurity, processColonySecurity } from './colony-security.js';
 import { ensureSettlementInfrastructureAssets, processOxygenGenerators, processNonPrimaryColonyMetabolism } from './infrastructure-services.js';
+import { ensureSettlementLifecycle, updateSettlementLifecycleFromPopulation } from './settlement-lifecycle.js';
 
 const MARS_RADIUS_M = 3_389_500;
 const MARS_SURFACE_AREA_M2 = 4 * Math.PI * MARS_RADIUS_M ** 2;
@@ -25,6 +26,7 @@ export function processWorldTick(w) {
   const sol = ++w.time.sol;
   const events = [];
   ensureMaterialInventories(w);
+  ensureSettlementLifecycle(w);
   ensureSettlementInfrastructureAssets(w);
   ensureColonyPoliticalState(w);
   ensureColonyEconomies(w);
@@ -313,6 +315,7 @@ export function processWorldTick(w) {
   w.time.lastProcessedSol = sol;
   w.time.solOfYear = ((sol - 1) % 669) + 1;
   for (const event of events) w.events.push({...event,sol});
+  updateSettlementLifecycleFromPopulation(w,sol,events);
   return events;
 }
 

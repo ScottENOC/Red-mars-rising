@@ -158,7 +158,7 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
     markerGroup.add(ring);
     colonyMarkers.push(markerGroup);
     settlementPickTargets.push(marker);
-    return { settlement, group, markerGroup };
+    return { settlement, group, markerGroup, marker, ring };
   }
 
   const builtSettlements = settlements.map(buildSettlement);
@@ -367,9 +367,15 @@ export function createColonyAndLogistics(THREE, { root, scene, worldState, terra
     syncPermanentCraters();
     const detailVisible = zoom < 1.6;
     const markerVisible = zoom >= 1.6 && zoom < 8.5;
-    for (const { group, markerGroup } of builtSettlements) {
+    for (const { settlement, group, markerGroup, marker, ring } of builtSettlements) {
       group.visible = detailVisible;
       markerGroup.visible = markerVisible;
+      const phase = settlement.lifecycle?.phase ?? (settlement.status === 'failed' ? 'abandoned' : settlement.status ?? 'active');
+      const colour = phase === 'abandoned' ? 0x777b80 : phase === 'evacuated' ? 0x8b9ba8 : phase === 'distressed' ? 0xe3a34e : 0xf1b08d;
+      marker.material.color.set(colour);
+      ring.material.color.set(colour);
+      ring.material.opacity = phase === 'abandoned' ? 0.45 : phase === 'distressed' ? 1 : 0.8;
+      marker.userData.status = phase;
     }
     for (const road of routeMeshes) road.visible = zoom < 8.5;
     const logisticsVisible = zoom > 8.5;

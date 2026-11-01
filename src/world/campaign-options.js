@@ -1,7 +1,7 @@
 import { createMaterialInventories, ensureMaterialInventories, checkMaterialConservation } from './material-inventories.js';
 import { ensureColonyPoliticalState } from './colony-politics.js';
 import { createPlayerCharacter } from './player-character.js';
-import { ensureSettlementInfrastructureAssets } from './infrastructure-services.js';
+import { ensureSettlementLifecycle } from './settlement-lifecycle.js';
 export const STARTING_LOCATIONS = [
  {id:'elysium',name:'Elysium Planitia',lat:4.5,lon:154.5,terrain:'Open volcanic plain',climate:'Near-equatorial; relatively favourable solar and thermal conditions',water:'Moderate prospects; accessible ice is less dependable than northern mid-latitudes',construction:'Easy',security:'Exposed',opportunity:'Best long-term candidate for an equatorial space-elevator programme.',heatDemand:.85,waterAccess:.55,buildEase:.9,vulnerability:.8,elevationKm:-1.5},
  {id:'arcadia',name:'Arcadia Planitia',lat:46.7,lon:164,terrain:'Broad northern plains',climate:'Colder, with greater seasonal variation',water:'Strong prospects for accessible buried water ice',construction:'Easy to moderate',security:'Exposed',opportunity:'Water extraction can reduce Earth dependence for life support and propellant.',heatDemand:1.2,waterAccess:.9,buildEase:.85,vulnerability:.8,elevationKm:-3},
@@ -74,9 +74,8 @@ export function startCampaign(w,locationId,sponsorId,playerOptions={}) {
  if(w.logistics?.plannedCargoDrops) for(const drop of w.logistics.plannedCargoDrops){const target=SHORTLISTED_SITES.find(x=>x.id===drop.siteId);if(target){drop.lat=target.lat;drop.lon=target.lon;}}
  for(const poi of (w.pointsOfInterest??[])) poi.compromised=false;
  w.sponsors=SPONSORS.map(s=>({...s,patience:s.patience,relationship:s.id===sponsor.id?75:(sponsor.relations?.[s.id]??s.relations?.[sponsor.id]??(s.type==='corporate'?45:50)),status:'active',colonyFounded:false}));
- w.colonists.population=12;w.colonists.health=74;w.colonists.morale=48;w.colonists.cumulativeWork=0;
- w.economy.water=12;w.economy.powerCapacity=90;w.economy.powerDemand=72;
- w.settlements=[{id:'first-colony',name:site.id==='jezero'?'Jezero Base':site.name+' Settlement',kind:'primary-colony',scenarioRole:'reoccupied-settlement',locationId:site.id,lat:site.lat,lon:site.lon,terrainType:site.terrain,population:w.colonists.population,status:'operational',sponsorId:sponsor.id,abandonment:{status:'previous-inhabitants-died-out',cause:'unknown',history:'The previous inhabitants died out. The circumstances have not yet been established.'},initialLifeSupport:{foodKg:500,waterKg:12000,oxygenKg:900},infrastructure:['habitats','landing-pad','greenhouse','power-array','oxygen-generator','laboratory','workshop','rovers'],infrastructureCondition:{habitats:{status:'operational',integrity:.72,note:'Pressure boundary holding; seals and environmental controls require inspection.'},'landing-pad':{status:'degraded',integrity:.58,note:'Surface access remains usable, but markings and handling equipment are damaged.'},greenhouse:{status:'disabled',integrity:.24,note:'Unpressurised and no longer producing food.'},'power-array':{status:'degraded',integrity:.43,note:'Several strings are offline; generation is intermittent.'},'oxygen-generator':{status:'disabled',integrity:.36,capacityOxygenKgPerSol:10,note:'Electrolyser is present but unavailable pending inspection and repair.'},laboratory:{status:'abandoned',integrity:.12,note:'Scientific equipment has been left without maintenance.'},workshop:{status:'damaged',integrity:.39,note:'Workshop structure survives; fabrication equipment condition is unknown.'},rovers:{status:'disabled',integrity:.31,note:'Vehicles remain on site but are not currently serviceable.'}},siteModifiers:{heatDemand:site.heatDemand,waterAccess:site.waterAccess,buildEase:site.buildEase,vulnerability:site.vulnerability,elevationKm:site.elevationKm}}];
+ w.settlements=[{id:'first-colony',name:site.id==='jezero'?'Jezero Base':site.name+' Base',kind:'primary-colony',locationId:site.id,lat:site.lat,lon:site.lon,terrainType:site.terrain,population:w.colonists.population,status:'operational',sponsorId:sponsor.id,infrastructure:['habitats','landing-pad','greenhouse','power-array','laboratory','workshop','rovers'],siteModifiers:{heatDemand:site.heatDemand,waterAccess:site.waterAccess,buildEase:site.buildEase,vulnerability:site.vulnerability,elevationKm:site.elevationKm}}];
+ ensureSettlementLifecycle(w);
  w.infrastructure.projects=[
   {id:'ice-survey',name:'Subsurface ice survey',category:'science',cost:{funds:35,materials:8},durationSols:18,remainingSols:18,progress:0,status:'available',description:'Survey local ice deposits and reduce uncertainty.'},
   {id:'buried-habitat',name:'Regolith-shielded habitat',category:'infrastructure',cost:{funds:65,materials:22,machinery:8},durationSols:35,remainingSols:35,progress:0,status:'available',description:'Expand habitable space with a choice of imported or locally fabricated structural materials.'},
@@ -86,9 +85,8 @@ export function startCampaign(w,locationId,sponsorId,playerOptions={}) {
  ensureConstructionRecipeOptions(w);
  w.economy.funds+=Math.round(sponsor.support*1.5);w.economy.materials+=Math.round(sponsor.support*.25);
  ensureColonyPoliticalState(w);
- w.materials=createMaterialInventories();ensureMaterialInventories(w);ensureSettlementInfrastructureAssets(w);checkMaterialConservation(w);
- w.events.push({type:'campaign-start',sol:w.time.sol,description:'A twelve-person reoccupation mission arrives at the abandoned settlement at '+site.name+', backed by '+sponsor.name+'.'});
- w.events.push({type:'settlement-reoccupation',sol:w.time.sol,settlementId:'first-colony',description:'The previous inhabitants died out. The cause is unknown; surviving infrastructure and stores must be assessed before the settlement can be made secure.'});
+ w.materials=createMaterialInventories();ensureMaterialInventories(w);checkMaterialConservation(w);
+ w.events.push({type:'campaign-start',sol:w.time.sol,description:'Five-year expedition support begins at '+site.name+', backed by '+sponsor.name+'.'});
  w.events.push({type:'sponsor-system-activated',sol:w.time.sol,description:'All sponsor blocs are active; rival colonies can emerge independently.'});
  return {site,sponsor};
 }

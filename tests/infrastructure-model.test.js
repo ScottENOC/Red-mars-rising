@@ -10,8 +10,6 @@ import {
 import { createMaterialInventories, ensureMaterialInventories, checkMaterialConservation } from '../src/world/material-inventories.js';
 import { ensureSettlementInfrastructureAssets, installOxygenGenerator, processOxygenGenerators, processNonPrimaryColonyMetabolism, getColonyOxygenStatus, deliverInfrastructureEquipmentShipment } from '../src/world/infrastructure-services.js';
 import { processSponsorCommitments } from '../src/world/sponsor-commitments.js';
-import { createInitialWorldState } from '../src/world/world-state.js';
-import { startCampaign, STARTING_LOCATIONS, SPONSORS } from '../src/world/campaign-options.js';
 
 function world(){
   return {
@@ -96,30 +94,6 @@ function campaignWorld(){
   ensureMaterialInventories(w);
   return w;
 }
-
-test('campaign begins by reoccupying an abandoned settlement with a small crew and degraded inherited assets',()=>{
-  const w=createInitialWorldState();
-  startCampaign(w,STARTING_LOCATIONS[2].id,SPONSORS[0].id,{majorIdeology:'sovereignty',minorIdeology:'communitarian',background:'scientist'});
-  const home=w.settlements.find(s=>s.kind==='primary-colony');
-  assert.equal(w.settlements.length,1);
-  assert.equal(home.scenarioRole,'reoccupied-settlement');
-  assert.equal(home.population,12);
-  assert.equal(w.colonists.population,12);
-  assert.equal(home.abandonment.cause,'unknown');
-  assert.equal(w.materials.colonies[home.id].foodKg,500);
-  assert.equal(w.materials.colonies[home.id].waterKg.tanks,12000);
-  assert.equal(w.materials.colonies[home.id].gasesKg.oxygen,900);
-  const assets=new Map(w.infrastructure.assets.map(asset=>[asset.kind,asset]));
-  assert.equal(assets.get('habitats').status,'operational');
-  assert.equal(assets.get('power-array').status,'degraded');
-  assert.equal(assets.get('greenhouse').status,'disabled');
-  assert.equal(assets.get('oxygen-generator').status,'disabled');
-  assert.equal(assets.get('oxygen-generator').capacityOxygenKgPerSol,10);
-  assert.equal(assets.get('laboratory').status,'abandoned');
-  assert.equal(assets.get('workshop').status,'damaged');
-  assert.equal(assets.get('rovers').status,'disabled');
-  assert.ok(w.events.some(event=>event.type==='settlement-reoccupation'));
-});
 
 test('existing settlement infrastructure tags migrate to one shared asset each',()=>{
   const w=campaignWorld();
@@ -245,4 +219,53 @@ test('oxygen generator output is capped by shared power headroom',()=>{
   assert.ok(output[0].oxygenKg>0);
   assert.ok(output[0].oxygenKg<10);
   assert.ok(getColonyOxygenStatus(w,'first-colony').generatorCapacityKgPerSol<10);
+});
+
+import { ensureSettlementLifecycle, transitionSettlementLifecycle, updateSettlementLifecycleFromPopulation } from '../src/world/settlement-lifecycle.js';
+
+test('settlement lifecycle initialises idempotently and records its founding sponsor',()=>{
+ const w={time:{sol:0},settlements:[{id:'base',name:'Jezero Base',kind:'primary-colony',sponsorId:'nasa',population:100,status:'operational'}]};
+ ensureSettlementLifecycle(w);ensureSettlementLifecycle(w);
+ assert.equal(w.settlements[0].lifecycle.phase,'active');
+ assert.equal(w.settlements[0].lifecycle.occupations.length,1);
+ assert.equal(w.settlements[0].lifecycle.occupations[0].sponsorId,'nasa');
+ assert.equal(w.settlements[0].lifecycle.history.length,1);
+});
+
+test('a distressed colony can recover without changing its infrastructure',()=>{
+ const w={time:{sol:12},events:[],settlements:[{id:'base',name:'Base',sponsorId:'nasa',population:80,status:'operational'}],infrastructure:{assets:[{id:'habitat',status:'operational'}]}};
+ ensureSettlementLifecycle(w);
+ transitionSettlementLifecycle(w,'base','distressed',{reason:'Life-support reserves are declining.'});
+ transitionSettlementLifecycle(w,'base','active',{reason:'Life-support restored.'});
+ assert.equal(w.settlements[0].status,'operational');
+ assert.equal(w.infrastructure.assets[0].status,'operational');
+ assert.equal(w.settlements[0].lifecycle.history.length,3);
+});
+
+test('zero population abandons a colony but preserves the settlement and its assets',()=>{
+ const w={time:{sol:30},events:[],settlements:[{id:'base',name:'Base',kind:'primary-colony',sponsorId:'nasa',population:0,status:'operational'}],infrastructure:{assets:[{id:'habitat',ownerId:'base',status:'operational'}]},colonists:{population:100}};
+ updateSettlementLifecycleFromPopulation(w,30,[]);
+ assert.equal(w.settlements.length,1);
+ assert.equal(w.settlements[0].status,'abandoned');
+ assert.equal(w.infrastructure.assets[0].status,'operational');
+ assert.equal(w.infrastructure.assets[0].ownerId,'base');
+ assert.equal(w.colonists.population,0);
+});
+
+test('evacuation remains distinct from population-loss abandonment and later occupation is recorded',()=>{
+ const w={time:{sol:50},events:[],settlements:[{id:'base',name:'Base',kind:'primary-colony',sponsorId:'nasa',population:12,status:'distressed'}],infrastructure:{assets:[{id:'habitat',status:'operational'}]},colonists:{population:12}};
+ ensureSettlementLifecycle(w);
+ transitionSettlementLifecycle(w,'base','evacuated',{reason:'The crew was evacuated.'});
+ assert.equal(w.settlements[0].lifecycle.phase,'evacuated');
+ assert.equal(w.settlements[0].lifecycle.occupations[0].status,'evacuated');
+ transitionSettlementLifecycle(w,'base','active',{reason:'A later expedition has reoccupied the site.',sol:400});
+ assert.equal(w.settlements[0].lifecycle.phase,'active');
+ assert.equal(w.settlements[0].lifecycle.occupations.length,2);
+ assert.equal(w.infrastructure.assets[0].status,'operational');
+});
+
+test('abandonment cannot be declared while people remain',()=>{
+ const w={time:{sol:1},settlements:[{id:'base',population:5,status:'operational'}]};
+ ensureSettlementLifecycle(w);
+ assert.throws(()=>transitionSettlementLifecycle(w,'base','abandoned'),/population remains/);
 });

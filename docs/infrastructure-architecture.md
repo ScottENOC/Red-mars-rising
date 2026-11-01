@@ -33,6 +33,19 @@ The campaign has several existing systems that already own specific mechanics. T
 
 Relationship IDs are deterministic, so repeated normalisation does not create duplicate ownership or operational links. Different roles remain independent: a funder, legal owner, builder, operator, controller, maintainer and occupant can all be different actors.
 
+## Colony lifecycle and reoccupation foundation
+
+Settlement identity persists after population loss. `src/world/settlement-lifecycle.js` stores phase and history on each existing settlement record; it does not create a second settlement registry or delete a site when its population disappears.
+
+- `active` and `distressed` describe an occupied colony; `evacuated` records a successful departure; `abandoned` records a site with no remaining population.
+- A zero-population settlement, or a legacy settlement marked `failed`, transitions to `abandoned` during the world tick. Evacuation remains distinct from deaths.
+- Lifecycle transitions are recorded in settlement history and the world event log. Initial sponsor occupation is retained in occupation history.
+- Infrastructure assets, routes, ownership, funding, operators and location records are not deleted or automatically destroyed when a settlement is abandoned. Asset condition and operational state remain authoritative.
+- A later transition from evacuated or abandoned to active records a subsequent occupation on the same settlement record. Sponsor selection, transport, reoccupation costs and AI decisions are not yet simulated.
+- The map marker reflects active, distressed, evacuated or abandoned state without hiding the physical site.
+
+The initial campaign remains the first-expedition founding scenario: 100 colonists arrive at the selected prepared landing site with the existing founding infrastructure and sponsor support. Reoccupation is a possible later event, not the player's starting scenario.
+
 ## Current scope
 
 The integration now establishes shared identities and relationships, migrates orbital assets, promotes existing settlement capability tags into canonical surface assets, and makes both orbital and surface assets selectable on the map. The inspector reports ownership, funding, construction, operation, control, occupancy, location, condition, dependencies, outputs and relevant activity. Oxygen equipment also exposes reserve, production and estimated runway.
@@ -43,13 +56,18 @@ The earlier prototype included an autonomous hermit-crab relief-outpost loop. Th
 
 The reusable infrastructure model, physical inventories, oxygen-generation service, sponsor obligations and existing freight pipeline remain. Food cargo is represented as physical mass while in transit and on delivery; the economy-unit conversion is defined alongside material inventories rather than in a relief-outpost-specific module. These systems are intended to support the condition, ownership, operation and recovery of infrastructure at an already-established settlement.
 
-The campaign start has now been redirected to reoccupation. The player arrives with twelve new settlers at a settlement that was previously occupied and then abandoned after its inhabitants died out. The cause is unknown. It is not a new-site founding exercise and it is not an aid mission to an active population. The starting manifest includes limited food, water and oxygen, plus inherited infrastructure with deliberately mixed condition: habitats remain operational, power is degraded, the greenhouse and electrolyser are disabled, the laboratory is abandoned, and the workshop and vehicles are damaged or unavailable. These are scenario starting conditions, not yet a complete repair or forensic-investigation system. The first gameplay loop is intended to be arrival, safety assessment, recovery of essential life support and deciding what can be reused.
+The next scenario direction is reoccupation. The player arrives with a small group of new settlers at a settlement that was previously occupied and then abandoned after its inhabitants died. It is not a new-site founding exercise and it is not an aid mission to an active population. The abandoned settlement should retain a legible material and infrastructure history: surviving assets may be operational, degraded, dormant, depleted, damaged or salvageable; life-support stocks and equipment condition must be assessed rather than assumed. The first gameplay loop should be arrival, safety assessment, recovery of essential life support and deciding what can be reused.
 
 The map remains the primary way to understand the settlement: show habitats, power generation, greenhouses, storage, workshops, vehicles, routes and damage in their physical locations. Inspectors should explain condition, dependencies, ownership and recoverability. Menus should not be the only way to discover the state of the place.
 
-The campaign-start flow now creates a reoccupied primary settlement rather than a newly founded colony. Sponsor support is framed as backing the reoccupation mission, rather than founding a new settlement. The current implementation seeds the scenario state and exposes inherited asset condition on the map; it does not yet implement physical repair actions, a forensic investigation of the previous crew's deaths, or a full recovery tutorial. Those are subsequent gameplay systems.
+This is a scenario direction, not yet a completed reoccupation implementation. The current campaign-start flow still creates a newly founded primary colony at a selected site; replacing that flow with an abandoned-settlement start is the next deliberate design and implementation step.
 This is not yet a general-purpose power/water/oxygen network solver. Power availability is gated by the existing colony-wide capacity/shortfall model. Oxygen generators share the remaining colony power headroom, with their kWh-per-sol demand converted to an average kW load; local grid topology and power routing are not yet modelled. Oxygen production is currently a water-electrolysis service, not a model of pressure, partial pressure, leaks, storage tanks or breathable-atmosphere quality. Those are deliberate next steps.
 
 ## Tick integration
 
 The existing one-sol world tick and its current ordering remain authoritative. Infrastructure normalisation and surface-asset registration run during the existing world tick. Oxygen services run within that same tick, using the existing material inventory and one-sol clock. Sponsor equipment deliveries use existing colony freight timing. No second world clock, inventory or shipment system is introduced.
+
+
+## Lifecycle implementation boundaries
+
+The lifecycle model does not yet infer distress from food, water, oxygen, power or political conditions. Existing simulation systems continue to own those conditions; callers can record explicit transitions with `transitionSettlementLifecycle`. Automatic abandonment currently occurs only when no population remains or an existing failure state is detected. Sponsor AI and reoccupation logistics are later work.
