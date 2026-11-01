@@ -307,7 +307,6 @@ function renderCampaignPanel(){
  projectCards+
  '<div class="cp-project"><strong>Campaign save</strong><small id="saveStatusText">'+saveStatus+'</small><button data-save-now="1">Save now</button></div>';
  saveStatusElement=campaignPanel.querySelector('#saveStatusText');
-}
  } catch(error) {
   console.error('Colony management panel failed to render',error);
   campaignPanel.replaceChildren();
