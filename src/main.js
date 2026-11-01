@@ -481,8 +481,6 @@ function marsSolarDeclination(dateMs) {
 
 const initialTemp = worldState.climate.meanSurfaceTemperatureC;
 document.querySelector('#meanTemp').textContent = (initialTemp < 0 ? '−' : initialTemp > 0 ? '+' : '') + Math.abs(initialTemp) + '°C';
-document.querySelector('#meanDiameter').textContent = worldState.planet.meanDiameterKm.toLocaleString('en-US') + ' km';
-document.querySelector('#planetAge').textContent = (worldState.planet.ageYears / 1e9).toFixed(1) + ' billion';
 document.querySelector('#pressure').textContent = worldState.climate.atmosphere.pressurePa + ' Pa';
 const locations={
  olympus:{name:'Olympus Mons',lat:18.65,lon:-133.8,zoom:1.7,description:'A shield volcano rising roughly 22 kilometres above the surrounding plains.'},
@@ -833,7 +831,15 @@ function focusMoon(id){
  document.querySelectorAll('[data-moon]').forEach(el=>el.classList.toggle('active',el.dataset.moon===id));
  notify('Observing '+moonSpecs[id].name+' · close approach view');
 }
-let pointer=null,lastTrackball=null,pointers=new Map(),pinchStart=0,pinchZoom=zoom,lastPinchAngle=null,dragged=false;
+let pointer=null,lastTrackball=null,pointers=new Map(),pinchStart=0,pinchZoom=zoom,pinchStartAngle=null,lastPinchAngle=null,pinchGesture=null,dragged=false;
+const PINCH_GESTURE_DEAD_ZONE_PX=8;
+const PINCH_GESTURE_DOMINANCE=1.4;
+function wrappedAngleDelta(angle,reference){
+ let delta=angle-reference;
+ while(delta>Math.PI)delta-=Math.PI*2;
+ while(delta< -Math.PI)delta+=Math.PI*2;
+ return delta;
+}
 const globeCompass=document.querySelector('#globeCompass');
 let compassHideTimer=null;
 function showGlobeCompass(){
@@ -934,9 +940,78 @@ function trackballPoint(clientX,clientY){
  if(length<=1)return new THREE.Vector3(x,y,Math.sqrt(1-length));
  const scale=1/Math.sqrt(length);return new THREE.Vector3(x*scale,y*scale,0);
 }
-space.addEventListener('pointerdown',e=>{space.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});dragged=false;if(pointers.size===1){pointer=e.pointerId;lastTrackball=trackballPoint(e.clientX,e.clientY);}else if(pointers.size===2){const a=[...pointers.values()];pinchStart=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);pinchZoom=zoom;lastPinchAngle=Math.atan2(a[1].y-a[0].y,a[1].x-a[0].x);lastTrackball=null;showGlobeCompass();}space.classList.add('dragging');});
-space.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2){const a=[...pointers.values()];const dist=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);const angle=Math.atan2(a[1].y-a[0].y,a[1].x-a[0].x);if(pinchStart>0)setZoom(pinchZoom*pinchStart/dist);if(lastPinchAngle!==null){let twist=angle-lastPinchAngle;while(twist>Math.PI)twist-=Math.PI*2;while(twist< -Math.PI)twist+=Math.PI*2;if(Math.abs(twist)>.001){const axis=new THREE.Vector3(0,0,1);const rotation=new THREE.Quaternion().setFromAxisAngle(axis,twist);if(focusedMoon)targetViewRotation.premultiply(rotation).normalize();else targetRotation.premultiply(rotation).normalize();showGlobeCompass();}}lastPinchAngle=angle;dragged=true;return;}if(pointer===e.pointerId){const next=trackballPoint(e.clientX,e.clientY);if(lastTrackball){const delta=new THREE.Quaternion().setFromUnitVectors(lastTrackball,next);if(focusedMoon&&moonObjects[focusedMoon])targetViewRotation.premultiply(delta).normalize();else targetRotation.premultiply(delta).normalize();}lastTrackball=next;if(pointers.size===1)dragged=true;}});
-function endPointer(e){pointers.delete(e.pointerId);if(pointer===e.pointerId){pointer=null;lastTrackball=null;}if(pointers.size<2){pinchStart=0;lastPinchAngle=null;}if(!pointers.size)space.classList.remove('dragging');}
+space.addEventListener('pointerdown',e=>{
+ space.setPointerCapture(e.pointerId);
+ pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+ dragged=false;
+ if(pointers.size===1){
+  pointer=e.pointerId;lastTrackball=trackballPoint(e.clientX,e.clientY);
+ }else if(pointers.size===2){
+  const a=[...pointers.values()];
+  pinchStart=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);
+  pinchZoom=zoom;
+  pinchStartAngle=Math.atan2(a[1].y-a[0].y,a[1].x-a[0].x);
+  lastPinchAngle=pinchStartAngle;
+  pinchGesture=null;
+  lastTrackball=null;
+ }
+ space.classList.add('dragging');
+});
+space.addEventListener('pointermove',e=>{
+ if(!pointers.has(e.pointerId))return;
+ pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+ if(pointers.size===2){
+  const a=[...pointers.values()];
+  const dx=a[1].x-a[0].x,dy=a[1].y-a[0].y;
+  const dist=Math.hypot(dx,dy);
+  const angle=Math.atan2(dy,dx);
+  if(pinchStart>0&&dist>0){
+   // Compare radial separation change with the tangential movement caused by twist.
+   // A 1.4x lead selects the dominant gesture; the initial 8px is a dead zone.
+   const pinchMotion=Math.abs(dist-pinchStart);
+   const rotateMotion=Math.abs(wrappedAngleDelta(angle,pinchStartAngle))*pinchStart/2;
+   const totalMotion=Math.max(pinchMotion,rotateMotion);
+   if(!pinchGesture&&totalMotion>=PINCH_GESTURE_DEAD_ZONE_PX){
+    if(pinchMotion>rotateMotion*PINCH_GESTURE_DOMINANCE)pinchGesture='pinch';
+    else if(rotateMotion>pinchMotion*PINCH_GESTURE_DOMINANCE)pinchGesture='rotate';
+    else if(totalMotion>=PINCH_GESTURE_DEAD_ZONE_PX*2)pinchGesture=pinchMotion>=rotateMotion?'pinch':'rotate';
+    if(pinchGesture==='rotate')lastPinchAngle=angle;
+   }
+   if(pinchGesture==='pinch'){
+    setZoom(pinchZoom*pinchStart/dist);
+   }else if(pinchGesture==='rotate'){
+    const twist=wrappedAngleDelta(angle,lastPinchAngle);
+    if(Math.abs(twist)>.001){
+     const axis=new THREE.Vector3(0,0,1);
+     // Invert the sign so the globe follows the fingers' rotational direction.
+     const rotation=new THREE.Quaternion().setFromAxisAngle(axis,-twist);
+     if(focusedMoon)targetViewRotation.premultiply(rotation).normalize();
+     else targetRotation.premultiply(rotation).normalize();
+     showGlobeCompass();
+    }
+    lastPinchAngle=angle;
+   }
+  }
+  dragged=true;
+  return;
+ }
+ if(pointer===e.pointerId){
+  const next=trackballPoint(e.clientX,e.clientY);
+  if(lastTrackball){
+   const delta=new THREE.Quaternion().setFromUnitVectors(lastTrackball,next);
+   if(focusedMoon&&moonObjects[focusedMoon])targetViewRotation.premultiply(delta).normalize();
+   else targetRotation.premultiply(delta).normalize();
+  }
+  lastTrackball=next;
+  if(pointers.size===1)dragged=true;
+ }
+});
+function endPointer(e){
+ pointers.delete(e.pointerId);
+ if(pointer===e.pointerId){pointer=null;lastTrackball=null;}
+ if(pointers.size<2){pinchStart=0;pinchStartAngle=null;lastPinchAngle=null;pinchGesture=null;}
+ if(!pointers.size)space.classList.remove('dragging');
+}
 space.addEventListener('pointerup',endPointer);space.addEventListener('pointercancel',endPointer);
 space.addEventListener('click',e=>{if(dragged)return;const rect=renderer.domElement.getBoundingClientRect();pointerNdc.x=((e.clientX-rect.left)/rect.width)*2-1;pointerNdc.y=-((e.clientY-rect.top)/rect.height)*2+1;raycaster.setFromCamera(pointerNdc,camera);const hits=raycaster.intersectObjects([...markerGroup.children,...Object.values(moonObjects).map(m=>m.marker),...(zoom>=1.6&&zoom<8.5?(colonyLogistics?.settlementPickTargets??[]):[]),...(zoom>=1.6?(colonyLogistics?.poiPickTargets??[]).filter(p=>p.visible):[]),...(zoom>3.5&&zoom<25?[...orbitalMapObjects.values()].map(o=>o.marker):[]),...(zoom<1.6?[...surfaceInfrastructureObjects.values()].map(o=>o.marker):[]),...(zoom>11.5?(colonyLogistics?.shipPickTargets??[]):[])],false);if(hits.length){const hit=hits[0].object;if(hit.userData.kind==='infrastructure-asset'){showInfrastructureAsset(hit.userData.assetId);}else if(hit.userData.kind==='supply-ship'){notify(hit.userData.cargo+' · inbound · about '+Math.ceil(hit.userData.etaSols??0)+' sols remaining');}else if(hit.userData.kind==='point-of-interest'||hit.userData.kind==='natural-impact-crater'){notify(hit.userData.name+' · '+hit.userData.status+' · '+hit.userData.description);}else if(hit.userData.kind==='settlement')focusPlace('colony');else if(hit.userData.id)focusPlace(hit.userData.id);else for(const [id,m] of Object.entries(moonObjects))if(hit===m.marker){focusMoon(id);break;}}});
 function resize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);}
